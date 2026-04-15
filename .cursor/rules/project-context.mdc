@@ -1,0 +1,29 @@
+---
+description: Project IronFlow context and execution defaults
+alwaysApply: true
+---
+
+# Project Context
+
+- This repo is `rust-based-prefect` (Project IronFlow).
+- Objective: Prefect-compatible orchestration with better deterministic state handling, scale, and static planning.
+- Prefect baseline target is `3.x`, with subset-first compatibility expansion.
+
+# Working Priorities
+
+1. Keep state transition semantics deterministic and idempotent.
+2. Protect benchmark comparability across runs.
+3. Add tests for each compatibility behavior change.
+4. Keep docs aligned with implementation (`README`, `COMPATIBILITY`, `docs/MEMORY_BANK`).
+
+# Validation Checklist
+
+- Run Python tests for shim/planner changes.
+- Run Rust tests for engine changes.
+- Re-run benchmark when runtime/control-plane behavior changes.
+
+# Implementation Guardrails
+
+- Do not claim full Prefect parity unless backed by compatibility matrix and tests.
+- Prefer small, composable changes over large refactors.
+- Maintain clear separation between in-process shim path and HTTP-boundary benchmark path.

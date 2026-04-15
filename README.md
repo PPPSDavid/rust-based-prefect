@@ -31,22 +31,23 @@ Project IronFlow is a hybrid MVP that explores a Rust-based orchestration contro
 - `static-planner/` static graph extraction and forecasting tooling.
 - `docs/` compatibility and benchmark baselines.
 - `scripts/` benchmark / demo scripts.
+- `AGENTS.md` quick background and runbook for future coding agents.
 
 ## Quickstart
 
 1. Create isolated environment:
-   - `mamba env create -f environment.yml` (preferred), or
-   - `conda env create -f environment.yml`
+  - `mamba env create -f environment.yml` (preferred), or
+  - `conda env create -f environment.yml`
 2. Activate:
-   - `conda activate ironflow-dev`
+  - `conda activate ironflow-dev`
 3. Run Python tests:
-   - `python -m pytest python-shim/tests static-planner/tests`
+  - `python -m pytest python-shim/tests static-planner/tests`
 4. Run Rust tests:
-   - `cargo test --manifest-path rust-engine/Cargo.toml`
+  - `cargo test --manifest-path rust-engine/Cargo.toml`
 5. Run performance comparison:
-   - `python benchmarks/compare_prefect_vs_ironflow.py`
-   - Compares `ironflow` (in-process), `ironflow_http` (server boundary), and local `prefect`.
-   - Results are written to `docs/perf_comparison.json`
+  - `python benchmarks/compare_prefect_vs_ironflow.py`
+  - Compares `ironflow` (in-process), `ironflow_http` (server boundary), and local `prefect`.
+  - Results are written to `docs/perf_comparison.json`
 
 ## History Persistence
 
@@ -54,3 +55,10 @@ Project IronFlow is a hybrid MVP that explores a Rust-based orchestration contro
 - Set `IRONFLOW_HISTORY_PATH` or pass `history_path` when creating `InMemoryControlPlane`.
 - Persisted data includes flow creation, flow transitions, task creation, and task events.
 - Current status: durable local history is available; a full Prefect-equivalent relational history model is a future step.
+
+## Agent Context Files
+
+- `docs/MEMORY_BANK.md` session handoff and current project state.
+- `AGENTS.md` working guide and validation defaults for future agents.
+- `.cursor/rules/project-context.mdc` always-apply project rule in Cursor.
+

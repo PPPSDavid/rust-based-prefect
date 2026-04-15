@@ -1,0 +1,73 @@
+body {
+  margin: 0;
+  font-family: Inter, system-ui, sans-serif;
+  background: #0f1221;
+  color: #e9eefc;
+}
+
+.app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.topbar nav a {
+  color: #8cc8ff;
+  margin-left: 12px;
+}
+
+.grid {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.grid th,
+.grid td {
+  border-bottom: 1px solid #2c3147;
+  text-align: left;
+  padding: 8px;
+}
+
+.badge {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.badge-running {
+  background: #2d6cdf;
+}
+
+.badge-completed {
+  background: #2b9155;
+}
+
+.badge-failed {
+  background: #a43b3b;
+}
+
+.tabs {
+  margin: 12px 0;
+}
+
+.tabs button {
+  margin-right: 8px;
+}
+
+.mono-list {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
