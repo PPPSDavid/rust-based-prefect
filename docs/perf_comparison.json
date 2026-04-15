@@ -1,0 +1,122 @@
+[
+  {
+    "engine": "ironflow",
+    "flavor": "mapped",
+    "complexity": 100,
+    "startup_seconds": 2.499999936844688e-06,
+    "runtime_seconds": 0.004547699999420729,
+    "transition_events": 306,
+    "transitions_per_second": 67286.7603489626,
+    "notes": ""
+  },
+  {
+    "engine": "ironflow_http",
+    "flavor": "mapped",
+    "complexity": 100,
+    "startup_seconds": 2.2095417000000452,
+    "runtime_seconds": 0.09848669999973936,
+    "transition_events": 306,
+    "transitions_per_second": 3107.0185111371366,
+    "notes": ""
+  },
+  {
+    "engine": "prefect",
+    "flavor": "mapped",
+    "complexity": 100,
+    "startup_seconds": 6.118066300000464,
+    "runtime_seconds": 10.4309788999999,
+    "transition_events": 306,
+    "transitions_per_second": 29.335693508113888,
+    "notes": ""
+  },
+  {
+    "engine": "ironflow",
+    "flavor": "mapped",
+    "complexity": 500,
+    "startup_seconds": 0.00011250000079598976,
+    "runtime_seconds": 0.022411199999623932,
+    "transition_events": 1506,
+    "transitions_per_second": 67198.5435864778,
+    "notes": ""
+  },
+  {
+    "engine": "ironflow_http",
+    "flavor": "mapped",
+    "complexity": 500,
+    "startup_seconds": 2.0393637000006493,
+    "runtime_seconds": 0.4775638999999501,
+    "transition_events": 1506,
+    "transitions_per_second": 3153.504693298965,
+    "notes": ""
+  },
+  {
+    "engine": "prefect",
+    "flavor": "mapped",
+    "complexity": 500,
+    "startup_seconds": 6.116839399999662,
+    "runtime_seconds": 4.347023399999671,
+    "transition_events": 1506,
+    "transitions_per_second": 346.44395979099494,
+    "notes": ""
+  },
+  {
+    "engine": "ironflow",
+    "flavor": "chained",
+    "complexity": 100,
+    "startup_seconds": 0.0011672999999063904,
+    "runtime_seconds": 0.003570100000615639,
+    "transition_events": 306,
+    "transitions_per_second": 85711.88480637304,
+    "notes": ""
+  },
+  {
+    "engine": "ironflow_http",
+    "flavor": "chained",
+    "complexity": 100,
+    "startup_seconds": 2.0407396000000517,
+    "runtime_seconds": 0.09372019999955228,
+    "transition_events": 306,
+    "transitions_per_second": 3265.037846712468,
+    "notes": ""
+  },
+  {
+    "engine": "prefect",
+    "flavor": "chained",
+    "complexity": 100,
+    "startup_seconds": 6.112867400000141,
+    "runtime_seconds": 2.1462854999999763,
+    "transition_events": 306,
+    "transitions_per_second": 142.57189921844198,
+    "notes": ""
+  },
+  {
+    "engine": "ironflow",
+    "flavor": "chained",
+    "complexity": 500,
+    "startup_seconds": 0.0001615999999557971,
+    "runtime_seconds": 0.017534600000544742,
+    "transition_events": 1506,
+    "transitions_per_second": 85887.33133080957,
+    "notes": ""
+  },
+  {
+    "engine": "ironflow_http",
+    "flavor": "chained",
+    "complexity": 500,
+    "startup_seconds": 2.0728754000001572,
+    "runtime_seconds": 0.43446289999974397,
+    "transition_events": 1506,
+    "transitions_per_second": 3466.348910346286,
+    "notes": ""
+  },
+  {
+    "engine": "prefect",
+    "flavor": "chained",
+    "complexity": 500,
+    "startup_seconds": 4.615195700000186,
+    "runtime_seconds": 11.145910299999741,
+    "transition_events": 1506,
+    "transitions_per_second": 135.11682397085457,
+    "notes": ""
+  }
+]

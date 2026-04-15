@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+.pytest_cache/
+*.pyc
+.venv/
+
+# Conda
+.conda/
+
+# Rust
+rust-engine/target/
+
+# Generated docs artifacts
+docs/sample_forecast.json
+docs/stress_results.json

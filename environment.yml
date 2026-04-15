@@ -1,0 +1,19 @@
+name: ironflow-dev
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pip
+  - rust
+  - cargo
+  - pytest
+  - pydantic>=2.10,<3
+  - fastapi
+  - uvicorn
+  - networkx
+  - pyyaml
+  - httpx
+  - rich
+  - ruff
+  - pip:
+      - prefect>=3,<4
