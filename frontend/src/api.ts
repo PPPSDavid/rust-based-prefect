@@ -3,8 +3,11 @@ import type {
   CursorPage,
   EventRecord,
   FlowRun,
+  FlowRunDag,
   LogRecord,
-  TaskRun
+  TaskRun,
+  Deployment,
+  DeploymentRun
 } from "./types";
 
 const base = "http://127.0.0.1:8000";
@@ -33,8 +36,22 @@ export const api = {
     ),
   listEvents: (id: string) =>
     readJson<CursorPage<EventRecord>>(`${base}/api/flow-runs/${id}/events?limit=1000`),
+  getFlowRunDag: (id: string, mode: "logical" | "expanded") =>
+    readJson<FlowRunDag>(`${base}/api/flow-runs/${id}/dag?mode=${mode}`),
   listFlowArtifacts: (id: string) =>
     readJson<ArtifactRecord[]>(`${base}/api/flow-runs/${id}/artifacts`),
+  listDeployments: () => readJson<CursorPage<Deployment>>(`${base}/api/deployments?limit=200`),
+  triggerDeploymentRun: (deploymentId: string, payload?: { parameters?: Record<string, unknown>; idempotency_key?: string }) =>
+    fetch(`${base}/api/deployments/${deploymentId}/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload ?? {})
+    }).then(async (res) => {
+      if (!res.ok) {
+        throw new Error(`Request failed: ${res.status}`);
+      }
+      return (await res.json()) as DeploymentRun;
+    }),
   streamFlowRuns: () => new EventSource(`${base}/api/stream/flow-runs`),
   streamFlowRun: (id: string) => new EventSource(`${base}/api/stream/flow-runs/${id}`)
 };

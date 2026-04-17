@@ -1,0 +1,52 @@
+{
+  "metadata": {
+    "git_sha": "baseline-example",
+    "timestamp_utc": "2026-04-16T00:00:00Z",
+    "python_version": "3.11",
+    "os": "example-os"
+  },
+  "aggregates": [
+    {
+      "recipe": "small_narrow_few_write_cold",
+      "repetitions": 3,
+      "params": {},
+      "wall_clock_seconds": {
+        "median": 1.2,
+        "p95": 1.4,
+        "p99": 1.5
+      },
+      "throughput": {
+        "transitions_per_sec": {
+          "median": 240.0,
+          "p95": 230.0,
+          "p99": 225.0
+        }
+      },
+      "latency_ms": {
+        "create_flow": {
+          "p50": 1.2,
+          "p95": 2.0,
+          "p99": 2.4
+        },
+        "set_flow_state": {
+          "p50": 0.9,
+          "p95": 1.7,
+          "p99": 2.1
+        }
+      },
+      "process": {
+        "cpu_seconds_used": {
+          "median": 0.7,
+          "p95": 0.9
+        }
+      },
+      "sqlite": {
+        "db_bytes_growth": {
+          "median": 30000.0,
+          "p95": 36000.0
+        }
+      },
+      "notes": []
+    }
+  ]
+}

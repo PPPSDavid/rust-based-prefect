@@ -1,0 +1,82 @@
+{
+  "pass": true,
+  "compatible": true,
+  "compare_skipped": false,
+  "baseline_compare_key": "preset:lite",
+  "candidate_compare_key": "preset:lite",
+  "regressions": [],
+  "comparisons": [
+    {
+      "recipe": "medium_narrow_heavy_mixed_warm",
+      "metric": "latency_ms.create_flow.p95",
+      "baseline": 2.193004999708137,
+      "candidate": 2.0559799999318784,
+      "delta_pct": -6.248275758354172,
+      "threshold_pct": 10.0,
+      "regression": false
+    },
+    {
+      "recipe": "medium_narrow_heavy_mixed_warm",
+      "metric": "latency_ms.set_flow_state.p95",
+      "baseline": 7.337909999910153,
+      "candidate": 5.925400000069203,
+      "delta_pct": -19.24948656849491,
+      "threshold_pct": 10.0,
+      "regression": false
+    },
+    {
+      "recipe": "medium_narrow_heavy_mixed_warm",
+      "metric": "throughput.transitions_per_sec.median",
+      "baseline": 66.86703373325054,
+      "candidate": 67.92699930669134,
+      "delta_pct": 1.5851840798999342,
+      "threshold_pct": 10.0,
+      "regression": false
+    },
+    {
+      "recipe": "medium_narrow_heavy_mixed_warm",
+      "metric": "wall_clock_seconds.p95",
+      "baseline": 1.7946062999999413,
+      "candidate": 1.7666024000000107,
+      "delta_pct": -1.5604481049649441,
+      "threshold_pct": 10.0,
+      "regression": false
+    },
+    {
+      "recipe": "small_narrow_few_write_cold",
+      "metric": "latency_ms.create_flow.p95",
+      "baseline": 8.016804999874694,
+      "candidate": 7.053250000126354,
+      "delta_pct": -12.019189686706865,
+      "threshold_pct": 10.0,
+      "regression": false
+    },
+    {
+      "recipe": "small_narrow_few_write_cold",
+      "metric": "latency_ms.set_flow_state.p95",
+      "baseline": 9.817464999923686,
+      "candidate": 7.954039999731322,
+      "delta_pct": -18.980714473714443,
+      "threshold_pct": 10.0,
+      "regression": false
+    },
+    {
+      "recipe": "small_narrow_few_write_cold",
+      "metric": "throughput.transitions_per_sec.median",
+      "baseline": 95.0009547595571,
+      "candidate": 101.82735985765792,
+      "delta_pct": 7.185617360770875,
+      "threshold_pct": 10.0,
+      "regression": false
+    },
+    {
+      "recipe": "small_narrow_few_write_cold",
+      "metric": "wall_clock_seconds.p95",
+      "baseline": 0.3157863000001271,
+      "candidate": 0.29461629999968864,
+      "delta_pct": -6.70390070767159,
+      "threshold_pct": 10.0,
+      "regression": false
+    }
+  ]
+}

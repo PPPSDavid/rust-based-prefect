@@ -10,6 +10,24 @@ __pycache__/
 # Rust
 rust-engine/target/
 
+# Node / frontend build
+frontend/node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# Local run data
+data/
+python-shim/data/
+
+# MkDocs output
+site/
+
 # Generated docs artifacts
 docs/sample_forecast.json
 docs/stress_results.json
+# Added by code-review-graph
+.code-review-graph/
+
+# Local agent / scratch
+.claude/
+baseline_stage2.*

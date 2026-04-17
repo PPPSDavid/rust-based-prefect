@@ -1,0 +1,2173 @@
+{
+  "metadata": {
+    "timestamp_utc": "2026-04-17T03:59:43.942516+00:00",
+    "git_sha": "5173d32adb89f44dcdec668feea652020fadc1bb",
+    "python_version": "3.13.12",
+    "rust_version": "unknown",
+    "os": "Windows-11-10.0.26200-SP0",
+    "seed": 20260416,
+    "repetitions": 5,
+    "warmups": 2,
+    "jobs": 1
+  },
+  "recipes": [
+    "small_narrow_few_write_cold",
+    "medium_wide_heavy_write_warm",
+    "medium_narrow_heavy_mixed_warm"
+  ],
+  "samples": [
+    {
+      "recipe": "medium_narrow_heavy_mixed_warm",
+      "iteration": 1,
+      "warmup": false,
+      "seed": 20260980,
+      "wall_clock_seconds": 2.0553765000004205,
+      "counts": {
+        "flows_created": 40,
+        "tasks_created": 340,
+        "flow_transitions": 120,
+        "task_events_recorded": 1620,
+        "read_queries": 180
+      },
+      "throughput": {
+        "flows_per_sec": 19.461154683821587,
+        "tasks_per_sec": 165.41981481248348,
+        "transitions_per_sec": 58.383464051464756,
+        "task_events_per_sec": 788.1767646947742
+      },
+      "latency_ms": {
+        "create_flow": {
+          "count": 40.0,
+          "p50": 1.6168000001925975,
+          "p95": 2.200210001137748,
+          "p99": 3.9588749997346895
+        },
+        "set_flow_state": {
+          "count": 120.0,
+          "p50": 3.8871000015205937,
+          "p95": 7.0301849982570275,
+          "p99": 9.514814999238297
+        },
+        "create_task": {
+          "count": 340.0,
+          "p50": 1.6451499977847561,
+          "p95": 2.0375099982629763,
+          "p99": 17.00755100162496
+        },
+        "record_task_event": {
+          "count": 1620.0,
+          "p50": 0.2877000006265007,
+          "p95": 0.37226500007818686,
+          "p99": 0.4883219990733778
+        },
+        "query.list_flow_runs": {
+          "count": 60.0,
+          "p50": 1.5250500018737512,
+          "p95": 2.0082549992366694,
+          "p99": 4.615867000211438
+        },
+        "query.get_flow_run_detail": {
+          "count": 78.0,
+          "p50": 0.7657500009372598,
+          "p95": 2.0623799990062253,
+          "p99": 5.617096998539637
+        },
+        "query.list_task_runs": {
+          "count": 59.0,
+          "p50": 0.7631000007677358,
+          "p95": 1.1592700000619516,
+          "p99": 5.474737999029458
+        },
+        "query.list_events": {
+          "count": 61.0,
+          "p50": 0.7708999983151443,
+          "p95": 1.3781999987259042,
+          "p99": 2.7355799997167196
+        }
+      },
+      "process": {
+        "cpu_seconds_used": 1.046875,
+        "rss_bytes_start": 0.0,
+        "rss_bytes_end": 0.0,
+        "rss_bytes_delta": 0.0
+      },
+      "sqlite": {
+        "db_bytes_before": 4096.0,
+        "db_bytes_after": 335872.0,
+        "db_bytes_growth": 331776.0,
+        "wal_bytes_before": 407912.0,
+        "wal_bytes_after": 4128272.0,
+        "wal_bytes_growth": 3720360.0,
+        "bytes_per_write_op": 156.49811320754716
+      }
+    },
+    {
+      "recipe": "medium_narrow_heavy_mixed_warm",
+      "iteration": 1,
+      "warmup": true,
+      "seed": 20261979,
+      "wall_clock_seconds": 1.8806889999978011,
+      "counts": {
+        "flows_created": 40,
+        "tasks_created": 340,
+        "flow_transitions": 120,
+        "task_events_recorded": 1620,
+        "read_queries": 180
+      },
+      "throughput": {
+        "flows_per_sec": 21.268800955419405,
+        "tasks_per_sec": 180.78480812106494,
+        "transitions_per_sec": 63.80640286625822,
+        "task_events_per_sec": 861.386438694486
+      },
+      "latency_ms": {
+        "create_flow": {
+          "count": 40.0,
+          "p50": 1.660099998844089,
+          "p95": 1.9666099984533503,
+          "p99": 3.788463000455522
+        },
+        "set_flow_state": {
+          "count": 120.0,
+          "p50": 3.8971499998297077,
+          "p95": 4.82698000214441,
+          "p99": 7.254379999139928
+        },
+        "create_task": {
+          "count": 340.0,
+          "p50": 1.6496999996888917,
+          "p95": 2.08134499953303,
+          "p99": 4.623729000486492
+        },
+        "record_task_event": {
+          "count": 1620.0,
+          "p50": 0.287499999103602,
+          "p95": 0.3717999972650432,
+          "p99": 0.4681770017850795
+        },
+        "query.list_events": {
+          "count": 67.0,
+          "p50": 0.7899000011093449,
+          "p95": 1.1495300001115538,
+          "p99": 5.883295998428366
+        },
+        "query.list_task_runs": {
+          "count": 68.0,
+          "p50": 0.7776499987812713,
+          "p95": 1.0925550008323626,
+          "p99": 6.155729001184227
+        },
+        "query.get_flow_run_detail": {
+          "count": 69.0,
+          "p50": 0.7757999992463738,
+          "p95": 0.8607200012193061,
+          "p99": 2.998620000871597
+        },
+        "query.list_flow_runs": {
+          "count": 45.0,
+          "p50": 1.5798999993421603,
+          "p95": 1.9954400006099604,
+          "p99": 4.815104001172585
+        }
+      },
+      "process": {
+        "cpu_seconds_used": 1.109375,
+        "rss_bytes_start": 0.0,
+        "rss_bytes_end": 0.0,
+        "rss_bytes_delta": 0.0
+      },
+      "sqlite": {
+        "db_bytes_before": 4096.0,
+        "db_bytes_after": 335872.0,
+        "db_bytes_growth": 331776.0,
+        "wal_bytes_before": 407912.0,
+        "wal_bytes_after": 4144752.0,
+        "wal_bytes_growth": 3736840.0,
+        "bytes_per_write_op": 156.49811320754716
+      }
+    },
+    {
+      "recipe": "medium_narrow_heavy_mixed_warm",
+      "iteration": 2,
+      "warmup": false,
+      "seed": 20260981,
+      "wall_clock_seconds": 1.8691315999967628,
+      "counts": {
+        "flows_created": 40,
+        "tasks_created": 340,
+        "flow_transitions": 120,
+        "task_events_recorded": 1620,
+        "read_queries": 180
+      },
+      "throughput": {
+        "flows_per_sec": 21.400312316195006,
+        "tasks_per_sec": 181.90265468765756,
+        "transitions_per_sec": 64.20093694858501,
+        "task_events_per_sec": 866.7126488058977
+      },
+      "latency_ms": {
+        "create_flow": {
+          "count": 40.0,
+          "p50": 1.659200001085992,
+          "p95": 2.02844500199717,
+          "p99": 2.401735000858025
+        },
+        "set_flow_state": {
+          "count": 120.0,
+          "p50": 3.904799999872921,
+          "p95": 5.0969099980648025,
+          "p99": 9.760835999513802
+        },
+        "create_task": {
+          "count": 340.0,
+          "p50": 1.6403499994339654,
+          "p95": 1.9718950019523618,
+          "p99": 2.7249909989041043
+        },
+        "record_task_event": {
+          "count": 1620.0,
+          "p50": 0.28774999918823596,
+          "p95": 0.3818050005065743,
+          "p99": 0.5064579992904328
+        },
+        "query.list_events": {
+          "count": 65.0,
+          "p50": 0.768699999753153,
+          "p95": 0.8598199987318367,
+          "p99": 6.88505999991321
+        },
+        "query.list_flow_runs": {
+          "count": 67.0,
+          "p50": 1.5607999994244892,
+          "p95": 4.8348900010751095,
+          "p99": 6.409961999452207
+        },
+        "query.get_flow_run_detail": {
+          "count": 65.0,
+          "p50": 0.7704999989073258,
+          "p95": 1.0935999991488643,
+          "p99": 2.866688000940485
+        },
+        "query.list_task_runs": {
+          "count": 48.0,
+          "p50": 0.7728999989922158,
+          "p95": 0.8483949986839434,
+          "p99": 1.1851959984051064
+        }
+      },
+      "process": {
+        "cpu_seconds_used": 1.015625,
+        "rss_bytes_start": 0.0,
+        "rss_bytes_end": 0.0,
+        "rss_bytes_delta": 0.0
+      },
+      "sqlite": {
+        "db_bytes_before": 4096.0,
+        "db_bytes_after": 335872.0,
+        "db_bytes_growth": 331776.0,
+        "wal_bytes_before": 407912.0,
+        "wal_bytes_after": 4152992.0,
+        "wal_bytes_growth": 3745080.0,
+        "bytes_per_write_op": 156.49811320754716
+      }
+    },
+    {
+      "recipe": "medium_narrow_heavy_mixed_warm",
+      "iteration": 2,
+      "warmup": true,
+      "seed": 20262979,
+      "wall_clock_seconds": 1.8390865999972448,
+      "counts": {
+        "flows_created": 40,
+        "tasks_created": 340,
+        "flow_transitions": 120,
+        "task_events_recorded": 1620,
+        "read_queries": 180
+      },
+      "throughput": {
+        "flows_per_sec": 21.749927382462538,
+        "tasks_per_sec": 184.87438275093157,
+        "transitions_per_sec": 65.2497821473876,
+        "task_events_per_sec": 880.8720589897327
+      },
+      "latency_ms": {
+        "create_flow": {
+          "count": 40.0,
+          "p50": 1.6813500005810056,
+          "p95": 1.9352950004758895,
+          "p99": 2.10071700039407
+        },
+        "set_flow_state": {
+          "count": 120.0,
+          "p50": 3.895050000210176,
+          "p95": 4.350094998881104,
+          "p99": 7.257092001236742
+        },
+        "create_task": {
+          "count": 340.0,
+          "p50": 1.6297500005748589,
+          "p95": 1.9310150017190608,
+          "p99": 2.8754929989372613
+        },
+        "record_task_event": {
+          "count": 1620.0,
+          "p50": 0.28574999851116445,
+          "p95": 0.366115000906575,
+          "p99": 0.42938100261380896
+        },
+        "query.list_task_runs": {
+          "count": 66.0,
+          "p50": 0.7673000000067987,
+          "p95": 0.8766999999352265,
+          "p99": 5.640475001564482
+        },
+        "query.list_events": {
+          "count": 59.0,
+          "p50": 0.767400000768248,
+          "p95": 1.3248100000055274,
+          "p99": 5.333045998122543
+        },
+        "query.list_flow_runs": {
+          "count": 55.0,
+          "p50": 1.5439000017067883,
+          "p95": 1.6628300014417619,
+          "p99": 3.5917019988119137
+        },
+        "query.get_flow_run_detail": {
+          "count": 71.0,
+          "p50": 0.7645000005140901,
+          "p95": 0.9259500020561973,
+          "p99": 4.3700500016711885
+        }
+      },
+      "process": {
+        "cpu_seconds_used": 1.21875,
+        "rss_bytes_start": 0.0,
+        "rss_bytes_end": 0.0,
+        "rss_bytes_delta": 0.0
+      },
+      "sqlite": {
+        "db_bytes_before": 4096.0,
+        "db_bytes_after": 327680.0,
+        "db_bytes_growth": 323584.0,
+        "wal_bytes_before": 407912.0,
+        "wal_bytes_after": 4136512.0,
+        "wal_bytes_growth": 3728600.0,
+        "bytes_per_write_op": 152.63396226415094
+      }
+    },
+    {
+      "recipe": "medium_narrow_heavy_mixed_warm",
+      "iteration": 3,
+      "warmup": false,
+      "seed": 20260982,
+      "wall_clock_seconds": 1.8784391000008327,
+      "counts": {
+        "flows_created": 40,
+        "tasks_created": 340,
+        "flow_transitions": 120,
+        "task_events_recorded": 1620,
+        "read_queries": 180
+      },
+      "throughput": {
+        "flows_per_sec": 21.29427565683778,
+        "tasks_per_sec": 181.00134308312113,
+        "transitions_per_sec": 63.88282697051334,
+        "task_events_per_sec": 862.4181641019301
+      },
+      "latency_ms": {
+        "create_flow": {
+          "count": 40.0,
+          "p50": 1.640800001041498,
+          "p95": 1.888259998668218,
+          "p99": 2.095440999546554
+        },
+        "set_flow_state": {
+          "count": 120.0,
+          "p50": 3.848899999866262,
+          "p95": 4.776459999084182,
+          "p99": 10.120104001798609
+        },
+        "create_task": {
+          "count": 340.0,
+          "p50": 1.632300001801923,
+          "p95": 1.9730999985767994,
+          "p99": 4.417161999117525
+        },
+        "record_task_event": {
+          "count": 1620.0,
+          "p50": 0.28715000007650815,
+          "p95": 0.36284000125306193,
+          "p99": 0.42861499885475496
+        },
+        "query.list_task_runs": {
+          "count": 58.0,
+          "p50": 0.7809999988239724,
+          "p95": 4.451975000483799,
+          "p99": 5.967631999701553
+        },
+        "query.get_flow_run_detail": {
+          "count": 76.0,
+          "p50": 0.7610000011482043,
+          "p95": 0.8266999993793434,
+          "p99": 4.524874999333406
+        },
+        "query.list_flow_runs": {
+          "count": 68.0,
+          "p50": 1.5395000009448268,
+          "p95": 1.6494049994435045,
+          "p99": 5.550298999623919
+        },
+        "query.list_events": {
+          "count": 54.0,
+          "p50": 0.7755500009807292,
+          "p95": 0.8685399998284993,
+          "p99": 2.7067399998850306
+        }
+      },
+      "process": {
+        "cpu_seconds_used": 1.03125,
+        "rss_bytes_start": 0.0,
+        "rss_bytes_end": 0.0,
+        "rss_bytes_delta": 0.0
+      },
+      "sqlite": {
+        "db_bytes_before": 4096.0,
+        "db_bytes_after": 335872.0,
+        "db_bytes_growth": 331776.0,
+        "wal_bytes_before": 407912.0,
+        "wal_bytes_after": 4136512.0,
+        "wal_bytes_growth": 3728600.0,
+        "bytes_per_write_op": 156.49811320754716
+      }
+    },
+    {
+      "recipe": "medium_narrow_heavy_mixed_warm",
+      "iteration": 4,
+      "warmup": false,
+      "seed": 20260983,
+      "wall_clock_seconds": 1.8658524000020407,
+      "counts": {
+        "flows_created": 40,
+        "tasks_created": 340,
+        "flow_transitions": 120,
+        "task_events_recorded": 1620,
+        "read_queries": 180
+      },
+      "throughput": {
+        "flows_per_sec": 21.437922956797788,
+        "tasks_per_sec": 182.22234513278121,
+        "transitions_per_sec": 64.31376887039337,
+        "task_events_per_sec": 868.2358797503105
+      },
+      "latency_ms": {
+        "create_flow": {
+          "count": 40.0,
+          "p50": 1.6297999991365941,
+          "p95": 1.8517449983846745,
+          "p99": 3.5015209998528007
+        },
+        "set_flow_state": {
+          "count": 120.0,
+          "p50": 3.8635000000795117,
+          "p95": 4.440484999395267,
+          "p99": 10.048405998677481
+        },
+        "create_task": {
+          "count": 340.0,
+          "p50": 1.6346000011253636,
+          "p95": 1.9586349981182138,
+          "p99": 2.5689599993711454
+        },
+        "record_task_event": {
+          "count": 1620.0,
+          "p50": 0.2877000006265007,
+          "p95": 0.38197500125534134,
+          "p99": 0.4686389987182338
+        },
+        "query.list_task_runs": {
+          "count": 64.0,
+          "p50": 0.770050000937772,
+          "p95": 0.8412850002059713,
+          "p99": 6.9170770004348014
+        },
+        "query.list_events": {
+          "count": 59.0,
+          "p50": 0.7791999996697996,
+          "p95": 4.678969997985405,
+          "p99": 5.468826001015259
+        },
+        "query.get_flow_run_detail": {
+          "count": 82.0,
+          "p50": 0.7621000004292,
+          "p95": 0.8204150026358548,
+          "p99": 5.199061001694645
+        },
+        "query.list_flow_runs": {
+          "count": 57.0,
+          "p50": 1.558899999508867,
+          "p95": 1.6700000014679972,
+          "p99": 1.8612640009087045
+        }
+      },
+      "process": {
+        "cpu_seconds_used": 1.265625,
+        "rss_bytes_start": 0.0,
+        "rss_bytes_end": 0.0,
+        "rss_bytes_delta": 0.0
+      },
+      "sqlite": {
+        "db_bytes_before": 4096.0,
+        "db_bytes_after": 331776.0,
+        "db_bytes_growth": 327680.0,
+        "wal_bytes_before": 407912.0,
+        "wal_bytes_after": 4136512.0,
+        "wal_bytes_growth": 3728600.0,
+        "bytes_per_write_op": 154.56603773584905
+      }
+    },
+    {
+      "recipe": "medium_narrow_heavy_mixed_warm",
+      "iteration": 5,
+      "warmup": false,
+      "seed": 20260984,
+      "wall_clock_seconds": 1.8726958000006562,
+      "counts": {
+        "flows_created": 40,
+        "tasks_created": 340,
+        "flow_transitions": 120,
+        "task_events_recorded": 1620,
+        "read_queries": 180
+      },
+      "throughput": {
+        "flows_per_sec": 21.359582266370214,
+        "tasks_per_sec": 181.55644926414683,
+        "transitions_per_sec": 64.07874679911065,
+        "task_events_per_sec": 865.0630817879937
+      },
+      "latency_ms": {
+        "create_flow": {
+          "count": 40.0,
+          "p50": 1.648299998123548,
+          "p95": 1.9919299989851424,
+          "p99": 2.268617999907292
+        },
+        "set_flow_state": {
+          "count": 120.0,
+          "p50": 3.9015000002109446,
+          "p95": 4.630209997412749,
+          "p99": 9.546406001099967
+        },
+        "create_task": {
+          "count": 340.0,
+          "p50": 1.6506000010849675,
+          "p95": 2.02909999898111,
+          "p99": 3.360797998830094
+        },
+        "record_task_event": {
+          "count": 1620.0,
+          "p50": 0.2874000019801315,
+          "p95": 0.3837950003799051,
+          "p99": 0.5271159992844332
+        },
+        "query.list_events": {
+          "count": 52.0,
+          "p50": 0.7717999997112202,
+          "p95": 2.893255000526551,
+          "p99": 6.775652998003352
+        },
+        "query.list_flow_runs": {
+          "count": 59.0,
+          "p50": 1.5571999974781647,
+          "p95": 1.8192800001997966,
+          "p99": 5.658616001310293
+        },
+        "query.list_task_runs": {
+          "count": 69.0,
+          "p50": 0.7740000000922009,
+          "p95": 0.9769000011147,
+          "p99": 4.823224000429036
+        },
+        "query.get_flow_run_detail": {
+          "count": 75.0,
+          "p50": 0.7669000005989801,
+          "p95": 0.8377199985261541,
+          "p99": 1.9067699998413445
+        }
+      },
+      "process": {
+        "cpu_seconds_used": 1.171875,
+        "rss_bytes_start": 0.0,
+        "rss_bytes_end": 0.0,
+        "rss_bytes_delta": 0.0
+      },
+      "sqlite": {
+        "db_bytes_before": 4096.0,
+        "db_bytes_after": 331776.0,
+        "db_bytes_growth": 327680.0,
+        "wal_bytes_before": 407912.0,
+        "wal_bytes_after": 4132392.0,
+        "wal_bytes_growth": 3724480.0,
+        "bytes_per_write_op": 154.56603773584905
+      }
+    },
+    {
+      "recipe": "medium_wide_heavy_write_warm",
+      "iteration": 1,
+      "warmup": false,
+      "seed": 20261041,
+      "wall_clock_seconds": 3.9609689000026265,
+      "counts": {
+        "flows_created": 50,
+        "tasks_created": 1000,
+        "flow_transitions": 150,
+        "task_events_recorded": 4000,
+        "read_queries": 157
+      },
+      "throughput": {
+        "flows_per_sec": 12.623174092572867,
+        "tasks_per_sec": 252.46348185145735,
+        "transitions_per_sec": 37.8695222777186,
+        "task_events_per_sec": 1009.8539274058294
+      },
+      "latency_ms": {
+        "create_flow": {
+          "count": 50.0,
+          "p50": 1.6374000006180722,
+          "p95": 2.5401750002856716,
+          "p99": 4.665969997440698
+        },
+        "set_flow_state": {
+          "count": 150.0,
+          "p50": 3.8794000010966556,
+          "p95": 4.39754500057461,
+          "p99": 7.359229999456147
+        },
+        "create_task": {
+          "count": 1000.0,
+          "p50": 1.6386999996029772,
+          "p95": 2.1544099994571297,
+          "p99": 5.071938997643883
+        },
+        "record_task_event": {
+          "count": 4000.0,
+          "p50": 0.28480000037234277,
+          "p95": 0.3789000002143439,
+          "p99": 0.47314600084064296
+        },
+        "query.list_events": {
+          "count": 56.0,
+          "p50": 0.8076000012806617,
+          "p95": 1.3815749998684623,
+          "p99": 3.96608999963064
+        },
+        "query.get_flow_run_detail": {
+          "count": 64.0,
+          "p50": 0.7875000010244548,
+          "p95": 1.2953349982126383,
+          "p99": 1.4263110013052938
+        },
+        "query.list_task_runs": {
+          "count": 50.0,
+          "p50": 0.7937999998830492,
+          "p95": 1.4952850000554463,
+          "p99": 1.6213069986042683
+        },
+        "query.list_flow_runs": {
+          "count": 51.0,
+          "p50": 1.744099998177262,
+          "p95": 2.236250000350992,
+          "p99": 2.7211500018893275
+        }
+      },
+      "process": {
+        "cpu_seconds_used": 2.375,
+        "rss_bytes_start": 0.0,
+        "rss_bytes_end": 0.0,
+        "rss_bytes_delta": 0.0
+      },
+      "sqlite": {
+        "db_bytes_before": 4096.0,
+        "db_bytes_after": 622592.0,
+        "db_bytes_growth": 618496.0,
+        "wal_bytes_before": 407912.0,
+        "wal_bytes_after": 4152992.0,
+        "wal_bytes_growth": 3745080.0,
+        "bytes_per_write_op": 118.94153846153846
+      }
+    },
+    {
+      "recipe": "medium_wide_heavy_write_warm",
+      "iteration": 1,
+      "warmup": true,
+      "seed": 20262040,
+      "wall_clock_seconds": 3.7602633999995305,
+      "counts": {
+        "flows_created": 50,
+        "tasks_created": 1000,
+        "flow_transitions": 150,
+        "task_events_recorded": 4000,
+        "read_queries": 157
+      },
+      "throughput": {
+        "flows_per_sec": 13.296940847283794,
+        "tasks_per_sec": 265.9388169456759,
+        "transitions_per_sec": 39.890822541851385,
+        "task_events_per_sec": 1063.7552677827036
+      },
+      "latency_ms": {
+        "create_flow": {
+          "count": 50.0,
+          "p50": 1.6149500006577,
+          "p95": 1.8116699999154662,
+          "p99": 1.8728049997298513
+        },
+        "set_flow_state": {
+          "count": 150.0,
+          "p50": 3.8314999983413145,
+          "p95": 4.523505000724981,
+          "p99": 8.106320001279528
+        },
+        "create_task": {
+          "count": 1000.0,
+          "p50": 1.6116999995574588,
+          "p95": 2.027664999513945,
+          "p99": 4.7814989990365575
+        },
+        "record_task_event": {
+          "count": 4000.0,
+          "p50": 0.2795000000332948,
+          "p95": 0.3654249992905534,
+          "p99": 0.4428129993175389
+        },
+        "query.list_flow_runs": {
+          "count": 49.0,
+          "p50": 1.7245000017283019,
+          "p95": 2.003719998174347,
+          "p99": 4.9691400010488
+        },
+        "query.get_flow_run_detail": {
+          "count": 57.0,
+          "p50": 0.7714999992458615,
+          "p95": 0.8978800004115328,
+          "p99": 1.1000960000092164
+        },
+        "query.list_events": {
+          "count": 63.0,
+          "p50": 0.7795999990776181,
+          "p95": 0.9288599987485213,
+          "p99": 1.3638759986497462
+        },
+        "query.list_task_runs": {
+          "count": 45.0,
+          "p50": 0.7774000005156267,
+          "p95": 0.9958399998140521,
+          "p99": 1.5202679997310042
+        }
+      },
+      "process": {
+        "cpu_seconds_used": 2.21875,
+        "rss_bytes_start": 0.0,
+        "rss_bytes_end": 0.0,
+        "rss_bytes_delta": 0.0
+      },
+      "sqlite": {
+        "db_bytes_before": 4096.0,
+        "db_bytes_after": 618496.0,
+        "db_bytes_growth": 614400.0,
+        "wal_bytes_before": 407912.0,
+        "wal_bytes_after": 4132392.0,
+        "wal_bytes_growth": 3724480.0,
+        "bytes_per_write_op": 118.15384615384616
+      }
+    },
+    {
+      "recipe": "medium_wide_heavy_write_warm",
+      "iteration": 2,
+      "warmup": false,
+      "seed": 20261042,
+      "wall_clock_seconds": 3.972832899999048,
+      "counts": {
+        "flows_created": 50,
+        "tasks_created": 1000,
+        "flow_transitions": 150,
+        "task_events_recorded": 4000,
+        "read_queries": 157
+      },
+      "throughput": {
+        "flows_per_sec": 12.585477733033267,
+        "tasks_per_sec": 251.70955466066533,
+        "transitions_per_sec": 37.7564331990998,
+        "task_events_per_sec": 1006.8382186426613
+      },
+      "latency_ms": {
+        "create_flow": {
+          "count": 50.0,
+          "p50": 1.6270500000246102,
+          "p95": 2.0643250003558933,
+          "p99": 2.10255199981475
+        },
+        "set_flow_state": {
+          "count": 150.0,
+          "p50": 3.911800000423682,
+          "p95": 4.621194999526779,
+          "p99": 9.94016699885833
+        },
+        "create_task": {
+          "count": 1000.0,
+          "p50": 1.6356000014638994,
+          "p95": 2.1436600014567375,
+          "p99": 4.833477002684958
+        },
+        "record_task_event": {
+          "count": 4000.0,
+          "p50": 0.28899999961140566,
+          "p95": 0.38921499872230925,
+          "p99": 0.514120000116236
+        },
+        "query.list_task_runs": {
+          "count": 57.0,
+          "p50": 0.7655000008526258,
+          "p95": 0.8116599994536955,
+          "p99": 3.620279998285696
+        },
+        "query.list_flow_runs": {
+          "count": 45.0,
+          "p50": 1.6871000007085968,
+          "p95": 1.8127199982700404,
+          "p99": 2.0758040016517043
+        },
+        "query.get_flow_run_detail": {
+          "count": 74.0,
+          "p50": 0.7565500000055181,
+          "p95": 0.7999900013601291,
+          "p99": 0.814849000198592
+        },
+        "query.list_events": {
+          "count": 55.0,
+          "p50": 0.7695999993302394,
+          "p95": 0.8075999994616723,
+          "p99": 0.896449999709148
+        }
+      },
+      "process": {
+        "cpu_seconds_used": 2.1875,
+        "rss_bytes_start": 0.0,
+        "rss_bytes_end": 0.0,
+        "rss_bytes_delta": 0.0
+      },
+      "sqlite": {
+        "db_bytes_before": 4096.0,
+        "db_bytes_after": 618496.0,
+        "db_bytes_growth": 614400.0,
+        "wal_bytes_before": 407912.0,
+        "wal_bytes_after": 4181832.0,
+        "wal_bytes_growth": 3773920.0,
+        "bytes_per_write_op": 118.15384615384616
+      }
+    },
+    {
+      "recipe": "medium_wide_heavy_write_warm",
+      "iteration": 2,
+      "warmup": true,
+      "seed": 20263040,
+      "wall_clock_seconds": 4.017847899998742,
+      "counts": {
+        "flows_created": 50,
+        "tasks_created": 1000,
+        "flow_transitions": 150,
+        "task_events_recorded": 4000,
+        "read_queries": 157
+      },
+      "throughput": {
+        "flows_per_sec": 12.444473072267284,
+        "tasks_per_sec": 248.8894614453457,
+        "transitions_per_sec": 37.33341921680185,
+        "task_events_per_sec": 995.5578457813828
+      },
+      "latency_ms": {
+        "create_flow": {
+          "count": 50.0,
+          "p50": 1.627800000278512,
+          "p95": 2.054570000836975,
+          "p99": 3.540502999567252
+        },
+        "set_flow_state": {
+          "count": 150.0,
+          "p50": 3.9044999994075624,
+          "p95": 4.60131499930867,
+          "p99": 46.22174099946278
+        },
+        "create_task": {
+          "count": 1000.0,
+          "p50": 1.6390500004490605,
+          "p95": 2.074004998576129,
+          "p99": 4.552721000218298
+        },
+        "record_task_event": {
+          "count": 4000.0,
+          "p50": 0.28790000033040997,
+          "p95": 0.3742150007383316,
+          "p99": 0.45590100082335994
+        },
+        "query.list_events": {
+          "count": 39.0,
+          "p50": 0.7802000000083353,
+          "p95": 0.9676300003775395,
+          "p99": 4.4617060002929065
+        },
+        "query.list_flow_runs": {
+          "count": 59.0,
+          "p50": 1.721600001474144,
+          "p95": 2.0549899993056897,
+          "p99": 2.1919040016655345
+        },
+        "query.get_flow_run_detail": {
+          "count": 60.0,
+          "p50": 0.7748500011075521,
+          "p95": 1.0517050010093953,
+          "p99": 1.3324739991003298
+        },
+        "query.list_task_runs": {
+          "count": 59.0,
+          "p50": 0.7828999987395946,
+          "p95": 0.8840399979817448,
+          "p99": 1.0474339991924353
+        }
+      },
+      "process": {
+        "cpu_seconds_used": 2.21875,
+        "rss_bytes_start": 0.0,
+        "rss_bytes_end": 0.0,
+        "rss_bytes_delta": 0.0
+      },
+      "sqlite": {
+        "db_bytes_before": 4096.0,
+        "db_bytes_after": 618496.0,
+        "db_bytes_growth": 614400.0,
+        "wal_bytes_before": 407912.0,
+        "wal_bytes_after": 4157112.0,
+        "wal_bytes_growth": 3749200.0,
+        "bytes_per_write_op": 118.15384615384616
+      }
+    },
+    {
+      "recipe": "medium_wide_heavy_write_warm",
+      "iteration": 3,
+      "warmup": false,
+      "seed": 20261043,
+      "wall_clock_seconds": 3.8574746000012965,
+      "counts": {
+        "flows_created": 50,
+        "tasks_created": 1000,
+        "flow_transitions": 150,
+        "task_events_recorded": 4000,
+        "read_queries": 157
+      },
+      "throughput": {
+        "flows_per_sec": 12.961848148004188,
+        "tasks_per_sec": 259.23696296008376,
+        "transitions_per_sec": 38.88554444401257,
+        "task_events_per_sec": 1036.947851840335
+      },
+      "latency_ms": {
+        "create_flow": {
+          "count": 50.0,
+          "p50": 1.6066999996837694,
+          "p95": 1.9801999991614139,
+          "p99": 2.456838001307915
+        },
+        "set_flow_state": {
+          "count": 150.0,
+          "p50": 3.89040000118257,
+          "p95": 4.627429998981825,
+          "p99": 12.822127001563786
+        },
+        "create_task": {
+          "count": 1000.0,
+          "p50": 1.6365999981644563,
+          "p95": 2.0260050005163066,
+          "p99": 4.736209001639509
+        },
+        "record_task_event": {
+          "count": 4000.0,
+          "p50": 0.28640000164159574,
+          "p95": 0.370624999050051,
+          "p99": 0.47260700062906835
+        },
+        "query.list_task_runs": {
+          "count": 51.0,
+          "p50": 0.7770999982312787,
+          "p95": 0.827799998660339,
+          "p99": 4.4942500007891795
+        },
+        "query.get_flow_run_detail": {
+          "count": 74.0,
+          "p50": 0.7604499987792224,
+          "p95": 0.8374750006623799,
+          "p99": 0.9645989996352
+        },
+        "query.list_events": {
+          "count": 66.0,
+          "p50": 0.769950001995312,
+          "p95": 0.8231749998230953,
+          "p99": 0.9251949993995368
+        },
+        "query.list_flow_runs": {
+          "count": 40.0,
+          "p50": 1.71299999965413,
+          "p95": 1.8517100001190556,
+          "p99": 2.1154469982138835
+        }
+      },
+      "process": {
+        "cpu_seconds_used": 2.453125,
+        "rss_bytes_start": 0.0,
+        "rss_bytes_end": 0.0,
+        "rss_bytes_delta": 0.0
+      },
+      "sqlite": {
+        "db_bytes_before": 4096.0,
+        "db_bytes_after": 614400.0,
+        "db_bytes_growth": 610304.0,
+        "wal_bytes_before": 407912.0,
+        "wal_bytes_after": 4148872.0,
+        "wal_bytes_growth": 3740960.0,
+        "bytes_per_write_op": 117.36615384615385
+      }
+    },
+    {
+      "recipe": "medium_wide_heavy_write_warm",
+      "iteration": 4,
+      "warmup": false,
+      "seed": 20261044,
+      "wall_clock_seconds": 4.026293499999156,
+      "counts": {
+        "flows_created": 50,
+        "tasks_created": 1000,
+        "flow_transitions": 150,
+        "task_events_recorded": 4000,
+        "read_queries": 157
+      },
+      "throughput": {
+        "flows_per_sec": 12.418369401041053,
+        "tasks_per_sec": 248.36738802082107,
+        "transitions_per_sec": 37.25510820312316,
+        "task_events_per_sec": 993.4695520832843
+      },
+      "latency_ms": {
+        "create_flow": {
+          "count": 50.0,
+          "p50": 1.6493499988428084,
+          "p95": 1.8544299988207058,
+          "p99": 3.6603700008708984
+        },
+        "set_flow_state": {
+          "count": 150.0,
+          "p50": 3.8959000012255274,
+          "p95": 4.40370999967854,
+          "p99": 5.795751998812193
+        },
+        "create_task": {
+          "count": 1000.0,
+          "p50": 1.6517499989276985,
+          "p95": 2.1278150014040875,
+          "p99": 4.88492000135011
+        },
+        "record_task_event": {
+          "count": 4000.0,
+          "p50": 0.2897000013035722,
+          "p95": 0.38440499865828315,
+          "p99": 0.5086110019328771
+        },
+        "query.list_task_runs": {
+          "count": 53.0,
+          "p50": 0.7694000014453195,
+          "p95": 0.85456000015256,
+          "p99": 4.536019998486154
+        },
+        "query.get_flow_run_detail": {
+          "count": 58.0,
+          "p50": 0.7625999987794785,
+          "p95": 0.8313050011565792,
+          "p99": 0.8791520012528053
+        },
+        "query.list_flow_runs": {
+          "count": 62.0,
+          "p50": 1.7003499997372273,
+          "p95": 1.8579849980596919,
+          "p99": 1.903852000104962
+        },
+        "query.list_events": {
+          "count": 42.0,
+          "p50": 0.7724000006419374,
+          "p95": 0.8416799984843237,
+          "p99": 0.9170550008639111
+        }
+      },
+      "process": {
+        "cpu_seconds_used": 2.390625,
+        "rss_bytes_start": 0.0,
+        "rss_bytes_end": 0.0,
+        "rss_bytes_delta": 0.0
+      },
+      "sqlite": {
+        "db_bytes_before": 4096.0,
+        "db_bytes_after": 614400.0,
+        "db_bytes_growth": 610304.0,
+        "wal_bytes_before": 407912.0,
+        "wal_bytes_after": 4152992.0,
+        "wal_bytes_growth": 3745080.0,
+        "bytes_per_write_op": 117.36615384615385
+      }
+    },
+    {
+      "recipe": "medium_wide_heavy_write_warm",
+      "iteration": 5,
+      "warmup": false,
+      "seed": 20261045,
+      "wall_clock_seconds": 3.917037999999593,
+      "counts": {
+        "flows_created": 50,
+        "tasks_created": 1000,
+        "flow_transitions": 150,
+        "task_events_recorded": 4000,
+        "read_queries": 157
+      },
+      "throughput": {
+        "flows_per_sec": 12.764747240135325,
+        "tasks_per_sec": 255.2949448027065,
+        "transitions_per_sec": 38.29424172040598,
+        "task_events_per_sec": 1021.179779210826
+      },
+      "latency_ms": {
+        "create_flow": {
+          "count": 50.0,
+          "p50": 1.6670500008331146,
+          "p95": 1.9829199987725588,
+          "p99": 2.439099998155143
+        },
+        "set_flow_state": {
+          "count": 150.0,
+          "p50": 3.8391999987652525,
+          "p95": 4.4850800002677715,
+          "p99": 9.03077300030418
+        },
+        "create_task": {
+          "count": 1000.0,
+          "p50": 1.6402000019297702,
+          "p95": 1.9774950013015768,
+          "p99": 4.673249997176754
+        },
+        "record_task_event": {
+          "count": 4000.0,
+          "p50": 0.28639999982260633,
+          "p95": 0.3676000014820602,
+          "p99": 0.452508000380476
+        },
+        "query.list_events": {
+          "count": 51.0,
+          "p50": 0.7839000027161092,
+          "p95": 1.0360999986005481,
+          "p99": 4.844100001719198
+        },
+        "query.get_flow_run_detail": {
+          "count": 67.0,
+          "p50": 0.7746999981463887,
+          "p95": 0.8473000005324138,
+          "p99": 1.0430459994677221
+        },
+        "query.list_flow_runs": {
+          "count": 55.0,
+          "p50": 1.7107999992731493,
+          "p95": 1.8068599991238443,
+          "p99": 1.9583579996833578
+        },
+        "query.list_task_runs": {
+          "count": 51.0,
+          "p50": 0.780099999246886,
+          "p95": 0.8362500011571683,
+          "p99": 0.9913499998219777
+        }
+      },
+      "process": {
+        "cpu_seconds_used": 2.640625,
+        "rss_bytes_start": 0.0,
+        "rss_bytes_end": 0.0,
+        "rss_bytes_delta": 0.0
+      },
+      "sqlite": {
+        "db_bytes_before": 4096.0,
+        "db_bytes_after": 614400.0,
+        "db_bytes_growth": 610304.0,
+        "wal_bytes_before": 407912.0,
+        "wal_bytes_after": 4148872.0,
+        "wal_bytes_growth": 3740960.0,
+        "bytes_per_write_op": 117.36615384615385
+      }
+    },
+    {
+      "recipe": "small_narrow_few_write_cold",
+      "iteration": 1,
+      "warmup": false,
+      "seed": 20260420,
+      "wall_clock_seconds": 0.24890120000054594,
+      "counts": {
+        "flows_created": 10,
+        "tasks_created": 40,
+        "flow_transitions": 30,
+        "task_events_recorded": 40,
+        "read_queries": 5
+      },
+      "throughput": {
+        "flows_per_sec": 40.176584122447245,
+        "tasks_per_sec": 160.70633648978898,
+        "transitions_per_sec": 120.52975236734173,
+        "task_events_per_sec": 160.70633648978898
+      },
+      "latency_ms": {
+        "create_flow": {
+          "count": 10.0,
+          "p50": 1.601299998583272,
+          "p95": 9.293915000307607,
+          "p99": 14.053583001514198
+        },
+        "set_flow_state": {
+          "count": 30.0,
+          "p50": 3.925500001059845,
+          "p95": 7.199765000586922,
+          "p99": 11.464236001083918
+        },
+        "create_task": {
+          "count": 40.0,
+          "p50": 1.5855499987083022,
+          "p95": 1.8239499981064,
+          "p99": 1.8918340011441614
+        },
+        "record_task_event": {
+          "count": 40.0,
+          "p50": 0.2594500001578126,
+          "p95": 0.3749250017790473,
+          "p99": 0.44017900072503835
+        },
+        "query.list_flow_runs": {
+          "count": 2.0,
+          "p50": 2.683700000488898,
+          "p95": 4.42285999924934,
+          "p99": 4.577451999139157
+        },
+        "query.list_events": {
+          "count": 2.0,
+          "p50": 0.6087500005378388,
+          "p95": 0.6418250002752757,
+          "p99": 0.6447650002519367
+        },
+        "query.get_flow_run_detail": {
+          "count": 2.0,
+          "p50": 0.6293000005825888,
+          "p95": 0.6349700011924142,
+          "p99": 0.6354740012466209
+        },
+        "query.list_task_runs": {
+          "count": 1.0,
+          "p50": 0.5777000005764421,
+          "p95": 0.5777000005764421,
+          "p99": 0.5777000005764421
+        }
+      },
+      "process": {
+        "cpu_seconds_used": 0.15625,
+        "rss_bytes_start": 0.0,
+        "rss_bytes_end": 0.0,
+        "rss_bytes_delta": 0.0
+      },
+      "sqlite": {
+        "db_bytes_before": 4096.0,
+        "db_bytes_after": 4096.0,
+        "db_bytes_growth": 0.0,
+        "wal_bytes_before": 255472.0,
+        "wal_bytes_after": 2640952.0,
+        "wal_bytes_growth": 2385480.0,
+        "bytes_per_write_op": 0.0
+      }
+    },
+    {
+      "recipe": "small_narrow_few_write_cold",
+      "iteration": 1,
+      "warmup": true,
+      "seed": 20261419,
+      "wall_clock_seconds": 0.23267999999734457,
+      "counts": {
+        "flows_created": 10,
+        "tasks_created": 40,
+        "flow_transitions": 30,
+        "task_events_recorded": 40,
+        "read_queries": 5
+      },
+      "throughput": {
+        "flows_per_sec": 42.97747980107497,
+        "tasks_per_sec": 171.90991920429988,
+        "transitions_per_sec": 128.93243940322492,
+        "task_events_per_sec": 171.90991920429988
+      },
+      "latency_ms": {
+        "create_flow": {
+          "count": 10.0,
+          "p50": 1.6228500007855473,
+          "p95": 10.852459999659914,
+          "p99": 16.76193199957197
+        },
+        "set_flow_state": {
+          "count": 30.0,
+          "p50": 3.854450000289944,
+          "p95": 4.132939999908558,
+          "p99": 4.2008070024166955
+        },
+        "create_task": {
+          "count": 40.0,
+          "p50": 1.5488499993807636,
+          "p95": 1.803259999724105,
+          "p99": 1.885888999531744
+        },
+        "record_task_event": {
+          "count": 40.0,
+          "p50": 0.26175000130024273,
+          "p95": 0.3278949989180546,
+          "p99": 0.34063699898979394
+        },
+        "query.list_events": {
+          "count": 4.0,
+          "p50": 0.65320000067004,
+          "p95": 5.856829999174806,
+          "p99": 6.591445998856216
+        },
+        "query.list_task_runs": {
+          "count": 1.0,
+          "p50": 0.7579000011901371,
+          "p95": 0.7579000011901371,
+          "p99": 0.7579000011901371
+        }
+      },
+      "process": {
+        "cpu_seconds_used": 0.09375,
+        "rss_bytes_start": 0.0,
+        "rss_bytes_end": 0.0,
+        "rss_bytes_delta": 0.0
+      },
+      "sqlite": {
+        "db_bytes_before": 4096.0,
+        "db_bytes_after": 4096.0,
+        "db_bytes_growth": 0.0,
+        "wal_bytes_before": 255472.0,
+        "wal_bytes_after": 2640952.0,
+        "wal_bytes_growth": 2385480.0,
+        "bytes_per_write_op": 0.0
+      }
+    },
+    {
+      "recipe": "small_narrow_few_write_cold",
+      "iteration": 2,
+      "warmup": false,
+      "seed": 20260421,
+      "wall_clock_seconds": 0.22773140000208514,
+      "counts": {
+        "flows_created": 10,
+        "tasks_created": 40,
+        "flow_transitions": 30,
+        "task_events_recorded": 40,
+        "read_queries": 5
+      },
+      "throughput": {
+        "flows_per_sec": 43.911379809321154,
+        "tasks_per_sec": 175.64551923728462,
+        "transitions_per_sec": 131.73413942796344,
+        "task_events_per_sec": 175.64551923728462
+      },
+      "latency_ms": {
+        "create_flow": {
+          "count": 10.0,
+          "p50": 1.5381000011984725,
+          "p95": 7.770665000134613,
+          "p99": 11.789812999486458
+        },
+        "set_flow_state": {
+          "count": 30.0,
+          "p50": 3.8053000025684014,
+          "p95": 4.088249999949767,
+          "p99": 4.388793001380691
+        },
+        "create_task": {
+          "count": 40.0,
+          "p50": 1.5753000006952789,
+          "p95": 1.7534299977342016,
+          "p99": 2.0451279993358185
+        },
+        "record_task_event": {
+          "count": 40.0,
+          "p50": 0.2507499975763494,
+          "p95": 0.3286899996965076,
+          "p99": 0.3467230000751442
+        },
+        "query.list_events": {
+          "count": 1.0,
+          "p50": 7.05759999982547,
+          "p95": 7.05759999982547,
+          "p99": 7.05759999982547
+        },
+        "query.list_flow_runs": {
+          "count": 1.0,
+          "p50": 0.811099998827558,
+          "p95": 0.811099998827558,
+          "p99": 0.811099998827558
+        },
+        "query.get_flow_run_detail": {
+          "count": 2.0,
+          "p50": 0.6880499986436917,
+          "p95": 0.6993449978835997,
+          "p99": 0.700348997816036
+        },
+        "query.list_task_runs": {
+          "count": 3.0,
+          "p50": 0.6986000007600524,
+          "p95": 0.8980400001746602,
+          "p99": 0.9157680001226254
+        }
+      },
+      "process": {
+        "cpu_seconds_used": 0.078125,
+        "rss_bytes_start": 0.0,
+        "rss_bytes_end": 0.0,
+        "rss_bytes_delta": 0.0
+      },
+      "sqlite": {
+        "db_bytes_before": 4096.0,
+        "db_bytes_after": 4096.0,
+        "db_bytes_growth": 0.0,
+        "wal_bytes_before": 255472.0,
+        "wal_bytes_after": 2640952.0,
+        "wal_bytes_growth": 2385480.0,
+        "bytes_per_write_op": 0.0
+      }
+    },
+    {
+      "recipe": "small_narrow_few_write_cold",
+      "iteration": 2,
+      "warmup": true,
+      "seed": 20262419,
+      "wall_clock_seconds": 0.23026970000137226,
+      "counts": {
+        "flows_created": 10,
+        "tasks_created": 40,
+        "flow_transitions": 30,
+        "task_events_recorded": 40,
+        "read_queries": 5
+      },
+      "throughput": {
+        "flows_per_sec": 43.42733759561248,
+        "tasks_per_sec": 173.7093503824499,
+        "transitions_per_sec": 130.28201278683744,
+        "task_events_per_sec": 173.7093503824499
+      },
+      "latency_ms": {
+        "create_flow": {
+          "count": 10.0,
+          "p50": 1.547400001072674,
+          "p95": 7.931015001122432,
+          "p99": 12.011723001669452
+        },
+        "set_flow_state": {
+          "count": 30.0,
+          "p50": 3.8516000004165107,
+          "p95": 4.17211999920255,
+          "p99": 4.391860999821802
+        },
+        "create_task": {
+          "count": 40.0,
+          "p50": 1.5314499996748054,
+          "p95": 1.7484249994595302,
+          "p99": 1.8482399999265908
+        },
+        "record_task_event": {
+          "count": 40.0,
+          "p50": 0.24529999973310623,
+          "p95": 0.3113300004770281,
+          "p99": 0.3271519995178096
+        },
+        "query.list_task_runs": {
+          "count": 3.0,
+          "p50": 0.6742000005033333,
+          "p95": 6.501250002111192,
+          "p99": 7.019210002254113
+        },
+        "query.get_flow_run_detail": {
+          "count": 4.0,
+          "p50": 0.7464999998774147,
+          "p95": 1.043254999058263,
+          "p99": 1.069690999102022
+        },
+        "query.list_events": {
+          "count": 2.0,
+          "p50": 0.7970999995450256,
+          "p95": 0.8837699997457094,
+          "p99": 0.8914739997635479
+        }
+      },
+      "process": {
+        "cpu_seconds_used": 0.09375,
+        "rss_bytes_start": 0.0,
+        "rss_bytes_end": 0.0,
+        "rss_bytes_delta": 0.0
+      },
+      "sqlite": {
+        "db_bytes_before": 4096.0,
+        "db_bytes_after": 4096.0,
+        "db_bytes_growth": 0.0,
+        "wal_bytes_before": 255472.0,
+        "wal_bytes_after": 2640952.0,
+        "wal_bytes_growth": 2385480.0,
+        "bytes_per_write_op": 0.0
+      }
+    },
+    {
+      "recipe": "small_narrow_few_write_cold",
+      "iteration": 3,
+      "warmup": false,
+      "seed": 20260422,
+      "wall_clock_seconds": 0.2375261999986833,
+      "counts": {
+        "flows_created": 10,
+        "tasks_created": 40,
+        "flow_transitions": 30,
+        "task_events_recorded": 40,
+        "read_queries": 5
+      },
+      "throughput": {
+        "flows_per_sec": 42.100618795128426,
+        "tasks_per_sec": 168.4024751805137,
+        "transitions_per_sec": 126.30185638538528,
+        "task_events_per_sec": 168.4024751805137
+      },
+      "latency_ms": {
+        "create_flow": {
+          "count": 10.0,
+          "p50": 1.7360499987262301,
+          "p95": 9.912969999641064,
+          "p99": 13.47171400055231
+        },
+        "set_flow_state": {
+          "count": 30.0,
+          "p50": 3.7628500012942823,
+          "p95": 4.523189998144517,
+          "p99": 10.751217999859364
+        },
+        "create_task": {
+          "count": 40.0,
+          "p50": 1.5461999992112396,
+          "p95": 1.7901600022014463,
+          "p99": 2.003125999144686
+        },
+        "record_task_event": {
+          "count": 40.0,
+          "p50": 0.24384999960602727,
+          "p95": 0.3196200017555384,
+          "p99": 0.372355998151761
+        },
+        "query.list_task_runs": {
+          "count": 3.0,
+          "p50": 0.6505000019387808,
+          "p95": 4.1600500015192665,
+          "p99": 4.472010001481976
+        },
+        "query.list_events": {
+          "count": 2.0,
+          "p50": 0.5523499985429225,
+          "p95": 0.5572549982389319,
+          "p99": 0.5576909982119105
+        }
+      },
+      "process": {
+        "cpu_seconds_used": 0.078125,
+        "rss_bytes_start": 0.0,
+        "rss_bytes_end": 0.0,
+        "rss_bytes_delta": 0.0
+      },
+      "sqlite": {
+        "db_bytes_before": 4096.0,
+        "db_bytes_after": 4096.0,
+        "db_bytes_growth": 0.0,
+        "wal_bytes_before": 255472.0,
+        "wal_bytes_after": 2640952.0,
+        "wal_bytes_growth": 2385480.0,
+        "bytes_per_write_op": 0.0
+      }
+    },
+    {
+      "recipe": "small_narrow_few_write_cold",
+      "iteration": 4,
+      "warmup": false,
+      "seed": 20260423,
+      "wall_clock_seconds": 0.23303039999882458,
+      "counts": {
+        "flows_created": 10,
+        "tasks_created": 40,
+        "flow_transitions": 30,
+        "task_events_recorded": 40,
+        "read_queries": 5
+      },
+      "throughput": {
+        "flows_per_sec": 42.91285600526987,
+        "tasks_per_sec": 171.6514240210795,
+        "transitions_per_sec": 128.73856801580962,
+        "task_events_per_sec": 171.6514240210795
+      },
+      "latency_ms": {
+        "create_flow": {
+          "count": 10.0,
+          "p50": 1.634149999517831,
+          "p95": 7.598424998832343,
+          "p99": 11.453844999596186
+        },
+        "set_flow_state": {
+          "count": 30.0,
+          "p50": 3.8949999998294516,
+          "p95": 4.284159999770054,
+          "p99": 8.543534000127693
+        },
+        "create_task": {
+          "count": 40.0,
+          "p50": 1.555450000523706,
+          "p95": 1.812244998109236,
+          "p99": 1.962626000677119
+        },
+        "record_task_event": {
+          "count": 40.0,
+          "p50": 0.25269999969168566,
+          "p95": 0.35813500107906293,
+          "p99": 0.45543299998826114
+        },
+        "query.list_task_runs": {
+          "count": 1.0,
+          "p50": 4.937900001095841,
+          "p95": 4.937900001095841,
+          "p99": 4.937900001095841
+        },
+        "query.list_flow_runs": {
+          "count": 2.0,
+          "p50": 0.7834499992895871,
+          "p95": 0.7996949985681567,
+          "p99": 0.8011389985040296
+        },
+        "query.list_events": {
+          "count": 2.0,
+          "p50": 0.6488500021077925,
+          "p95": 0.7104550013536937,
+          "p99": 0.7159310012866626
+        },
+        "query.get_flow_run_detail": {
+          "count": 1.0,
+          "p50": 0.5442000001494307,
+          "p95": 0.5442000001494307,
+          "p99": 0.5442000001494307
+        }
+      },
+      "process": {
+        "cpu_seconds_used": 0.109375,
+        "rss_bytes_start": 0.0,
+        "rss_bytes_end": 0.0,
+        "rss_bytes_delta": 0.0
+      },
+      "sqlite": {
+        "db_bytes_before": 4096.0,
+        "db_bytes_after": 4096.0,
+        "db_bytes_growth": 0.0,
+        "wal_bytes_before": 255472.0,
+        "wal_bytes_after": 2640952.0,
+        "wal_bytes_growth": 2385480.0,
+        "bytes_per_write_op": 0.0
+      }
+    },
+    {
+      "recipe": "small_narrow_few_write_cold",
+      "iteration": 5,
+      "warmup": false,
+      "seed": 20260424,
+      "wall_clock_seconds": 0.23585309999907622,
+      "counts": {
+        "flows_created": 10,
+        "tasks_created": 40,
+        "flow_transitions": 30,
+        "task_events_recorded": 40,
+        "read_queries": 5
+      },
+      "throughput": {
+        "flows_per_sec": 42.39927310702792,
+        "tasks_per_sec": 169.5970924281117,
+        "transitions_per_sec": 127.19781932108377,
+        "task_events_per_sec": 169.5970924281117
+      },
+      "latency_ms": {
+        "create_flow": {
+          "count": 10.0,
+          "p50": 1.5615000011166558,
+          "p95": 6.833100000403647,
+          "p99": 10.195500000590982
+        },
+        "set_flow_state": {
+          "count": 30.0,
+          "p50": 3.8208500009204727,
+          "p95": 5.828340000152821,
+          "p99": 11.042026999748487
+        },
+        "create_task": {
+          "count": 40.0,
+          "p50": 1.5390000007755589,
+          "p95": 2.00965500134771,
+          "p99": 2.264980999098043
+        },
+        "record_task_event": {
+          "count": 40.0,
+          "p50": 0.2507999997760635,
+          "p95": 0.3270600012911018,
+          "p99": 0.3528889996232465
+        },
+        "query.list_flow_runs": {
+          "count": 2.0,
+          "p50": 2.8445499992812984,
+          "p95": 4.790844997114618,
+          "p99": 4.9638489969220245
+        },
+        "query.get_flow_run_detail": {
+          "count": 3.0,
+          "p50": 0.5591999979515094,
+          "p95": 0.5810700007714331,
+          "p99": 0.583014001022093
+        },
+        "query.list_task_runs": {
+          "count": 2.0,
+          "p50": 0.5516499986697454,
+          "p95": 0.5609649975667708,
+          "p99": 0.5617929974687286
+        },
+        "query.list_events": {
+          "count": 1.0,
+          "p50": 0.6091999966884032,
+          "p95": 0.6091999966884032,
+          "p99": 0.6091999966884032
+        }
+      },
+      "process": {
+        "cpu_seconds_used": 0.09375,
+        "rss_bytes_start": 0.0,
+        "rss_bytes_end": 0.0,
+        "rss_bytes_delta": 0.0
+      },
+      "sqlite": {
+        "db_bytes_before": 4096.0,
+        "db_bytes_after": 4096.0,
+        "db_bytes_growth": 0.0,
+        "wal_bytes_before": 255472.0,
+        "wal_bytes_after": 2640952.0,
+        "wal_bytes_growth": 2385480.0,
+        "bytes_per_write_op": 0.0
+      }
+    }
+  ],
+  "aggregates": [
+    {
+      "recipe": "medium_narrow_heavy_mixed_warm",
+      "repetitions": 5,
+      "params": {
+        "name": "medium_narrow_heavy_mixed_warm",
+        "flow_count": 40,
+        "tasks_per_flow": 8,
+        "task_events_per_task": 5,
+        "read_ratio": 0.5,
+        "mixed": true,
+        "cold_start": false,
+        "sqlite_enabled": true
+      },
+      "wall_clock_seconds": {
+        "median": 1.8726958000006562,
+        "p95": 2.019989020000503,
+        "p99": 2.048299004000437
+      },
+      "throughput": {
+        "flows_per_sec": {
+          "median": 21.359582266370214,
+          "p95": 21.43040082867723,
+          "p99": 21.436418531173675
+        },
+        "task_events_per_sec": {
+          "median": 865.0630817879937,
+          "p95": 867.9312335614278,
+          "p99": 868.174950512534
+        },
+        "tasks_per_sec": {
+          "median": 181.55644926414683,
+          "p95": 182.15840704375648,
+          "p99": 182.20955751497627
+        },
+        "transitions_per_sec": {
+          "median": 64.07874679911065,
+          "p95": 64.2912024860317,
+          "p99": 64.30925559352104
+        }
+      },
+      "latency_ms": {
+        "create_flow": {
+          "p50": 1.640800001041498,
+          "p95": 1.9919299989851424,
+          "p99": 2.401735000858025
+        },
+        "create_task": {
+          "p50": 1.6403499994339654,
+          "p95": 1.9730999985767994,
+          "p99": 3.360797998830094
+        },
+        "query.get_flow_run_detail": {
+          "p50": 0.7657500009372598,
+          "p95": 0.8377199985261541,
+          "p99": 4.524874999333406
+        },
+        "query.list_events": {
+          "p50": 0.7717999997112202,
+          "p95": 1.3781999987259042,
+          "p99": 5.468826001015259
+        },
+        "query.list_flow_runs": {
+          "p50": 1.5571999974781647,
+          "p95": 1.8192800001997966,
+          "p99": 5.550298999623919
+        },
+        "query.list_task_runs": {
+          "p50": 0.7728999989922158,
+          "p95": 0.9769000011147,
+          "p99": 5.474737999029458
+        },
+        "record_task_event": {
+          "p50": 0.2877000006265007,
+          "p95": 0.3818050005065743,
+          "p99": 0.4883219990733778
+        },
+        "set_flow_state": {
+          "p50": 3.8871000015205937,
+          "p95": 4.776459999084182,
+          "p99": 9.760835999513802
+        }
+      },
+      "process": {
+        "cpu_seconds_used": {
+          "median": 1.046875,
+          "p95": 1.246875
+        },
+        "rss_bytes_delta": {
+          "median": 0.0,
+          "p95": 0.0
+        },
+        "rss_bytes_end": {
+          "median": 0.0,
+          "p95": 0.0
+        },
+        "rss_bytes_start": {
+          "median": 0.0,
+          "p95": 0.0
+        }
+      },
+      "sqlite": {
+        "bytes_per_write_op": {
+          "median": 156.49811320754716,
+          "p95": 156.49811320754716
+        },
+        "db_bytes_after": {
+          "median": 335872.0,
+          "p95": 335872.0
+        },
+        "db_bytes_before": {
+          "median": 4096.0,
+          "p95": 4096.0
+        },
+        "db_bytes_growth": {
+          "median": 331776.0,
+          "p95": 331776.0
+        },
+        "wal_bytes_after": {
+          "median": 4136512.0,
+          "p95": 4149696.0
+        },
+        "wal_bytes_before": {
+          "median": 407912.0,
+          "p95": 407912.0
+        },
+        "wal_bytes_growth": {
+          "median": 3728600.0,
+          "p95": 3741784.0
+        }
+      },
+      "notes": []
+    },
+    {
+      "recipe": "medium_wide_heavy_write_warm",
+      "repetitions": 5,
+      "params": {
+        "name": "medium_wide_heavy_write_warm",
+        "flow_count": 50,
+        "tasks_per_flow": 20,
+        "task_events_per_task": 4,
+        "read_ratio": 0.15,
+        "mixed": false,
+        "cold_start": false,
+        "sqlite_enabled": true
+      },
+      "wall_clock_seconds": {
+        "median": 3.9609689000026265,
+        "p95": 4.015601379999135,
+        "p99": 4.024155075999151
+      },
+      "throughput": {
+        "flows_per_sec": {
+          "median": 12.623174092572867,
+          "p95": 12.922427966430414,
+          "p99": 12.953964111689434
+        },
+        "task_events_per_sec": {
+          "median": 1009.8539274058294,
+          "p95": 1033.7942373144333,
+          "p99": 1036.3171289351549
+        },
+        "tasks_per_sec": {
+          "median": 252.46348185145735,
+          "p95": 258.4485593286083,
+          "p99": 259.0792822337887
+        },
+        "transitions_per_sec": {
+          "median": 37.8695222777186,
+          "p95": 38.76728389929125,
+          "p99": 38.861892335068305
+        }
+      },
+      "latency_ms": {
+        "create_flow": {
+          "p50": 1.6374000006180722,
+          "p95": 1.9829199987725588,
+          "p99": 2.456838001307915
+        },
+        "create_task": {
+          "p50": 1.6386999996029772,
+          "p95": 2.1278150014040875,
+          "p99": 4.833477002684958
+        },
+        "query.get_flow_run_detail": {
+          "p50": 0.7625999987794785,
+          "p95": 0.8374750006623799,
+          "p99": 0.9645989996352
+        },
+        "query.list_events": {
+          "p50": 0.7724000006419374,
+          "p95": 0.8416799984843237,
+          "p99": 0.9251949993995368
+        },
+        "query.list_flow_runs": {
+          "p50": 1.7107999992731493,
+          "p95": 1.8517100001190556,
+          "p99": 2.0758040016517043
+        },
+        "query.list_task_runs": {
+          "p50": 0.7770999982312787,
+          "p95": 0.8362500011571683,
+          "p99": 3.620279998285696
+        },
+        "record_task_event": {
+          "p50": 0.28640000164159574,
+          "p95": 0.3789000002143439,
+          "p99": 0.47314600084064296
+        },
+        "set_flow_state": {
+          "p50": 3.89040000118257,
+          "p95": 4.4850800002677715,
+          "p99": 9.03077300030418
+        }
+      },
+      "process": {
+        "cpu_seconds_used": {
+          "median": 2.390625,
+          "p95": 2.603125
+        },
+        "rss_bytes_delta": {
+          "median": 0.0,
+          "p95": 0.0
+        },
+        "rss_bytes_end": {
+          "median": 0.0,
+          "p95": 0.0
+        },
+        "rss_bytes_start": {
+          "median": 0.0,
+          "p95": 0.0
+        }
+      },
+      "sqlite": {
+        "bytes_per_write_op": {
+          "median": 117.36615384615385,
+          "p95": 118.78399999999999
+        },
+        "db_bytes_after": {
+          "median": 614400.0,
+          "p95": 621772.8
+        },
+        "db_bytes_before": {
+          "median": 4096.0,
+          "p95": 4096.0
+        },
+        "db_bytes_growth": {
+          "median": 610304.0,
+          "p95": 617676.8
+        },
+        "wal_bytes_after": {
+          "median": 4152992.0,
+          "p95": 4176064.0
+        },
+        "wal_bytes_before": {
+          "median": 407912.0,
+          "p95": 407912.0
+        },
+        "wal_bytes_growth": {
+          "median": 3745080.0,
+          "p95": 3768152.0
+        }
+      },
+      "notes": []
+    },
+    {
+      "recipe": "small_narrow_few_write_cold",
+      "repetitions": 5,
+      "params": {
+        "name": "small_narrow_few_write_cold",
+        "flow_count": 10,
+        "tasks_per_flow": 4,
+        "task_events_per_task": 1,
+        "read_ratio": 0.1,
+        "mixed": false,
+        "cold_start": true,
+        "sqlite_enabled": true
+      },
+      "wall_clock_seconds": {
+        "median": 0.23585309999907622,
+        "p95": 0.2466262000001734,
+        "p99": 0.24844620000047143
+      },
+      "throughput": {
+        "flows_per_sec": {
+          "median": 42.39927310702792,
+          "p95": 43.7116750485109,
+          "p99": 43.8714388571591
+        },
+        "task_events_per_sec": {
+          "median": 169.5970924281117,
+          "p95": 174.8467001940436,
+          "p99": 175.4857554286364
+        },
+        "tasks_per_sec": {
+          "median": 169.5970924281117,
+          "p95": 174.8467001940436,
+          "p99": 175.4857554286364
+        },
+        "transitions_per_sec": {
+          "median": 127.19781932108377,
+          "p95": 131.13502514553267,
+          "p99": 131.61431657147727
+        }
+      },
+      "latency_ms": {
+        "create_flow": {
+          "p50": 1.601299998583272,
+          "p95": 7.770665000134613,
+          "p99": 11.789812999486458
+        },
+        "create_task": {
+          "p50": 1.555450000523706,
+          "p95": 1.812244998109236,
+          "p99": 2.003125999144686
+        },
+        "query.get_flow_run_detail": {
+          "p50": 0.5591999979515094,
+          "p95": 0.5810700007714331,
+          "p99": 0.583014001022093
+        },
+        "query.list_events": {
+          "p50": 0.6091999966884032,
+          "p95": 0.6418250002752757,
+          "p99": 0.6447650002519367
+        },
+        "query.list_flow_runs": {
+          "p50": 0.811099998827558,
+          "p95": 0.811099998827558,
+          "p99": 0.811099998827558
+        },
+        "query.list_task_runs": {
+          "p50": 0.6505000019387808,
+          "p95": 0.8980400001746602,
+          "p99": 0.9157680001226254
+        },
+        "record_task_event": {
+          "p50": 0.2507999997760635,
+          "p95": 0.3286899996965076,
+          "p99": 0.372355998151761
+        },
+        "set_flow_state": {
+          "p50": 3.8208500009204727,
+          "p95": 4.523189998144517,
+          "p99": 10.751217999859364
+        }
+      },
+      "process": {
+        "cpu_seconds_used": {
+          "median": 0.09375,
+          "p95": 0.146875
+        },
+        "rss_bytes_delta": {
+          "median": 0.0,
+          "p95": 0.0
+        },
+        "rss_bytes_end": {
+          "median": 0.0,
+          "p95": 0.0
+        },
+        "rss_bytes_start": {
+          "median": 0.0,
+          "p95": 0.0
+        }
+      },
+      "sqlite": {
+        "bytes_per_write_op": {
+          "median": 0.0,
+          "p95": 0.0
+        },
+        "db_bytes_after": {
+          "median": 4096.0,
+          "p95": 4096.0
+        },
+        "db_bytes_before": {
+          "median": 4096.0,
+          "p95": 4096.0
+        },
+        "db_bytes_growth": {
+          "median": 0.0,
+          "p95": 0.0
+        },
+        "wal_bytes_after": {
+          "median": 2640952.0,
+          "p95": 2640952.0
+        },
+        "wal_bytes_before": {
+          "median": 255472.0,
+          "p95": 255472.0
+        },
+        "wal_bytes_growth": {
+          "median": 2385480.0,
+          "p95": 2385480.0
+        }
+      },
+      "notes": []
+    }
+  ]
+}

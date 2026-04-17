@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "code-review-graph": {
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/tools/dev/crg_mcp_serve.ps1"
+      ],
+      "type": "stdio",
+      "env": {
+        "CRG_EMBEDDING_MODEL": "Qwen/Qwen3-Embedding-0.6B",
+        "CRG_APPLY_ST_CACHE_PATCH": "1",
+        "TOKENIZERS_PARALLELISM": "false"
+      }
+    }
+  }
+}

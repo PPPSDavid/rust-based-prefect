@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from prefect_compat import InMemoryControlPlane, flow, set_control_plane, task, wait
 
 
@@ -27,7 +29,7 @@ def example_flow(total: int = 10) -> int:
 
 
 def run() -> tuple[int, int]:
-    plane = InMemoryControlPlane()
+    plane = InMemoryControlPlane(history_path=os.environ.get("IRONFLOW_HISTORY_PATH"))
     set_control_plane(plane)
     result = example_flow(5)
     return result, len(plane.events())

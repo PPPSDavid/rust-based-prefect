@@ -1,0 +1,53 @@
+site_name: Project IronFlow
+site_description: Rust-backed Prefect-compatible orchestration prototype
+site_url: https://pppsdavid.github.io/rust-based-prefect/
+repo_url: https://github.com/PPPSDavid/rust-based-prefect
+edit_uri: edit/main/docs/
+
+# Keep the published site focused; other files remain in docs/ for repo browsing.
+exclude_docs: |
+  MEMORY_BANK.md
+  benchmark_baseline.md
+  perf_baseline_pre_next_step.md
+  perf_candidate*.md
+  perf_compare*.md
+  perf_design_note.md
+  perf_matrix_summary.md
+  ui_phase1_api_contract.md
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+nav:
+  - Home: index.md
+  - "Prefect → IronFlow": PREFECT_IRONFLOW_MAPPING.md
+  - Compatibility: compatibility.md
+  - Architecture: architecture.md
+  - "UI E2E checklist": ui_e2e_visual_check.md
+  - "Perf methodology": perf_methodology.md
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.snippets:
+      base_path: ["."]
+  - tables
+  - toc:
+      permalink: true
+
+strict: true

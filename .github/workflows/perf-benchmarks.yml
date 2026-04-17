@@ -1,0 +1,63 @@
+name: Perf Benchmarks
+
+on:
+  pull_request:
+    paths:
+      - "benchmarks/**"
+      - "python-shim/src/prefect_compat/**"
+      - "docs/perf_*.md"
+      - ".github/workflows/perf-benchmarks.yml"
+  push:
+    branches: ["main"]
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  perf-pr:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install benchmark deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "pydantic>=2,<3"
+      - name: Run reduced deterministic suite
+        run: |
+          python benchmarks/perf_matrix.py run --preset lite --repetitions 2 --warmups 1 --jobs 2 --out-json docs/perf_pr_results.json --out-md docs/perf_pr_summary.md
+      - name: Upload reduced suite artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-pr-artifacts
+          path: |
+            docs/perf_pr_results.json
+            docs/perf_pr_summary.md
+
+  perf-main:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install benchmark deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "pydantic>=2,<3"
+      - name: Run full deterministic suite
+        run: |
+          python benchmarks/perf_matrix.py run --preset full --repetitions 5 --warmups 2 --jobs 2 --out-json docs/perf_main_results.json --out-md docs/perf_main_summary.md
+      - name: Upload full suite artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-main-artifacts
+          path: |
+            docs/perf_main_results.json
+            docs/perf_main_summary.md

@@ -27,3 +27,16 @@ alwaysApply: true
 - Do not claim full Prefect parity unless backed by compatibility matrix and tests.
 - Prefer small, composable changes over large refactors.
 - Maintain clear separation between in-process shim path and HTTP-boundary benchmark path.
+- Keep Python as a bridge layer; move hot paths and performance-critical logic to Rust.
+
+# Decision Protocol (Mandatory for Significant Work)
+
+For code review and key decision-making (architecture, compatibility, performance, refactors), use this protocol:
+
+1. Simulate three different experts answering the question.
+2. Each expert shares one step of reasoning at a time.
+3. Continue step-by-step as a group.
+4. Any expert that finds their reasoning wrong drops out.
+5. Continue until a consensus final answer is reached.
+
+Minor mechanical edits can skip this process.

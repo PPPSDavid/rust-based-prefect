@@ -10,9 +10,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_ironflow_script_e2e():
+def test_ironflow_script_e2e(tmp_path):
     env = os.environ.copy()
     env["PYTHONPATH"] = str(ROOT / "python-shim" / "src")
+    env["IRONFLOW_HISTORY_PATH"] = str(tmp_path / "script_history.jsonl")
     script = ROOT / "python-shim" / "examples" / "flow_ironflow.py"
 
     proc = subprocess.run(

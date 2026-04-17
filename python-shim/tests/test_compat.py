@@ -3,8 +3,8 @@ from uuid import uuid4
 from prefect_compat import InMemoryControlPlane, RunState, flow, set_control_plane, task, wait
 
 
-def test_submit_chain_and_map():
-    plane = InMemoryControlPlane()
+def test_submit_chain_and_map(tmp_path):
+    plane = InMemoryControlPlane(history_path=str(tmp_path / "chain.jsonl"))
     set_control_plane(plane)
 
     @task
@@ -26,8 +26,8 @@ def test_submit_chain_and_map():
     assert len(plane.events()) >= 3
 
 
-def test_duplicate_transition_token_is_idempotent():
-    plane = InMemoryControlPlane()
+def test_duplicate_transition_token_is_idempotent(tmp_path):
+    plane = InMemoryControlPlane(history_path=str(tmp_path / "dup.jsonl"))
     run = plane.create_flow_run("x")
     token = uuid4()
 
@@ -39,8 +39,8 @@ def test_duplicate_transition_token_is_idempotent():
     assert len(plane.events()) == 1
 
 
-def test_wait_for_dependency_order():
-    plane = InMemoryControlPlane()
+def test_wait_for_dependency_order(tmp_path):
+    plane = InMemoryControlPlane(history_path=str(tmp_path / "wait.jsonl"))
     set_control_plane(plane)
     calls: list[str] = []
 
@@ -63,3 +63,25 @@ def test_wait_for_dependency_order():
 
     assert pipeline() == 2
     assert calls == ["first", "second"]
+
+
+def test_flow_runs_without_server_or_ui(tmp_path):
+    history = tmp_path / "script_run_history.jsonl"
+    plane = InMemoryControlPlane(history_path=str(history))
+    set_control_plane(plane)
+
+    @task
+    def inc(x: int) -> int:
+        return x + 1
+
+    @flow
+    def script_like_flow() -> int:
+        return inc.submit(41).result()
+
+    assert script_like_flow() == 42
+    summary = plane.summary()
+    assert summary["flow_runs"] == 1
+    assert summary["task_runs"] >= 1
+    assert summary["events"] >= 3
+    assert history.exists()
+    assert history.with_suffix(".db").exists()

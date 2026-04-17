@@ -23,9 +23,11 @@ This file is a compact context handoff for future sessions.
 
 ## Persistence Status
 
-- IronFlow supports local JSONL history persistence in shim runtime.
-- History includes flow/task creation and lifecycle events.
-- This is durable local state, not yet full relational event store parity with Prefect.
+- IronFlow uses dual local persistence in shim runtime:
+  - JSONL append history for durable event replay
+  - SQLite read model for query/API/UI reads
+- History includes flow/task creation and lifecycle events; read model includes runs, logs, events, and artifacts.
+- Query hot paths can be Rust-backed through the optional Rust bridge.
 
 ## Performance Artifacts
 
@@ -42,7 +44,7 @@ This file is a compact context handoff for future sessions.
 
 ## Next High-Value Work
 
-1. Add read-model API shaped for UI consumption.
+1. Move projection write hot paths from Python into Rust-backed implementation.
 2. Expand Prefect API compatibility matrix with concrete parity tests.
-3. Replace JSONL persistence with DB-backed event store.
+3. Add migration/versioning path toward PostgreSQL for larger-scale persistence.
 4. Add CI gates and benchmark regression thresholds.

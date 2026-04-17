@@ -1,27 +1,66 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../api";
+import { RunDagPanel } from "../components/RunDagPanel";
 import { useSsePulse } from "../hooks/useSsePulse";
+import type { FlowRunDag } from "../types";
 
-type Tab = "tasks" | "logs" | "events" | "artifacts";
+type Tab = "tasks" | "logs" | "events" | "artifacts" | "dag";
 
 export function RunDetailPage() {
   const { id = "" } = useParams();
   const [tab, setTab] = useState<Tab>("tasks");
+  const [dagMode, setDagMode] = useState<"logical" | "expanded">("logical");
+  const queryClient = useQueryClient();
   const pulse = useSsePulse(useMemo(() => () => api.streamFlowRun(id), [id]));
 
-  const run = useQuery({ queryKey: ["flow-run", id, pulse], queryFn: () => api.getFlowRun(id) });
-  const tasks = useQuery({ queryKey: ["task-runs", id, pulse], queryFn: () => api.listTaskRuns(id) });
-  const logs = useQuery({ queryKey: ["logs", id, pulse], queryFn: () => api.listLogs(id) });
-  const events = useQuery({ queryKey: ["events", id, pulse], queryFn: () => api.listEvents(id) });
+  useEffect(() => {
+    if (pulse > 0) {
+      void queryClient.invalidateQueries({ queryKey: ["flow-run", id] });
+      void queryClient.invalidateQueries({ queryKey: ["task-runs", id] });
+      void queryClient.invalidateQueries({ queryKey: ["logs", id] });
+      void queryClient.invalidateQueries({ queryKey: ["events", id] });
+      void queryClient.invalidateQueries({ queryKey: ["artifacts", id] });
+      void queryClient.invalidateQueries({ queryKey: ["dag", id, dagMode] });
+    }
+  }, [pulse, id, dagMode, queryClient]);
+
+  const run = useQuery({ queryKey: ["flow-run", id], queryFn: () => api.getFlowRun(id), staleTime: 5_000 });
+  const tasks = useQuery({ queryKey: ["task-runs", id], queryFn: () => api.listTaskRuns(id), staleTime: 5_000 });
+  const logs = useQuery({ queryKey: ["logs", id], queryFn: () => api.listLogs(id), staleTime: 5_000 });
+  const events = useQuery({ queryKey: ["events", id], queryFn: () => api.listEvents(id), staleTime: 5_000 });
   const artifacts = useQuery({
-    queryKey: ["artifacts", id, pulse],
-    queryFn: () => api.listFlowArtifacts(id)
+    queryKey: ["artifacts", id],
+    queryFn: () => api.listFlowArtifacts(id),
+    staleTime: 5_000
+  });
+  const dag = useQuery({
+    queryKey: ["dag", id, dagMode],
+    queryFn: () => api.getFlowRunDag(id, dagMode),
+    staleTime: 5_000
   });
 
-  if (run.isLoading) return <p>Loading run...</p>;
-  if (run.error || !run.data) return <p>Unable to load run.</p>;
+  useEffect(() => {
+    if (pulse <= 0 || !tasks.data) return;
+    queryClient.setQueryData<FlowRunDag | undefined>(["dag", id, dagMode], (current) => {
+      if (!current) return current;
+      const nextNodes = current.nodes.map((node) => {
+        const related = tasks.data.items.filter(
+          (task) => task.planned_node_id === node.id || task.task_name === node.task_name
+        );
+        if (related.length === 0) return node;
+        const states = related.map((t) => t.state);
+        const nextState = aggregateState(states);
+        return { ...node, state: nextState };
+      });
+      return { ...current, nodes: nextNodes };
+    });
+  }, [pulse, tasks.data, dagMode, id, queryClient]);
+
+  if (run.isLoading && !run.data) return <p>Loading run...</p>;
+  if ((run.error && !run.data) || !run.data) return <p>Unable to load run.</p>;
 
   return (
     <section>
@@ -34,6 +73,7 @@ export function RunDetailPage() {
         <button onClick={() => setTab("logs")}>Logs</button>
         <button onClick={() => setTab("events")}>Events</button>
         <button onClick={() => setTab("artifacts")}>Artifacts</button>
+        <button onClick={() => setTab("dag")}>DAG</button>
       </div>
       {tab === "tasks" && (
         <ul>
@@ -72,6 +112,18 @@ export function RunDetailPage() {
           ))}
         </ul>
       )}
+      {tab === "dag" && dag.data && (
+        <RunDagPanel dag={dag.data} mode={dagMode} onModeChange={setDagMode} />
+      )}
+      {tab === "dag" && dag.isLoading && <p>Loading DAG...</p>}
     </section>
   );
+}
+
+function aggregateState(states: string[]): string {
+  const priority = ["FAILED", "CANCELLED", "RUNNING", "PENDING", "SCHEDULED", "COMPLETED"];
+  for (const state of priority) {
+    if (states.includes(state)) return state;
+  }
+  return states[0] ?? "PENDING";
 }

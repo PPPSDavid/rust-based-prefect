@@ -1,0 +1,10 @@
+# Cursor workspace rules
+
+For **code-review-graph MCP** usage, validation commands, **`perf_matrix.py`**
+benchmark modes and compare rules, repo layout, and the three-expert consensus
+review protocol, read **`AGENTS.md`** (Ground Truth Files, Expected Validation,
+**Performance: perf_matrix.py**, and MCP Tools sections).
+
+**Rule of thumb:** use graph tools (`query_graph`, `get_architecture_overview`,
+`detect_changes`, etc.) for exploration and impact analysis before relying on
+blind search across the tree.

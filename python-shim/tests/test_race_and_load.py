@@ -4,8 +4,8 @@ from uuid import uuid4
 from prefect_compat import InMemoryControlPlane, RunState
 
 
-def test_duplicate_token_race():
-    plane = InMemoryControlPlane()
+def test_duplicate_token_race(tmp_path):
+    plane = InMemoryControlPlane(history_path=str(tmp_path / "race.jsonl"))
     run = plane.create_flow_run("race")
     token = uuid4()
 
@@ -22,8 +22,8 @@ def test_duplicate_token_race():
     assert len(plane.events()) == 1
 
 
-def test_transition_load_progression():
-    plane = InMemoryControlPlane()
+def test_transition_load_progression(tmp_path):
+    plane = InMemoryControlPlane(history_path=str(tmp_path / "load.jsonl"))
     total_runs = 500
 
     for i in range(total_runs):

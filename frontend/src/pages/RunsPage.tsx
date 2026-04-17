@@ -1,17 +1,28 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import { useSsePulse } from "../hooks/useSsePulse";
 
 export function RunsPage() {
-  const pulse = useSsePulse(() => api.streamFlowRuns());
+  const queryClient = useQueryClient();
+  const openFlowRunsStream = useCallback(() => api.streamFlowRuns(), []);
+  const pulse = useSsePulse(openFlowRunsStream);
+
+  useEffect(() => {
+    if (pulse > 0) {
+      void queryClient.invalidateQueries({ queryKey: ["flow-runs"] });
+    }
+  }, [pulse, queryClient]);
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ["flow-runs", pulse],
-    queryFn: () => api.listFlowRuns()
+    queryKey: ["flow-runs"],
+    queryFn: () => api.listFlowRuns(),
+    staleTime: 5_000
   });
 
-  if (isLoading) return <p>Loading runs...</p>;
-  if (error) return <p>Failed to load runs.</p>;
+  if (isLoading && !data) return <p>Loading runs...</p>;
+  if (error && !data) return <p>Failed to load runs.</p>;
 
   return (
     <section>
