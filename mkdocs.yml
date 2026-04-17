@@ -33,6 +33,7 @@ theme:
 
 nav:
   - Home: index.md
+  - "Quick start (demo flow)": QUICKSTART_DEMO.md
   - Architecture: architecture.md
   - "Performance (vs Prefect)": PERFORMANCE_OVERVIEW.md
   - "Prefect → IronFlow": PREFECT_IRONFLOW_MAPPING.md

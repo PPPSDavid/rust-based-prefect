@@ -14,6 +14,7 @@ Project IronFlow is a **hybrid MVP** built around a **Rust orchestration kernel*
 | How Rust and Python fit together | [docs/architecture.md](docs/architecture.md) |
 | PyPI / conda “one command” install (roadmap) | [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) |
 | Performance vs Prefect (expectations, caveats) | [docs/PERFORMANCE_OVERVIEW.md](docs/PERFORMANCE_OVERVIEW.md) |
+| Quick start (demo flow, hosted docs) | [docs/QUICKSTART_DEMO.md](docs/QUICKSTART_DEMO.md) |
 | Map Prefect concepts to this repo | [docs/PREFECT_IRONFLOW_MAPPING.md](docs/PREFECT_IRONFLOW_MAPPING.md) |
 | Supported behavior & gaps vs Prefect | [COMPATIBILITY.md](COMPATIBILITY.md) |
 | Releases & version bumps | [RELEASING.md](RELEASING.md) |
