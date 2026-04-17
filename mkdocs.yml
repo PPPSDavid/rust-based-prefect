@@ -32,6 +32,7 @@ theme:
 nav:
   - Home: index.md
   - Architecture: architecture.md
+  - "Install & distribution (PyPI/conda)": DISTRIBUTION.md
   - "Prefect → IronFlow": PREFECT_IRONFLOW_MAPPING.md
   - Compatibility: compatibility.md
   - "UI E2E checklist": ui_e2e_visual_check.md

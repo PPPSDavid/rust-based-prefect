@@ -12,6 +12,7 @@ Project IronFlow is a **hybrid MVP** built around a **Rust orchestration kernel*
 | If you want… | Go to… |
 | --- | --- |
 | How Rust and Python fit together | [docs/architecture.md](docs/architecture.md) |
+| PyPI / conda “one command” install (roadmap) | [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) |
 | Map Prefect concepts to this repo | [docs/PREFECT_IRONFLOW_MAPPING.md](docs/PREFECT_IRONFLOW_MAPPING.md) |
 | Supported behavior & gaps vs Prefect | [COMPATIBILITY.md](COMPATIBILITY.md) |
 | Releases & version bumps | [RELEASING.md](RELEASING.md) |
@@ -102,6 +103,8 @@ python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v
 ```
 
 Replace `v0.1.1` with the [latest release tag](https://github.com/PPPSDavid/rust-based-prefect/releases).
+
+**Prefect-style `pip install ironflow`?** Not on PyPI yet. IronFlow is **Rust + Python**; a smooth one-command install needs **platform wheels** that bundle `rust-engine`’s native library and small loader changes — see [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md).
 
 **Docs vs releases:** The [hosted MkDocs site](https://pppsdavid.github.io/rust-based-prefect/) tracks the **`main`** branch. For documentation that exactly matches a tag, use GitHub’s file browser at that tag, or checkout the tag locally and run `mkdocs serve` (see **Building docs locally**).
 

@@ -5,6 +5,7 @@
 ## Where to go next
 
 - **Releases:** install or checkout a [numbered release](https://github.com/PPPSDavid/rust-based-prefect/releases) (for example `v0.1.1`) — see the root **README** section *Using a numbered release*. This site is built from **`main`**; for docs frozen to a tag, browse the repository on GitHub at that tag or run MkDocs from a local checkout.
+- **Easier install (PyPI / conda):** not published yet; options and roadmap — [Distribution](DISTRIBUTION.md).
 - **Prefect OSS (reference):** [Prefect 3 — get started](https://docs.prefect.io/v3/get-started) · [prefecthq/prefect on GitHub](https://github.com/prefecthq/prefect)
 - **[Prefect concepts → IronFlow](PREFECT_IRONFLOW_MAPPING.md)** — map Prefect mental models to this codebase.
 - **[Compatibility](compatibility.md)** — supported `@flow` / `@task` subset and boundaries (`COMPATIBILITY.md` in-repo).
