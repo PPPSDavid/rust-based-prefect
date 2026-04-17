@@ -1,5 +1,5 @@
 site_name: Project IronFlow
-site_description: Rust-backed Prefect-compatible orchestration prototype
+site_description: Rust orchestration kernel with Prefect-style Python authoring (prefect_compat)
 site_url: https://pppsdavid.github.io/rust-based-prefect/
 repo_url: https://github.com/PPPSDavid/rust-based-prefect
 edit_uri: edit/main/docs/
@@ -31,9 +31,9 @@ theme:
 
 nav:
   - Home: index.md
+  - Architecture: architecture.md
   - "Prefect → IronFlow": PREFECT_IRONFLOW_MAPPING.md
   - Compatibility: compatibility.md
-  - Architecture: architecture.md
   - "UI E2E checklist": ui_e2e_visual_check.md
   - "Perf methodology": perf_methodology.md
 

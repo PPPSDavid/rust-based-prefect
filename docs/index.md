@@ -1,6 +1,6 @@
 # Project IronFlow
 
-**IronFlow** is a hybrid prototype: a **Rust** orchestration kernel with a **Prefect-style** Python authoring layer (`prefect_compat`). It targets developers who want deterministic control-plane behavior, local-first persistence, and optional HTTP/UI for observability.
+**IronFlow** centers on a **Rust orchestration kernel** (`rust-engine`): the deterministic control plane, event history, and native FFI surface are implemented there first. **`prefect_compat`** (Python) provides Prefect-style `@flow` / `@task` authoring and runtime glue — including optional HTTP — on top of that kernel. The optional UI is observability only. Read [Architecture](architecture.md) for the full runtime path.
 
 ## Where to go next
 

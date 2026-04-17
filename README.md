@@ -5,12 +5,13 @@
 [![Release](https://img.shields.io/github/v/release/PPPSDavid/rust-based-prefect?sort=semver)](https://github.com/PPPSDavid/rust-based-prefect/releases)
 [![License](https://img.shields.io/github/license/PPPSDavid/rust-based-prefect)](LICENSE)
 
-Project IronFlow is a **hybrid MVP** that pairs a **Rust** orchestration control plane with **Prefect-style** Python authoring (`@flow` / `@task`). It is aimed at developers who already know **Prefect 3.x** and want to try a deterministic, locally persisted runner without adopting a new authoring model from scratch.
+Project IronFlow is a **hybrid MVP** built around a **Rust orchestration kernel** (`rust-engine/`) and **Prefect-style** Python authoring (`@flow` / `@task` via `prefect_compat/`). It is aimed at developers who already know **Prefect 3.x** and want a deterministic, locally persisted control plane where **orchestration semantics live in Rust** and Python carries authoring and integration.
 
 **Hosted docs (MkDocs):** [https://pppsdavid.github.io/rust-based-prefect/](https://pppsdavid.github.io/rust-based-prefect/) — start with [Prefect → IronFlow mapping](https://pppsdavid.github.io/rust-based-prefect/PREFECT_IRONFLOW_MAPPING/) after you enable GitHub Pages (see [RELEASING.md](RELEASING.md)).
 
 | If you want… | Go to… |
 | --- | --- |
+| How Rust and Python fit together | [docs/architecture.md](docs/architecture.md) |
 | Map Prefect concepts to this repo | [docs/PREFECT_IRONFLOW_MAPPING.md](docs/PREFECT_IRONFLOW_MAPPING.md) |
 | Supported behavior & gaps vs Prefect | [COMPATIBILITY.md](COMPATIBILITY.md) |
 | Releases & version bumps | [RELEASING.md](RELEASING.md) |
@@ -19,10 +20,10 @@ Project IronFlow is a **hybrid MVP** that pairs a **Rust** orchestration control
 
 ## Goals
 
-- Improve orchestration robustness with a deterministic state machine and append-only event log.
-- Keep Prefect-style `@flow` / `@task` Python authoring for a **prioritized subset** (import from **`prefect_compat`**, not `prefect`).
-- Add static pre-run planning and forecasting for analyzable flow definitions.
-- Keep performance-critical paths Rust-backed; use Python as the compatibility/API bridge.
+- **Rust (`rust-engine/`):** implement the orchestration **kernel** — deterministic state machine, transition validation, append-only history, and the native query/FFI surface the Python layer calls into. This is the primary control plane, not an add-on.
+- **Python (`python-shim/`):** Prefect-style `@flow` / `@task` authoring and runtime glue for a **prioritized subset** (import from **`prefect_compat`**, not `prefect`), plus optional HTTP APIs.
+- **Static planner:** graph IR and forecasting for analyzable flow definitions.
+- **Performance:** hot paths belong in Rust by design; Python stays a thin compatibility and I/O bridge.
 
 ## Prefect baseline
 
@@ -41,13 +42,15 @@ Project IronFlow is a **hybrid MVP** that pairs a **Rust** orchestration control
 
 | Path | Role |
 | --- | --- |
-| `rust-engine/` | Deterministic orchestration kernel (FSM, events, SQLite-backed reads). |
-| `python-shim/` | `prefect_compat` package: decorators, runtime, optional FastAPI server. |
+| **`rust-engine/`** | **Core** orchestration kernel: FSM, events, persistence hooks, FFI/cdylib for Python. |
+| `python-shim/` | Authoring and runtime: `prefect_compat` decorators, control-plane calls into Rust, optional FastAPI server. |
 | `static-planner/` | Static graph IR and forecasting for analyzable flows. |
 | `frontend/` | Optional Vite/React UI for runs and detail views. |
 | `benchmarks/` | `perf_matrix.py`, Prefect vs IronFlow comparison harnesses. |
 | `docs/` | Methodology notes, UI checklists, **MkDocs sources** for the site above. |
 | `scripts/` | Server launcher (`ironflow_server.py`), seeds, demos. |
+
+See [docs/architecture.md](docs/architecture.md) for the runtime data path (Python → shim → Rust engine).
 
 ## Quickstart
 
@@ -72,9 +75,9 @@ Python **3.11+** is supported; `environment.yml` currently pins **3.12**.
 
 ### Using a numbered release (e.g. v0.1.1)
 
-Pick **one** approach depending on whether you need the full repo (Rust engine, benchmarks, UI, scripts) or only the Python compatibility layer.
+Pick **one** approach depending on whether you need the **full stack** (Rust engine sources, Python shim, benchmarks, scripts) or only the installable Python packages.
 
-**A — Full checkout (recommended for development, benchmarks, optional UI/Rust)**
+**A — Full checkout (recommended: `rust-engine` + shim + benchmarks + scripts; UI optional)**
 
 ```bash
 git clone https://github.com/PPPSDavid/rust-based-prefect.git
@@ -86,7 +89,7 @@ Then follow the **Environment** subsection above (`environment.yml` or `requirem
 
 **B — Install only the Python shim (`prefect_compat`) from git**
 
-Use this when you want to depend on the published API in another project without cloning the whole tree (no bundled `rust-engine` build from this path—optional acceleration still applies if you build the library separately and set `IRONFLOW_RUST_LIB`).
+Use this when you want the **Python package alone** in another project. That install path does **not** ship the `rust-engine` crate or its native library; behavior falls back to Python-side implementations unless you **build `rust-engine` yourself** and point **`IRONFLOW_RUST_LIB`** at the resulting `cdylib`. For the intended architecture (kernel in Rust), prefer **full checkout** and `cargo build` below.
 
 ```bash
 python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v0.1.1#subdirectory=python-shim"
@@ -139,13 +142,15 @@ Manual uvicorn (equivalent API):
 python -m uvicorn python-shim.src.prefect_compat.server:app --host 127.0.0.1 --port 8000
 ```
 
-### 5. Optional: Rust query acceleration
+### 5. Rust engine (build the native library)
+
+The control plane is implemented in **`rust-engine/`**. Build the shared library so the Python shim can load it and use the Rust FSM, event pipeline, and native query path (auto-discovered under `rust-engine/target/`).
 
 ```bash
 cargo build --manifest-path rust-engine/Cargo.toml
 ```
 
-The shim auto-detects the built `cdylib` under `rust-engine/target/`. Override with `IRONFLOW_RUST_LIB` if needed.
+Override the search path with **`IRONFLOW_RUST_LIB`** if you build elsewhere. Skipping this step leaves you on Python fallbacks where implemented; for production-like behavior and parity with how the repo is developed, treat **`cargo build` as part of the normal full stack**, not a niche optimization.
 
 ## Benchmarks
 

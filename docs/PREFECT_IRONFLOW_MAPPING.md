@@ -1,11 +1,12 @@
 # Prefect concepts → IronFlow
 
-This project is **not** a drop-in replacement for Prefect Cloud or the full Prefect OSS runtime. It is a **prototype** that lets you author flows with **Prefect-like** decorators and patterns while execution goes through IronFlow’s control plane (Python shim + Rust engine). Use this table to orient yourself if you already know Prefect 3.x.
+This project is **not** a drop-in replacement for Prefect Cloud or the full Prefect OSS runtime. It is a **prototype** that lets you author flows with **Prefect-like** decorators while execution is governed by IronFlow’s **Rust-first control plane** (`rust-engine`) with a Python compatibility layer (`prefect_compat`). Use this table to orient yourself if you already know Prefect 3.x.
 
 **Upstream Prefect (reference only):** the official [Prefect 3 get started guide](https://docs.prefect.io/v3/get-started) explains flows, tasks, and the mental model this repo echoes. Source for Prefect OSS lives at [github.com/prefecthq/prefect](https://github.com/prefecthq/prefect). IronFlow reuses *patterns*, not the Prefect runtime.
 
 | Prefect (typical mental model) | In IronFlow |
 | --- | --- |
+| Prefect engine / orchestrator (Python services, workers, …) | **Rust `rust-engine`** owns the deterministic state machine and durable history; Python proposes transitions and runs user task code. Build the `cdylib` and load it from the shim (see README). |
 | `from prefect import flow, task` | `from prefect_compat import flow, task` (and `wait`, `set_control_plane`, etc.). Imports come from the **`prefect_compat`** package in this repo, not from `prefect`. |
 | Prefect orchestration / API server | Optional HTTP API in `prefect_compat.server` (e.g. `uvicorn python-shim.src.prefect_compat.server:app`). Start with `python scripts/ironflow_server.py start` or run flows **without** any server—orchestration works in-process. |
 | Prefect UI | Optional Vite/React app under `frontend/` when you want a local dashboard; not the Prefect Cloud UI. |
