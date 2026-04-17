@@ -27,6 +27,16 @@ The `release` workflow checks that `vX.Y.Z` (without `v`) equals `VERSION` and c
 
 If you fork, replace repository URLs in `CHANGELOG.md` with your GitHub coordinates.
 
+## Using a release (downstream)
+
+Consumers should take artifacts from [**GitHub Releases**](https://github.com/PPPSDavid/rust-based-prefect/releases), not from unlabeled `main` snapshots, when they need a reproducible version.
+
+1. **Full stack:** clone the repository and `git checkout vX.Y.Z`, then use `environment.yml` / `requirements-ci.txt` and run from the repo root (Rust, benchmarks, `scripts/`, optional UI) as in the root `README.md`.
+2. **Python packages only:** install with pip from git, for example:
+   - `pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@vX.Y.Z#subdirectory=python-shim"`
+   - optional: `#subdirectory=static-planner` for `ironflow-static-planner`.
+3. **Documentation:** the public MkDocs site tracks **`main`**. To read docs that match a specific tag exactly, browse the repo on GitHub at that tag, or checkout the tag and run `mkdocs serve` per the README.
+
 ## Documentation site (GitHub Pages)
 
 After enabling **GitHub Pages** from **GitHub Actions** in the repository settings:

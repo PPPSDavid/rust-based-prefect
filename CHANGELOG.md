@@ -4,16 +4,21 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
-### Added
+## [0.1.1] — 2026-04-17
 
-- User-facing documentation site (MkDocs Material) deployable to GitHub Pages.
-- CI workflow for Python/Rust tests, version sync, and frontend unit tests.
-- `docs/PREFECT_IRONFLOW_MAPPING.md` — Prefect concepts mapped to IronFlow.
-- `requirements-ci.txt` for reproducible test installs without conda.
+### Fixed
+
+- CI on Linux: process-pool `task.map` tests now use a `prefect_compat` top-level callable (`mp_picklable.inc`) so multiprocessing can unpickle the task body reliably.
+- `benchmarks/perf_matrix.py`: read-query phase calls `list_flow_runs`, `list_task_runs`, and `list_events` with the correct parameters (limits and `flow_run_id` UUIDs), fixing SQLite errors in CI perf runs.
+
+### Documentation
+
+- Documented how to **use a tagged release** (full repo checkout vs pip-installing the Python shim from git); see README and `RELEASING.md`.
 
 ## [0.1.0] — 2026-04-17
 
-Initial public-oriented packaging: Apache-2.0 license, compatibility matrix, benchmarks, and prototype UI.
+Initial public-oriented packaging: Apache-2.0 license, compatibility matrix, benchmarks, prototype UI, CI, MkDocs site, and Prefect→IronFlow mapping.
 
-[Unreleased]: https://github.com/PPPSDavid/rust-based-prefect/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/PPPSDavid/rust-based-prefect/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/PPPSDavid/rust-based-prefect/releases/tag/v0.1.1
 [0.1.0]: https://github.com/PPPSDavid/rust-based-prefect/releases/tag/v0.1.0

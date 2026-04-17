@@ -20,7 +20,7 @@ This project is **not** a drop-in replacement for Prefect Cloud or the full Pref
 
 ## Practical “bring your own tasks” path
 
-1. **Clone** the repo and create the conda env from `environment.yml` (or install `requirements-ci.txt` in a venv).
+1. **Clone** the repo, **checkout a [release tag](https://github.com/PPPSDavid/rust-based-prefect/releases)** (for example `v0.1.1`) when you want a stable baseline, then create the conda env from `environment.yml` (or install `requirements-ci.txt` in a venv). Alternatively install only `prefect_compat` with pip from git — see the root README *Using a numbered release*.
 2. **Port imports**: replace `prefect` flow/task imports with `prefect_compat` (and wire `set_control_plane` / `InMemoryControlPlane` as in tests under `python-shim/tests/`).
 3. **Stay inside the subset**: prefer `submit` chains, `map` with clear static shape, and control-plane features listed in `COMPATIBILITY.md`.
 4. **Validate**: run `python -m pytest python-shim/tests` and your own scripts locally; add a small script under `scripts/` if you want a repeatable smoke test.

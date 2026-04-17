@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ironflow-static-planner"
-version = "0.1.0"
+version = "0.1.1"
 description = "Static graph IR and forecasting for Prefect-style usage subset."
 requires-python = ">=3.11"
 dependencies = ["pydantic>=2,<3"]

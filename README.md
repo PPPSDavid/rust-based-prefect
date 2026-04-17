@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/PPPSDavid/rust-based-prefect/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/PPPSDavid/rust-based-prefect/actions/workflows/ci.yml)
 [![Docs](https://github.com/PPPSDavid/rust-based-prefect/actions/workflows/docs.yml/badge.svg?branch=main)](https://github.com/PPPSDavid/rust-based-prefect/actions/workflows/docs.yml)
+[![Release](https://img.shields.io/github/v/release/PPPSDavid/rust-based-prefect?sort=semver)](https://github.com/PPPSDavid/rust-based-prefect/releases)
 [![License](https://img.shields.io/github/license/PPPSDavid/rust-based-prefect)](LICENSE)
 
 Project IronFlow is a **hybrid MVP** that pairs a **Rust** orchestration control plane with **Prefect-style** Python authoring (`@flow` / `@task`). It is aimed at developers who already know **Prefect 3.x** and want to try a deterministic, locally persisted runner without adopting a new authoring model from scratch.
@@ -69,6 +70,38 @@ python -m pip install -r requirements-ci.txt
 
 Python **3.11+** is supported; `environment.yml` currently pins **3.12**.
 
+### Using a numbered release (e.g. v0.1.1)
+
+Pick **one** approach depending on whether you need the full repo (Rust engine, benchmarks, UI, scripts) or only the Python compatibility layer.
+
+**A — Full checkout (recommended for development, benchmarks, optional UI/Rust)**
+
+```bash
+git clone https://github.com/PPPSDavid/rust-based-prefect.git
+cd rust-based-prefect
+git checkout v0.1.1
+```
+
+Then follow the **Environment** subsection above (`environment.yml` or `requirements-ci.txt` at that tag). Run tests and scripts from the repo root as documented below.
+
+**B — Install only the Python shim (`prefect_compat`) from git**
+
+Use this when you want to depend on the published API in another project without cloning the whole tree (no bundled `rust-engine` build from this path—optional acceleration still applies if you build the library separately and set `IRONFLOW_RUST_LIB`).
+
+```bash
+python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v0.1.1#subdirectory=python-shim"
+```
+
+The static planner package is optional and installs separately if you need it:
+
+```bash
+python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v0.1.1#subdirectory=static-planner"
+```
+
+Replace `v0.1.1` with the [latest release tag](https://github.com/PPPSDavid/rust-based-prefect/releases).
+
+**Docs vs releases:** The [hosted MkDocs site](https://pppsdavid.github.io/rust-based-prefect/) tracks the **`main`** branch. For documentation that exactly matches a tag, use GitHub’s file browser at that tag, or checkout the tag locally and run `mkdocs serve` (see **Building docs locally**).
+
 ### 2. Tests
 
 From the repo root (`pytest.ini` sets `PYTHONPATH` for all packages):
@@ -134,8 +167,8 @@ The shim auto-detects the built `cdylib` under `rust-engine/target/`. Override w
 
 ## Versioning & releases
 
-- Single version in **`VERSION`**, kept in sync with Rust, Python packages, and `frontend/package.json` (`python scripts/check_version_sync.py`).
-- Tag **`vX.Y.Z`** must match `VERSION`; see [RELEASING.md](RELEASING.md) and [CHANGELOG.md](CHANGELOG.md).
+- Current release: see GitHub [**Releases**](https://github.com/PPPSDavid/rust-based-prefect/releases) (e.g. **v0.1.1**). Single version in **`VERSION`**, kept in sync with Rust, Python packages, and `frontend/package.json` (`python scripts/check_version_sync.py`).
+- Tag **`vX.Y.Z`** must match `VERSION`; pushing a tag creates a GitHub Release (see [RELEASING.md](RELEASING.md)). Changes are listed in [CHANGELOG.md](CHANGELOG.md).
 
 ## Building docs locally
 
