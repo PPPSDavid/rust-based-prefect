@@ -6,10 +6,12 @@ If you are coming from Prefect 3.x, start with **[Prefect → IronFlow](PREFECT_
 
 ## Get started
 
-1. **Run the demo** — **[Quick start (demo flow)](QUICKSTART_DEMO.md)** runs a tiny `@flow` in a few commands and shows what to expect on the terminal (no server required).
-2. **Install from a release** — Clone the [repository](https://github.com/PPPSDavid/rust-based-prefect) and check out a [release tag](https://github.com/PPPSDavid/rust-based-prefect/releases), then follow the **Quickstart** in the root **README** (conda or `pip` + `cargo build` for the Rust engine). That README is the single source for commands and paths.
+1. **[Install IronFlow](INSTALL.md)** — clone the repo, set up Python, build `rust-engine` with Cargo (current supported path; no PyPI wheel yet).
+2. **[Quick start (demo flow)](QUICKSTART_DEMO.md)** — run a tiny `@flow` and see expected terminal output (no server required).
 3. **Understand the stack** — Read **[Architecture](architecture.md)** for how Python calls into the Rust kernel.
 4. **Performance expectations** — See **[Performance (vs Prefect)](PERFORMANCE_OVERVIEW.md)** for what “faster” means here (control-plane throughput; not always faster end-to-end jobs).
+
+The root **README** in the repository duplicates install commands with scripts, tests, and optional UI — use it when you need the full command reference.
 
 ## Optional
 

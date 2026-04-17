@@ -1,6 +1,10 @@
 # Distribution: PyPI, conda, and “one command” installs
 
-Today the smoothest **supported** paths are:
+**Audience:** maintainers and contributors planning releases. **End users** should follow **[Installation](INSTALL.md)** for what is supported **today** (git clone + environment + `cargo build`).
+
+---
+
+Today the smoothest **supported** paths for *using* IronFlow are (also summarized in INSTALL):
 
 - **Full stack:** clone the repo (optionally at a release tag), `conda`/`mamba` or `pip install -r requirements-ci.txt`, then `cargo build` for `rust-engine`. This matches how the project is developed and tested.
 - **Python packages only:**  

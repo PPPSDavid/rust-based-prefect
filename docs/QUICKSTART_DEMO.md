@@ -1,6 +1,6 @@
 # Quick start: run a demo flow
 
-This page walks through **one minimal flow** in a few minutes: no API server and no UI required. You only need Python with the shim on your import path (from a [release](https://github.com/PPPSDavid/rust-based-prefect/releases) checkout — see the repository **README** for conda/`pip` setup).
+This page walks through **one minimal flow** in a few minutes: no API server and no UI required. Complete **[Installation](INSTALL.md)** first (clone, Python env, `cargo build`), then continue here.
 
 ## 1. Prepare the environment
 

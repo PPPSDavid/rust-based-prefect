@@ -12,7 +12,8 @@ Project IronFlow is a **hybrid MVP** built around a **Rust orchestration kernel*
 | If you want… | Go to… |
 | --- | --- |
 | How Rust and Python fit together | [docs/architecture.md](docs/architecture.md) |
-| PyPI / conda “one command” install (roadmap) | [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) |
+| **Install (current; hosted docs)** | [docs/INSTALL.md](docs/INSTALL.md) |
+| PyPI / conda packaging roadmap (contributors) | [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) |
 | Performance vs Prefect (expectations, caveats) | [docs/PERFORMANCE_OVERVIEW.md](docs/PERFORMANCE_OVERVIEW.md) |
 | Quick start (demo flow, hosted docs) | [docs/QUICKSTART_DEMO.md](docs/QUICKSTART_DEMO.md) |
 | Map Prefect concepts to this repo | [docs/PREFECT_IRONFLOW_MAPPING.md](docs/PREFECT_IRONFLOW_MAPPING.md) |
@@ -106,7 +107,7 @@ python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v
 
 Replace `v0.1.1` with the [latest release tag](https://github.com/PPPSDavid/rust-based-prefect/releases).
 
-**Prefect-style `pip install ironflow`?** Not on PyPI yet. IronFlow is **Rust + Python**; a smooth one-command install needs **platform wheels** that bundle `rust-engine`’s native library and small loader changes — see [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md).
+**Install guide (users):** see [docs/INSTALL.md](docs/INSTALL.md) on the hosted docs site. **PyPI wheels** are not published yet; future packaging work is described for maintainers in [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md).
 
 **Docs vs releases:** The [hosted MkDocs site](https://pppsdavid.github.io/rust-based-prefect/) tracks the **`main`** branch. For documentation that exactly matches a tag, use GitHub’s file browser at that tag, or checkout the tag locally and run `mkdocs serve` (see **Building docs locally**).
 
@@ -186,7 +187,7 @@ Read the full caveats and tables in **[docs/PERFORMANCE_OVERVIEW.md](docs/PERFOR
 
 ## Building docs locally
 
-The **GitHub Pages** site is **end-user** documentation only (install, architecture, compatibility, performance expectations). Maintainer topics such as [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) (PyPI roadmap) and [docs/perf_methodology.md](docs/perf_methodology.md) (benchmark harness internals) stay in the repository but are **not** published to the site.
+The **GitHub Pages** site is **end-user** documentation: [docs/INSTALL.md](docs/INSTALL.md), quick start, architecture, compatibility, performance, etc. Maintainer topics such as [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) (PyPI roadmap) and [docs/perf_methodology.md](docs/perf_methodology.md) (benchmark harness internals) stay in the repository but are **not** published to the site.
 
 ```bash
 python -m pip install -r requirements-docs.txt
