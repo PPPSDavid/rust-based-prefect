@@ -539,12 +539,17 @@ def _measure_read_queries(
 ) -> None:
     for _ in range(reads):
         choice = rng.random()
+        # API shapes: list_flow_runs(state, limit, cursor); list_task_runs / list_events need a real flow_run_id.
         if choice < 0.34:
-            _timed_call(latencies, "query.list_flow_runs", plane.list_flow_runs, 200, None)
-        elif choice < 0.67:
-            _timed_call(latencies, "query.list_task_runs", plane.list_task_runs, 200, None)
+            _timed_call(latencies, "query.list_flow_runs", plane.list_flow_runs, None, 200, None)
+        elif not flow_ids:
+            _timed_call(latencies, "query.list_flow_runs", plane.list_flow_runs, None, 200, None)
         else:
-            _timed_call(latencies, "query.list_events", plane.list_events, 200, None)
+            rid = flow_ids[rng.randrange(len(flow_ids))]
+            if choice < 0.67:
+                _timed_call(latencies, "query.list_task_runs", plane.list_task_runs, rid, 200, None)
+            else:
+                _timed_call(latencies, "query.list_events", plane.list_events, rid, 200, None)
         if flow_ids and rng.random() < 0.4:
             rid = flow_ids[rng.randrange(len(flow_ids))]
             _timed_call(latencies, "query.get_flow_run_detail", plane.get_flow_run_detail, rid)

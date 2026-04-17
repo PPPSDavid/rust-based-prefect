@@ -7,17 +7,16 @@ import os
 import pytest
 
 from prefect_compat import InMemoryControlPlane, flow, set_control_plane, task, wait
+from prefect_compat.mp_picklable import inc as _mp_inc
 from prefect_compat.task_runners import (
     ProcessPoolTaskRunner,
     SequentialTaskRunner,
     ThreadPoolTaskRunner,
 )
 
-
-@task
-def _picklable_inc(x: int) -> int:
-    """Module-level for multiprocessing pickling."""
-    return x + 1
+# Task body must be a prefect_compat top-level function so ProcessPool workers unpickle reliably
+# (pytest-loaded test modules are not stable import paths for multiprocessing).
+_picklable_inc = task(_mp_inc)
 
 
 def test_map_sequential_deterministic_order(tmp_path):
