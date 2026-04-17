@@ -15,6 +15,7 @@ Deliver a Prefect-compatible orchestration prototype that improves:
 ## Multi-Agent Rules
 
 - **One worktree or workspace per agent; one branch per task.** Do not share a working directory with another active agent. Use separate clones or `git worktree` as needed; use normal Git fetch/rebase/merge to integrate work.
+- **Start every task on a fresh feature branch** (never commit directly to `main` or reuse another agent’s branch for unrelated work). Parallel agents pushing to the same branch causes **lost commits, confusing history, and merge races**—treat separate branches as mandatory isolation, not optional hygiene.
 - **Narrow, explicit scope.** Each task must name the files, modules, or layers in scope. Do not silently expand into areas owned by other in-flight tasks.
 - **Prefer sequential hand-offs** (spec → implementation → tests → documentation) over many agents editing the same files concurrently.
 - **Cross-cutting ideas** (wide refactors, API reshapes) should be filed as follow-up tasks or separate branches—not bundled into unrelated work.
@@ -33,6 +34,10 @@ Every task description should include: **goal**, **ownership area** (paths or mo
 | Tests only | `test/<area>-<short-description>` | `test/benchmarks-perf-matrix-cli` |
 
 Summarize work in the **branch description, commit messages, or PR body**: impacted modules/packages, user-visible behavior, and any migrations, config, or benchmark baseline updates.
+
+### Cloud / Cursor agents (branch naming)
+
+**Cursor Cloud** and similar hosted agents should follow the same **one branch per task** rule. Unless the task says otherwise, create a dedicated branch off `main` at the **start** of the run, using the project’s cloud convention when given one (for example `cursor/<short-description>-f251`). Do not pile unrelated changes onto an existing `cursor/*` branch that another session may still be using—**always** branch first to avoid cross-agent races on push, PR updates, and CI.
 
 ## Project Map & Ownership
 

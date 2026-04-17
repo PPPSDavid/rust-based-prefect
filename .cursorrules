@@ -5,6 +5,11 @@ benchmark modes and compare rules, repo layout, and the three-expert consensus
 review protocol, read **`AGENTS.md`** (Ground Truth Files, Expected Validation,
 **Performance: perf_matrix.py**, and MCP Tools sections).
 
+**Parallel agents:** each task must use its **own feature branch** off `main`
+(see **Multi-Agent Rules** and **Cloud / Cursor agents** in `AGENTS.md`). Never
+commit to `main` or share a branch between concurrent agents—avoids push/PR
+races and conflicting histories.
+
 **Rule of thumb:** use graph tools (`query_graph`, `get_architecture_overview`,
 `detect_changes`, etc.) for exploration and impact analysis before relying on
 blind search across the tree.
