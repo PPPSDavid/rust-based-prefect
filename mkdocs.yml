@@ -33,14 +33,27 @@ theme:
 
 nav:
   - Home: index.md
-  - Installation: INSTALL.md
-  - "Quick start (demo flow)": QUICKSTART_DEMO.md
-  - "Self-hosted server": SELF_HOSTED_SERVER.md
-  - Architecture: architecture.md
-  - "Performance (vs Prefect)": PERFORMANCE_OVERVIEW.md
-  - "Prefect → IronFlow": PREFECT_IRONFLOW_MAPPING.md
-  - Compatibility: compatibility.md
-  - "Optional: verify the web UI": ui_e2e_visual_check.md
+  - Get started:
+      - Installation: INSTALL.md
+      - "Quick start (demo flow)": QUICKSTART_DEMO.md
+      - "Self-hosted server": SELF_HOSTED_SERVER.md
+      - "Optional: verify the web UI": ui_e2e_visual_check.md
+  - Concepts:
+      - "Concepts overview": concepts/index.md
+      - Flows: concepts/flows.md
+      - Tasks: concepts/tasks.md
+      - Runners: concepts/runners.md
+      - "States and transitions": concepts/states-and-transitions.md
+      - "Prefect → IronFlow": PREFECT_IRONFLOW_MAPPING.md
+      - Architecture: architecture.md
+  - "How-to guides":
+      - Overview: how-to/index.md
+      - "How to set up IronFlow": how-to/setup.md
+      - "How to run the server and UI": how-to/server-and-ui.md
+      - "How to port a flow from Prefect": how-to/port-from-prefect.md
+  - Reference:
+      - "Compatibility matrix": compatibility.md
+      - "Performance (vs Prefect)": PERFORMANCE_OVERVIEW.md
 
 plugins:
   - search

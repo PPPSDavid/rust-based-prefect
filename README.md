@@ -7,10 +7,11 @@
 
 Project IronFlow is a **hybrid MVP** built around a **Rust orchestration kernel** (`rust-engine/`) and **Prefect-style** Python authoring (`@flow` / `@task` via `prefect_compat/`). It is aimed at developers who already know **Prefect 3.x** and want a deterministic, locally persisted control plane where **orchestration semantics live in Rust** and Python carries authoring and integration.
 
-**Hosted docs (MkDocs):** [https://pppsdavid.github.io/rust-based-prefect/](https://pppsdavid.github.io/rust-based-prefect/) — start with [Prefect → IronFlow mapping](https://pppsdavid.github.io/rust-based-prefect/PREFECT_IRONFLOW_MAPPING/) after you enable GitHub Pages (see [RELEASING.md](RELEASING.md)).
+**Hosted docs (MkDocs):** [https://pppsdavid.github.io/rust-based-prefect/](https://pppsdavid.github.io/rust-based-prefect/) — the site is organized into **Get started**, **Concepts**, **How-to guides**, and **Reference** (see [docs/index.md](docs/index.md)); the [Prefect → IronFlow mapping](https://pppsdavid.github.io/rust-based-prefect/PREFECT_IRONFLOW_MAPPING/) remains the main Prefect-oriented entry. Enable GitHub Pages per [RELEASING.md](RELEASING.md).
 
 | If you want… | Go to… |
 | --- | --- |
+| Layered doc home (hosted) | [docs/index.md](docs/index.md) |
 | How Rust and Python fit together | [docs/architecture.md](docs/architecture.md) |
 | **Install (current; hosted docs)** | [docs/INSTALL.md](docs/INSTALL.md) |
 | PyPI / conda packaging roadmap (contributors) | [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) |
