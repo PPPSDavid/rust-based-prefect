@@ -13,6 +13,7 @@ Project IronFlow is a **hybrid MVP** built around a **Rust orchestration kernel*
 | --- | --- |
 | How Rust and Python fit together | [docs/architecture.md](docs/architecture.md) |
 | PyPI / conda “one command” install (roadmap) | [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) |
+| Performance vs Prefect (expectations, caveats) | [docs/PERFORMANCE_OVERVIEW.md](docs/PERFORMANCE_OVERVIEW.md) |
 | Map Prefect concepts to this repo | [docs/PREFECT_IRONFLOW_MAPPING.md](docs/PREFECT_IRONFLOW_MAPPING.md) |
 | Supported behavior & gaps vs Prefect | [COMPATIBILITY.md](COMPATIBILITY.md) |
 | Releases & version bumps | [RELEASING.md](RELEASING.md) |
@@ -155,11 +156,15 @@ cargo build --manifest-path rust-engine/Cargo.toml
 
 Override the search path with **`IRONFLOW_RUST_LIB`** if you build elsewhere. Skipping this step leaves you on Python fallbacks where implemented; for production-like behavior and parity with how the repo is developed, treat **`cargo build` as part of the normal full stack**, not a niche optimization.
 
-## Benchmarks
+## Benchmarks and expected speedup
+
+IronFlow targets **control-plane** performance (state transitions, scheduling), not faster arbitrary Python in tasks. On the **synthetic A/B harness** checked into `docs/perf_comparison.json`, **in-process IronFlow** reaches on the order of **10⁴–10⁵ transitions/s** vs **10²–10¹** for local Prefect OSS on comparable toy flows — **roughly two to three orders of magnitude** higher throughput in that narrow scenario, and **~10²×** when IronFlow is used behind the local HTTP API. **End-to-end** pipelines dominated by I/O or heavy task bodies may see **much smaller** wall-clock gains.
+
+Read the full caveats and tables in **[docs/PERFORMANCE_OVERVIEW.md](docs/PERFORMANCE_OVERVIEW.md)** (also on the hosted docs site).
 
 - **Prefect vs IronFlow A/B** (optional; needs Prefect installed):  
   `python benchmarks/compare_prefect_vs_ironflow.py` → writes `docs/perf_comparison.json` (JSON **array** — not for `perf_matrix.py compare`).
-- **Deterministic control-plane matrix** (regression harness):  
+- **Deterministic control-plane matrix** (IronFlow vs IronFlow regressions):  
   `python benchmarks/perf_matrix.py run --preset lite --repetitions 1 --warmups 0 --jobs 2`  
   See [docs/perf_methodology.md](docs/perf_methodology.md) and **Performance** in [AGENTS.md](AGENTS.md).
 

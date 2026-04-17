@@ -1,5 +1,7 @@
 # IronFlow Performance Methodology
 
+For **Prefect vs IronFlow headline throughput** (synthetic A/B, caveats, and multipliers), see [Performance overview](PERFORMANCE_OVERVIEW.md).
+
 This document describes the deterministic benchmark harness in `benchmarks/perf_matrix.py`.
 The harness is designed for stable cross-commit comparison, regression detection, and CI use.
 
