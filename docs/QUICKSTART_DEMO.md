@@ -2,6 +2,23 @@
 
 This page walks through **one minimal flow** in a few minutes: no API server and no UI required. Complete **[Installation](INSTALL.md)** first (clone, Python env, `cargo build`), then continue here.
 
+## What the demo looks like (source)
+
+Imports use **`prefect_compat`**, not `prefect`. Tasks are plain functions decorated with **`@task`**; the workflow is a function decorated with **`@flow`**. The control plane is an **`InMemoryControlPlane`** registered with **`set_control_plane`** before the flow runs.
+
+**Flow of data:** `example_flow(5)` calls **`start`** once (`5 → 6`), then **`process.map`** runs **`process`** on **two** values derived from that result (`6` and `7` → `12` and `14`). **`aggregate`** sums those to **`26`**.
+
+The listing below is the same source as `python-shim/examples/flow_ironflow.py` (embedded here so you can read it without opening the repo):
+
+```python
+--8<-- "python-shim/examples/flow_ironflow.py"
+```
+
+- **`start.submit(total)`** — schedule one task; **`first.result()`** waits for it inside the flow.
+- **`process.map(..., wait_for=[first])`** — fan-out; **`wait(mapped)`** waits for all mapped futures.
+- **`aggregate.submit(..., wait_for=mapped)`** — downstream task depending on the mapped set.
+- **`run()`** — creates the control plane, sets it globally, runs the flow, returns `(result, event_count)`.
+
 ## 1. Prepare the environment
 
 From the **root** of a cloned IronFlow repository (with dependencies installed as in the README):
