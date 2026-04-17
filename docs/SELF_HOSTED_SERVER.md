@@ -130,5 +130,3 @@ Optional UI walkthrough: **[Optional: verify the web UI](ui_e2e_visual_check.md)
 - **[Quick start (demo flow)](QUICKSTART_DEMO.md)** — minimal `@flow` without a server.
 - **[Architecture](architecture.md)** — Python ↔ Rust data path.
 - **[Compatibility](compatibility.md)** — what is implemented vs stubbed for deployments and scheduling.
-
-**Prefect (upstream):** [Prefect 3 — get started](https://docs.prefect.io/v3/get-started) · [Self-hosted server](https://docs.prefect.io/v3/how-to-guides/self-hosted/server-cli).
