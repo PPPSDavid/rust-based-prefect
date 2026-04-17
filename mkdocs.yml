@@ -4,15 +4,17 @@ site_url: https://pppsdavid.github.io/rust-based-prefect/
 repo_url: https://github.com/PPPSDavid/rust-based-prefect
 edit_uri: edit/main/docs/
 
-# Keep the published site focused; other files remain in docs/ for repo browsing.
+# Published site = end-user docs only. Maintainer/roadmap/CI notes stay in-repo for GitHub browsing.
 exclude_docs: |
   MEMORY_BANK.md
+  DISTRIBUTION.md
   benchmark_baseline.md
   perf_baseline_pre_next_step.md
   perf_candidate*.md
   perf_compare*.md
   perf_design_note.md
   perf_matrix_summary.md
+  perf_methodology.md
   ui_phase1_api_contract.md
 
 theme:
@@ -32,12 +34,10 @@ theme:
 nav:
   - Home: index.md
   - Architecture: architecture.md
-  - "Install & distribution (PyPI/conda)": DISTRIBUTION.md
-  - "Performance vs Prefect": PERFORMANCE_OVERVIEW.md
+  - "Performance (vs Prefect)": PERFORMANCE_OVERVIEW.md
   - "Prefect → IronFlow": PREFECT_IRONFLOW_MAPPING.md
   - Compatibility: compatibility.md
-  - "UI E2E checklist": ui_e2e_visual_check.md
-  - "Perf methodology": perf_methodology.md
+  - "Optional: verify the web UI": ui_e2e_visual_check.md
 
 plugins:
   - search

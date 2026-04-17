@@ -185,6 +185,8 @@ Read the full caveats and tables in **[docs/PERFORMANCE_OVERVIEW.md](docs/PERFOR
 
 ## Building docs locally
 
+The **GitHub Pages** site is **end-user** documentation only (install, architecture, compatibility, performance expectations). Maintainer topics such as [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) (PyPI roadmap) and [docs/perf_methodology.md](docs/perf_methodology.md) (benchmark harness internals) stay in the repository but are **not** published to the site.
+
 ```bash
 python -m pip install -r requirements-docs.txt
 mkdocs serve

@@ -1,18 +1,19 @@
 # Project IronFlow
 
-**IronFlow** centers on a **Rust orchestration kernel** (`rust-engine`): the deterministic control plane, event history, and native FFI surface are implemented there first. **`prefect_compat`** (Python) provides Prefect-style `@flow` / `@task` authoring and runtime glue — including optional HTTP — on top of that kernel. The optional UI is observability only. Read [Architecture](architecture.md) for the full runtime path.
+**IronFlow** is a **Rust-first** orchestration system with **Prefect-style** Python authoring (`prefect_compat`): you write `@flow` / `@task` flows in Python; the **control plane and durable history** live in the Rust engine. An optional web UI helps you inspect runs.
 
-## Where to go next
+If you are coming from Prefect 3.x, start with **[Prefect → IronFlow](PREFECT_IRONFLOW_MAPPING.md)**. For supported features and limits, see **[Compatibility](compatibility.md)**.
 
-- **Releases:** install or checkout a [numbered release](https://github.com/PPPSDavid/rust-based-prefect/releases) (for example `v0.1.1`) — see the root **README** section *Using a numbered release*. This site is built from **`main`**; for docs frozen to a tag, browse the repository on GitHub at that tag or run MkDocs from a local checkout.
-- **Easier install (PyPI / conda):** not published yet; options and roadmap — [Distribution](DISTRIBUTION.md).
-- **Performance vs Prefect:** orders-of-magnitude control-plane throughput on a synthetic harness; real pipelines vary — [Performance overview](PERFORMANCE_OVERVIEW.md).
-- **Prefect OSS (reference):** [Prefect 3 — get started](https://docs.prefect.io/v3/get-started) · [prefecthq/prefect on GitHub](https://github.com/prefecthq/prefect)
-- **[Prefect concepts → IronFlow](PREFECT_IRONFLOW_MAPPING.md)** — map Prefect mental models to this codebase.
-- **[Compatibility](compatibility.md)** — supported `@flow` / `@task` subset and boundaries (`COMPATIBILITY.md` in-repo).
-- **[Architecture](architecture.md)** — runtime vs static planner paths.
-- **Repository README** (repo root) — quickstart, environment setup, and server commands.
+## Get started
 
-## Hosted docs note
+1. **Install from a release** — Clone the [repository](https://github.com/PPPSDavid/rust-based-prefect) and check out a [release tag](https://github.com/PPPSDavid/rust-based-prefect/releases), then follow the **Quickstart** in the root **README** (conda or `pip` + `cargo build` for the Rust engine). That README is the single source for commands and paths.
+2. **Understand the stack** — Read **[Architecture](architecture.md)** for how Python calls into the Rust kernel.
+3. **Performance expectations** — See **[Performance (vs Prefect)](PERFORMANCE_OVERVIEW.md)** for what “faster” means here (control-plane throughput; not always faster end-to-end jobs).
 
-This site is generated with [MkDocs](https://www.mkdocs.org/) Material from the `docs/` folder. After you fork, set `site_url` (and optionally `repo_url`) in `mkdocs.yml` so search and “edit” links resolve correctly on GitHub Pages.
+## Optional
+
+- **Try the web UI** — After the API is running, use **[Optional: verify the web UI](ui_e2e_visual_check.md)** as a quick visual check.
+
+## Learn more
+
+- **Prefect (upstream)** — [Prefect 3 — get started](https://docs.prefect.io/v3/get-started) · [prefecthq/prefect](https://github.com/prefecthq/prefect)

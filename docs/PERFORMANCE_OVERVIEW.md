@@ -51,4 +51,4 @@ The table below uses the **committed** `docs/perf_comparison.json` snapshot. Re-
 
 ## Regression tracking (IronFlow vs IronFlow)
 
-For **cross-commit** or CI comparison of the IronFlow stack itself, use the deterministic matrix — see [Performance methodology](perf_methodology.md) (`perf_matrix.py run` / `compare`).
+Contributors who compare IronFlow builds over time use the deterministic `perf_matrix.py` harness; methodology is documented in the repository at `docs/perf_methodology.md` (not required reading to **use** IronFlow).
