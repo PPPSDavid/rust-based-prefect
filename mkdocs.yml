@@ -35,6 +35,7 @@ nav:
   - Home: index.md
   - Installation: INSTALL.md
   - "Quick start (demo flow)": QUICKSTART_DEMO.md
+  - "Self-hosted server": SELF_HOSTED_SERVER.md
   - Architecture: architecture.md
   - "Performance (vs Prefect)": PERFORMANCE_OVERVIEW.md
   - "Prefect → IronFlow": PREFECT_IRONFLOW_MAPPING.md
