@@ -1,7 +1,10 @@
+use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Mutex, OnceLock};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::thread;
+use std::time::Duration;
 
 use rusqlite::Connection;
 use serde_json::{json, Value};
@@ -59,9 +62,36 @@ struct EngineContext {
     db_conn: Option<Connection>,
 }
 
-fn engines() -> &'static Mutex<std::collections::HashMap<u64, EngineContext>> {
-    static CELL: OnceLock<Mutex<std::collections::HashMap<u64, EngineContext>>> = OnceLock::new();
-    CELL.get_or_init(|| Mutex::new(std::collections::HashMap::new()))
+fn engines() -> &'static Mutex<HashMap<u64, EngineContext>> {
+    static CELL: OnceLock<Mutex<HashMap<u64, EngineContext>>> = OnceLock::new();
+    CELL.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+struct DeploymentSchedulerHandle {
+    stop: Arc<AtomicBool>,
+    join: Option<thread::JoinHandle<()>>,
+}
+
+static DEPLOYMENT_SCHEDULERS: OnceLock<Mutex<HashMap<u64, DeploymentSchedulerHandle>>> = OnceLock::new();
+
+fn deployment_schedulers() -> &'static Mutex<HashMap<u64, DeploymentSchedulerHandle>> {
+    DEPLOYMENT_SCHEDULERS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Stop background scheduler thread for `handle` (no-op if none).
+fn ironflow_deployment_scheduler_stop_internal(handle: u64) {
+    if handle == 0 {
+        return;
+    }
+    let Ok(mut map) = deployment_schedulers().lock() else {
+        return;
+    };
+    if let Some(mut h) = map.remove(&handle) {
+        h.stop.store(true, Ordering::SeqCst);
+        if let Some(j) = h.join.take() {
+            let _ = j.join();
+        }
+    }
 }
 
 static NEXT_ENGINE_HANDLE: AtomicU64 = AtomicU64::new(1);
@@ -488,6 +518,33 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
             }
             Ok(json!({"ok": true, "results": out_results}))
         }
+        "deployment_create" => {
+            let conn = ctx
+                .db_conn
+                .as_ref()
+                .ok_or_else(|| "deployment_create requires bind_db".to_string())?;
+            match deployment_ops::create_deployment(conn, body) {
+                Ok(dep) => Ok(json!({"ok": true, "deployment": dep})),
+                Err(e) => Ok(json!({"ok": false, "error": {"code": "deployment", "message": e}})),
+            }
+        }
+        "deployment_update" => {
+            let conn = ctx
+                .db_conn
+                .as_ref()
+                .ok_or_else(|| "deployment_update requires bind_db".to_string())?;
+            match deployment_ops::update_deployment(conn, body) {
+                Ok(dep) => Ok(json!({"ok": true, "deployment": dep})),
+                Err(e) => {
+                    let code = if e == "deployment not found" {
+                        "not_found"
+                    } else {
+                        "deployment"
+                    };
+                    Ok(json!({"ok": false, "error": {"code": code, "message": e}}))
+                }
+            }
+        }
         "deployment_claim_next" => {
             let conn = ctx
                 .db_conn
@@ -499,6 +556,23 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                 .ok_or_else(|| "missing string field worker_name".to_string())?;
             let lease_seconds = body.get("lease_seconds").and_then(|v| v.as_i64()).unwrap_or(30).max(1);
             match deployment_ops::claim_next_deployment_run(conn, worker_name, lease_seconds) {
+                Ok(Some(run)) => Ok(json!({"ok": true, "run": run})),
+                Ok(None) => Ok(json!({"ok": true, "run": Value::Null})),
+                Err(e) => Ok(json!({"ok": false, "error": {"code": "deployment", "message": e}})),
+            }
+        }
+        "deployment_claim_next_wait" => {
+            let conn = ctx
+                .db_conn
+                .as_ref()
+                .ok_or_else(|| "deployment_claim_next_wait requires bind_db".to_string())?;
+            let worker_name = body
+                .get("worker_name")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| "missing string field worker_name".to_string())?;
+            let lease_seconds = body.get("lease_seconds").and_then(|v| v.as_i64()).unwrap_or(30).max(1);
+            let wait_ms = body.get("wait_ms").and_then(|v| v.as_u64()).unwrap_or(500);
+            match deployment_ops::claim_next_deployment_run_wait(conn, worker_name, lease_seconds, wait_ms) {
                 Ok(Some(run)) => Ok(json!({"ok": true, "run": run})),
                 Ok(None) => Ok(json!({"ok": true, "run": Value::Null})),
                 Err(e) => Ok(json!({"ok": false, "error": {"code": "deployment", "message": e}})),
@@ -657,7 +731,59 @@ pub extern "C" fn ironflow_engine_free(handle: u64) {
     if handle == 0 {
         return;
     }
+    ironflow_deployment_scheduler_stop_internal(handle);
     engines().lock().expect("engine map poisoned").remove(&handle);
+}
+
+/// Spawn a background thread that periodically runs `deployment_maintenance` under the engine mutex.
+#[no_mangle]
+pub extern "C" fn ironflow_deployment_scheduler_start(
+    handle: u64,
+    interval_ms: u64,
+    stale_after_seconds: i64,
+) -> bool {
+    if handle == 0 {
+        return false;
+    }
+    ironflow_deployment_scheduler_stop_internal(handle);
+    let stop = Arc::new(AtomicBool::new(false));
+    let stop_t = Arc::clone(&stop);
+    let sleep_ms = interval_ms.max(50);
+    let stale = stale_after_seconds.max(1);
+    let join = thread::spawn(move || {
+        while !stop_t.load(Ordering::SeqCst) {
+            thread::sleep(Duration::from_millis(sleep_ms));
+            if stop_t.load(Ordering::SeqCst) {
+                break;
+            }
+            let mut map = match engines().lock() {
+                Ok(m) => m,
+                Err(_) => break,
+            };
+            let Some(ctx) = map.get_mut(&handle) else {
+                break;
+            };
+            let Some(conn) = ctx.db_conn.as_ref() else {
+                continue;
+            };
+            let _ = deployment_ops::deployment_maintenance(conn, stale);
+        }
+    });
+    if let Ok(mut m) = deployment_schedulers().lock() {
+        m.insert(
+            handle,
+            DeploymentSchedulerHandle {
+                stop,
+                join: Some(join),
+            },
+        );
+    }
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn ironflow_deployment_scheduler_stop(handle: u64) {
+    ironflow_deployment_scheduler_stop_internal(handle);
 }
 
 /// JSON in / JSON out control dispatch (FSM transitions, registration, replay checkpoints).

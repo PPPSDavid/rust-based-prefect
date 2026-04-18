@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from uuid import UUID
 
 from fastapi.testclient import TestClient
 
@@ -24,6 +26,7 @@ def _swap_plane(tmp_path: Path) -> None:
     control_plane._rust_fsm_bridge = plane._rust_fsm_bridge
     control_plane._rust_fsm_handle = plane._rust_fsm_handle
     control_plane._rust_native_persistence = plane._rust_native_persistence
+    control_plane._rust_db_bound = plane._rust_db_bound
     control_plane._test_plane_ref = plane
     set_control_plane(control_plane)
 
@@ -69,3 +72,33 @@ def test_deployment_trigger_and_local_worker(tmp_path: Path) -> None:
     assert items[0]["id"] == queued_id
     assert items[0]["status"] == "COMPLETED"
     assert items[0]["flow_run_id"] is not None
+
+
+def test_patch_deployment_schedule(tmp_path: Path) -> None:
+    _swap_plane(tmp_path)
+    client = TestClient(app)
+    create = client.post(
+        "/api/deployments",
+        json={
+            "name": "patch-sched",
+            "flow_name": "simple_flow",
+            "default_parameters": {"n": 1},
+            "paused": False,
+        },
+    )
+    assert create.status_code == 200
+    deployment_id = create.json()["id"]
+    past = (datetime.now(UTC) - timedelta(seconds=2)).isoformat()
+    patch = client.patch(
+        f"/api/deployments/{deployment_id}",
+        json={
+            "schedule_enabled": True,
+            "schedule_interval_seconds": 3600,
+            "schedule_next_run_at": past,
+        },
+    )
+    assert patch.status_code == 200
+    body = patch.json()
+    assert body["schedule_enabled"] is True
+    assert body["schedule_interval_seconds"] == 3600
+    assert UUID(body["id"]) == UUID(deployment_id)

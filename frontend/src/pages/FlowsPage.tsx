@@ -43,7 +43,22 @@ export function FlowsPage() {
           <ul>
             {deployments.data?.items.map((deployment) => (
               <li key={deployment.id}>
-                {deployment.name} [{deployment.flow_name}]{" "}
+                {deployment.name} [{deployment.flow_name}]
+                {deployment.schedule_enabled ? (
+                  <span style={{ opacity: 0.85 }}>
+                    {" "}
+                    — schedule:{" "}
+                    {deployment.schedule_cron && deployment.schedule_cron.trim() !== ""
+                      ? `cron ${deployment.schedule_cron}`
+                      : deployment.schedule_interval_seconds != null
+                        ? `every ${deployment.schedule_interval_seconds}s`
+                        : "on"}
+                    {deployment.schedule_next_run_at != null && deployment.schedule_next_run_at !== ""
+                      ? `, next ${deployment.schedule_next_run_at}`
+                      : ""}
+                  </span>
+                ) : null}
+                {" "}
                 <button
                   onClick={() => trigger.mutate(deployment.id)}
                   disabled={deployment.paused || trigger.isPending}

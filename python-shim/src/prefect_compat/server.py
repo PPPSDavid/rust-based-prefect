@@ -35,6 +35,25 @@ class DeploymentCreateRequest(BaseModel):
     path: str | None = None
     default_parameters: dict = Field(default_factory=dict)
     paused: bool = False
+    concurrency_limit: int | None = None
+    collision_strategy: str = "ENQUEUE"
+    schedule_interval_seconds: int | None = None
+    schedule_cron: str | None = None
+    schedule_next_run_at: str | None = None
+    schedule_enabled: bool = False
+
+
+class DeploymentPatchRequest(BaseModel):
+    entrypoint: str | None = None
+    path: str | None = None
+    default_parameters: dict[str, object] | None = None
+    paused: bool | None = None
+    concurrency_limit: int | None = None
+    collision_strategy: str | None = None
+    schedule_interval_seconds: int | None = None
+    schedule_cron: str | None = None
+    schedule_next_run_at: str | None = None
+    schedule_enabled: bool | None = None
 
 
 class DeploymentRunTriggerRequest(BaseModel):
@@ -53,6 +72,7 @@ _worker_thread: threading.Thread | None = None
 _worker_last_heartbeat = 0.0
 _scheduler_stop_event = threading.Event()
 _scheduler_thread: threading.Thread | None = None
+_rust_scheduler_started = False
 LOCAL_WORKER_NAME = os.getenv("IRONFLOW_LOCAL_WORKER_NAME", "local-worker-1")
 
 app = FastAPI(title="IronFlow Compat Server")
@@ -169,12 +189,7 @@ def _resolve_flow_callable(flow_name: str, entrypoint: str | None = None):
     raise ValueError(f"unknown local flow: {flow_name}")
 
 
-def _run_local_deployment_once(worker_name: str | None = None) -> bool:
-    wn = worker_name or LOCAL_WORKER_NAME
-    claimed = control_plane.claim_next_deployment_run(worker_name=wn, lease_seconds=30)
-    if not claimed:
-        return False
-
+def _execute_claimed_deployment_run(claimed: dict) -> None:
     deployment = control_plane.get_deployment(UUID(claimed["deployment_id"]))
     if deployment is None:
         control_plane.mark_deployment_run_finished(
@@ -182,7 +197,7 @@ def _run_local_deployment_once(worker_name: str | None = None) -> bool:
             status="FAILED",
             error="Deployment not found",
         )
-        return True
+        return
 
     control_plane.mark_deployment_run_started(UUID(claimed["id"]))
     flow_run_id: UUID | None = None
@@ -205,6 +220,14 @@ def _run_local_deployment_once(worker_name: str | None = None) -> bool:
             flow_run_id=flow_run_id,
             error=str(exc),
         )
+
+
+def _run_local_deployment_once(worker_name: str | None = None) -> bool:
+    wn = worker_name or LOCAL_WORKER_NAME
+    claimed = control_plane.claim_next_deployment_run(worker_name=wn, lease_seconds=30)
+    if not claimed:
+        return False
+    _execute_claimed_deployment_run(claimed)
     return True
 
 
@@ -221,6 +244,25 @@ def _local_worker_loop() -> None:
         handled = _run_local_deployment_once(worker_name=LOCAL_WORKER_NAME)
         if not handled:
             time.sleep(0.5)
+
+
+def _local_worker_loop_rust_wait() -> None:
+    """Worker loop using Rust-backed blocking claim when available."""
+    global _worker_last_heartbeat
+    while not _worker_stop_event.is_set():
+        now_m = time.monotonic()
+        if now_m - _worker_last_heartbeat > 15.0:
+            try:
+                control_plane.worker_heartbeat(LOCAL_WORKER_NAME)
+            except Exception:
+                pass
+            _worker_last_heartbeat = now_m
+        claimed = control_plane.claim_next_deployment_run_wait(
+            worker_name=LOCAL_WORKER_NAME, lease_seconds=30, wait_ms=500
+        )
+        if not claimed:
+            continue
+        _execute_claimed_deployment_run(claimed)
 
 
 def _scheduler_maintenance_loop() -> None:
@@ -288,9 +330,13 @@ def _startup_local_worker() -> None:
             default_parameters={"n": 3},
             paused=False,
         )
-    global _worker_thread, _scheduler_thread
+    global _worker_thread, _scheduler_thread, _rust_scheduler_started
     if os.getenv("IRONFLOW_ENABLE_SCHEDULER", "1").strip().lower() not in {"0", "false", "no"}:
-        if _scheduler_thread is None or not _scheduler_thread.is_alive():
+        interval_ms = int(os.getenv("IRONFLOW_SCHEDULER_INTERVAL_MS", "1000"))
+        stale = int(os.getenv("IRONFLOW_SCHEDULER_STALE_SECONDS", "120"))
+        if control_plane.start_rust_deployment_scheduler(interval_ms=interval_ms, stale_after_seconds=stale):
+            _rust_scheduler_started = True
+        elif _scheduler_thread is None or not _scheduler_thread.is_alive():
             _scheduler_stop_event.clear()
             _scheduler_thread = threading.Thread(
                 target=_scheduler_maintenance_loop, name="ironflow-scheduler", daemon=True
@@ -300,14 +346,22 @@ def _startup_local_worker() -> None:
         return
     if _worker_thread is None or not _worker_thread.is_alive():
         _worker_stop_event.clear()
-        _worker_thread = threading.Thread(target=_local_worker_loop, name="ironflow-local-worker", daemon=True)
+        use_rust_wait = bool(
+            getattr(control_plane, "_rust_db_bound", False) and getattr(control_plane, "_rust_fsm_bridge", None)
+        )
+        target = _local_worker_loop_rust_wait if use_rust_wait else _local_worker_loop
+        _worker_thread = threading.Thread(target=target, name="ironflow-local-worker", daemon=True)
         _worker_thread.start()
 
 
 @app.on_event("shutdown")
 def _shutdown_local_worker() -> None:
+    global _rust_scheduler_started
     _worker_stop_event.set()
     _scheduler_stop_event.set()
+    if _rust_scheduler_started:
+        control_plane.stop_rust_deployment_scheduler()
+        _rust_scheduler_started = False
 
 
 @app.get("/api/flow-runs", response_model=CursorPage)
@@ -383,7 +437,24 @@ def create_deployment(req: DeploymentCreateRequest) -> dict:
         path=req.path,
         default_parameters=req.default_parameters,
         paused=req.paused,
+        concurrency_limit=req.concurrency_limit,
+        collision_strategy=req.collision_strategy,
+        schedule_interval_seconds=req.schedule_interval_seconds,
+        schedule_cron=req.schedule_cron,
+        schedule_next_run_at=req.schedule_next_run_at,
+        schedule_enabled=req.schedule_enabled,
     )
+
+
+@app.patch("/api/deployments/{deployment_id}")
+def patch_deployment(deployment_id: UUID, req: DeploymentPatchRequest) -> dict:
+    patch = req.model_dump(exclude_unset=True)
+    try:
+        return control_plane.update_deployment(deployment_id, patch)
+    except ValueError as exc:
+        detail = str(exc)
+        status_code = 404 if "not found" in detail else 400
+        raise HTTPException(status_code=status_code, detail=detail) from exc
 
 
 @app.get("/api/deployment-runs", response_model=CursorPage)
