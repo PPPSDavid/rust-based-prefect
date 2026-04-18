@@ -25,6 +25,11 @@ Defaults: backend **`127.0.0.1:8000`**, frontend **`http://localhost:4173`**. Us
 
 The helper runs **`npm install`** and **`npm run dev`** in `frontend/` when the UI is enabled, so **Node.js** and **npm** must be on `PATH` unless you use **`--backend-only`**.
 
+## Deployments and schedules
+
+For deployment lifecycle operations (create/update/trigger) and schedule examples
+(interval + cron), see **[How to create and update deployments](deployments.md)**.
+
 ## Verify the UI
 
 Use **[Optional: verify the web UI](../ui_e2e_visual_check.md)** for a quick visual smoke check once services are up.

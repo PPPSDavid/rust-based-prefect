@@ -50,6 +50,7 @@ nav:
       - Overview: how-to/index.md
       - "How to set up IronFlow": how-to/setup.md
       - "How to run the server and UI": how-to/server-and-ui.md
+      - "How to create and update deployments": how-to/deployments.md
       - "How to port a flow from Prefect": how-to/port-from-prefect.md
   - Reference:
       - "Compatibility matrix": compatibility.md

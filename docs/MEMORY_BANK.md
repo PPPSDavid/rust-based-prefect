@@ -6,7 +6,7 @@ This file is a compact context handoff for future sessions.
 
 - Name: Project IronFlow (`rust-based-prefect`)
 - Goal: Build a Prefect-compatible orchestration prototype with better determinism, performance, and static planning support.
-- Status: MVP scaffold complete, private GitHub repo created, baseline benchmarks and persistence prototype implemented.
+- Status: MVP scaffold complete, private GitHub repo created, baseline benchmarks and persistence prototype implemented; deployment schedules now support interval + cron (with Rust-first scheduler paths when available).
 
 ## Core Architecture
 
