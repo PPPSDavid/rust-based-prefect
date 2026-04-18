@@ -1,7 +1,7 @@
 # Performance Regression Report
 
-- Baseline: `baseline_stage2.json`
-- Candidate: `candidate_perf_now.json`
+- Baseline: `docs/_perf_baseline_main.json`
+- Candidate: `docs/perf_matrix_results.json`
 - Benchmark mode: `preset:lite`
 - Status: `PASS`
 
