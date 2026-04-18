@@ -2,8 +2,6 @@
 //! Called from `ironflow_control` when `bind_db` has attached a connection.
 
 use std::str::FromStr;
-use std::thread;
-use std::time::{Duration as StdDuration, Instant};
 
 use chrono::{DateTime, Duration, Utc};
 use cron::Schedule;
@@ -511,17 +509,23 @@ pub fn update_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
         }
     }
     if let Some(v) = body.get("schedule_interval_seconds") {
-        if !v.is_null() {
+        if v.is_null() {
+            schedule_interval_seconds = None;
+        } else {
             schedule_interval_seconds = v.as_i64();
         }
     }
     if let Some(v) = body.get("schedule_cron") {
-        if !v.is_null() {
+        if v.is_null() {
+            schedule_cron = None;
+        } else {
             schedule_cron = v.as_str().map(|s| s.to_string());
         }
     }
     if let Some(v) = body.get("schedule_next_run_at") {
-        if !v.is_null() {
+        if v.is_null() {
+            schedule_next_run_at = None;
+        } else {
             schedule_next_run_at = v.as_str().map(|s| s.to_string());
         }
     }
@@ -676,26 +680,6 @@ pub fn tick_deployment_schedules(conn: &Connection) -> Result<u64, String> {
     let a = tick_interval_schedules(conn)?;
     let b = tick_cron_schedules(conn)?;
     Ok(a + b)
-}
-
-/// Poll until a claim succeeds or `wait_ms` elapses (sleep in Rust between attempts).
-pub fn claim_next_deployment_run_wait(
-    conn: &Connection,
-    worker_name: &str,
-    lease_seconds: i64,
-    wait_ms: u64,
-) -> Result<Option<Value>, String> {
-    let deadline = Instant::now() + StdDuration::from_millis(wait_ms.max(1));
-    loop {
-        match claim_next_deployment_run(conn, worker_name, lease_seconds)? {
-            Some(v) => return Ok(Some(v)),
-            None => {}
-        }
-        if Instant::now() >= deadline {
-            return Ok(None);
-        }
-        thread::sleep(StdDuration::from_millis(50));
-    }
 }
 
 pub fn mark_deployment_run_started(conn: &Connection, deployment_run_id: &str) -> Result<(), String> {
