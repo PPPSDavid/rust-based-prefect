@@ -92,7 +92,7 @@ export type Deployment = {
   schedule_interval_seconds?: number | null;
   schedule_cron?: string | null;
   schedule_next_run_at?: string | null;
-  schedule_enabled: boolean;
+  schedule_enabled?: boolean;
   created_at: string;
   updated_at: string;
 };
