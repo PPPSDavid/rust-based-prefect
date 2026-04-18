@@ -71,4 +71,5 @@ Nothing listens on a port: orchestration runs **in-process**. If you set `IRONFL
 
 - **[Prefect → IronFlow](PREFECT_IRONFLOW_MAPPING.md)** — map Prefect concepts to this project.
 - **[Compatibility](compatibility.md)** — what is supported vs not.
+- **[How to set up IronFlow](how-to/setup.md)** · **[How to run the server and UI](how-to/server-and-ui.md)** — optional stack beyond in-process runs.
 - **README** in the repo — optional HTTP API, UI, and `cargo build` for the Rust engine.
