@@ -10,7 +10,7 @@ This project is **not** a drop-in replacement for Prefect Cloud or the full Pref
 | `from prefect import flow, task` | `from prefect_compat import flow, task` (and `wait`, `set_control_plane`, etc.). Imports come from the **`prefect_compat`** package in this repo, not from `prefect`. |
 | Prefect orchestration / API server | Optional HTTP API in `prefect_compat.server` (e.g. `uvicorn python-shim.src.prefect_compat.server:app`). Start with `python scripts/ironflow_server.py start` or run flows **without** any server—orchestration works in-process. |
 | Prefect UI | Optional Vite/React app under `frontend/` when you want a local dashboard; not the Prefect Cloud UI. |
-| Deployments, work pools, workers | **Not** production-parity. Some deployment-shaped APIs exist for experiments; treat as **subset / prototype**. See `COMPATIBILITY.md`. |
+| Deployments, work pools, workers | **Subset:** create/list/trigger deployments, optional **interval or cron** schedules, local worker loop claiming `deployment_runs`. Not production-parity with Prefect Cloud work pools; schedule/worker hot paths prefer **Rust** when `bind_db` is active. See `COMPATIBILITY.md`. |
 | `task.submit()` / futures | Supported for dependency chains within the MVP subset. |
 | `task.map()` | Supported with moderate fan-out (see `COMPATIBILITY.md`). |
 | Retries, timeouts, cancellation | Enforced at the **control-plane** level for supported flows; semantics are workload-driven—see `COMPATIBILITY.md` for exact boundaries. |

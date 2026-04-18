@@ -28,6 +28,8 @@ def _swap_plane(tmp_path: Path) -> None:
     control_plane._rust_fsm_bridge = plane._rust_fsm_bridge
     control_plane._rust_fsm_handle = plane._rust_fsm_handle
     control_plane._rust_native_persistence = plane._rust_native_persistence
+    control_plane._rust_db_bound = plane._rust_db_bound
+    control_plane._warned_deployment_fallback = getattr(plane, "_warned_deployment_fallback", False)
     control_plane._test_plane_ref = plane
     set_control_plane(control_plane)
 
@@ -122,36 +124,52 @@ def test_reclaim_expired_claim_back_to_scheduled(tmp_path: Path) -> None:
 
 def test_interval_schedule_tick_inserts_run(tmp_path: Path) -> None:
     _swap_plane(tmp_path)
+    past = (datetime.now(UTC) - timedelta(seconds=1)).isoformat()
     dep = control_plane.create_deployment(
         name="sched-flow",
         flow_name="simple_flow",
         default_parameters={"n": 1},
         paused=False,
-    )
-    past = (datetime.now(UTC) - timedelta(seconds=1)).isoformat()
-    ts = datetime.now(UTC).isoformat()
-    control_plane._sqlite_conn.execute(
-        """
-        UPDATE deployments
-        SET schedule_enabled = 1,
-            schedule_interval_seconds = 3600,
-            schedule_next_run_at = ?,
-            updated_at = ?
-        WHERE id = ?
-        """,
-        (past, ts, dep["id"]),
+        schedule_enabled=True,
+        schedule_interval_seconds=3600,
+        schedule_next_run_at=past,
     )
     before = control_plane._query_rows(
         "SELECT COUNT(*) AS c FROM deployment_runs WHERE deployment_id = ?",
         [dep["id"]],
     )[0]["c"]
-    n = control_plane._tick_deployment_schedules_python()
-    assert n == 1
+    if control_plane._rust_fsm_active() and getattr(control_plane, "_rust_db_bound", False):
+        summary = control_plane.deployment_maintenance_tick(stale_after_seconds=120)
+        assert int(summary.get("triggered", 0)) >= 1
+    else:
+        n = control_plane._tick_deployment_schedules_python()
+        assert n == 1
     after = control_plane._query_rows(
         "SELECT COUNT(*) AS c FROM deployment_runs WHERE deployment_id = ?",
         [dep["id"]],
     )[0]["c"]
     assert after == before + 1
+
+
+def test_update_deployment_enables_schedule(tmp_path: Path) -> None:
+    _swap_plane(tmp_path)
+    dep = control_plane.create_deployment(
+        name="patch-flow",
+        flow_name="simple_flow",
+        default_parameters={"n": 1},
+        paused=False,
+    )
+    past = (datetime.now(UTC) - timedelta(seconds=1)).isoformat()
+    updated = control_plane.update_deployment(
+        UUID(dep["id"]),
+        {
+            "schedule_enabled": True,
+            "schedule_interval_seconds": 120,
+            "schedule_next_run_at": past,
+        },
+    )
+    assert updated["schedule_enabled"] is True
+    assert updated["schedule_interval_seconds"] == 120
 
 
 def test_deployment_maintenance_prefers_rust_when_bound(tmp_path: Path) -> None:

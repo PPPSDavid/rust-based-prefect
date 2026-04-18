@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sqlite3
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import Enum
@@ -125,6 +127,7 @@ class InMemoryControlPlane:
             self._history_path.parent.mkdir(parents=True, exist_ok=True)
             self._load_from_history()
         self._rebuild_manifest_cache_from_db()
+        self._warned_deployment_fallback = False
 
     def _open_sqlite_connection(self, sqlite_path: Path) -> sqlite3.Connection:
         try:
@@ -194,6 +197,12 @@ class InMemoryControlPlane:
     def _rust_deployment_dispatch(self, op: str, body: dict[str, Any]) -> dict[str, Any] | None:
         """Invoke Rust deployment ops on the bound SQLite connection. None = use Python fallback."""
         if not self._rust_fsm_active() or not self._rust_db_bound:
+            if self._rust_fsm_active() and not self._rust_db_bound and not self._warned_deployment_fallback:
+                logging.getLogger(__name__).warning(
+                    "IronFlow deployment op %s using Python fallback (Rust FSM active but bind_db failed).",
+                    op,
+                )
+                self._warned_deployment_fallback = True
             return None
         try:
             out = self._rust_fsm_call(op, body)
@@ -204,6 +213,43 @@ class InMemoryControlPlane:
             if self._is_unknown_op_error(err, op):
                 return None
         return out
+
+    @staticmethod
+    def _deployment_from_rust_json(d: dict[str, Any]) -> dict[str, Any]:
+        """Normalize Rust JSON deployment to match _deployment_row_to_dict shape."""
+        dp = d.get("default_parameters")
+        if not isinstance(dp, dict):
+            dp = {}
+        return {
+            "id": d["id"],
+            "name": d["name"],
+            "flow_name": d["flow_name"],
+            "entrypoint": d.get("entrypoint"),
+            "path": d.get("path"),
+            "default_parameters": dp,
+            "paused": bool(d.get("paused")),
+            "concurrency_limit": d.get("concurrency_limit"),
+            "collision_strategy": d.get("collision_strategy") or "ENQUEUE",
+            "schedule_interval_seconds": d.get("schedule_interval_seconds"),
+            "schedule_cron": d.get("schedule_cron"),
+            "schedule_next_run_at": d.get("schedule_next_run_at"),
+            "schedule_enabled": bool(d.get("schedule_enabled")),
+            "created_at": d["created_at"],
+            "updated_at": d["updated_at"],
+        }
+
+    def start_rust_deployment_scheduler(self, interval_ms: int = 1000, stale_after_seconds: int = 120) -> bool:
+        bridge = self._rust_fsm_bridge
+        handle = self._rust_fsm_handle
+        if not bridge or not handle or not self._rust_db_bound:
+            return False
+        return bool(bridge.deployment_scheduler_start(handle, interval_ms, stale_after_seconds))
+
+    def stop_rust_deployment_scheduler(self) -> None:
+        bridge = self._rust_fsm_bridge
+        handle = self._rust_fsm_handle
+        if bridge and handle:
+            bridge.deployment_scheduler_stop(handle)
 
     def _count_exec_runs(self, deployment_id: str) -> int:
         rows = self._query_rows(
@@ -1185,7 +1231,34 @@ class InMemoryControlPlane:
         path: str | None = None,
         default_parameters: dict[str, Any] | None = None,
         paused: bool = False,
+        concurrency_limit: int | None = None,
+        collision_strategy: str = "ENQUEUE",
+        schedule_interval_seconds: int | None = None,
+        schedule_cron: str | None = None,
+        schedule_next_run_at: str | None = None,
+        schedule_enabled: bool = False,
     ) -> dict[str, Any]:
+        body: dict[str, Any] = {
+            "name": name,
+            "flow_name": flow_name,
+            "entrypoint": entrypoint,
+            "path": path,
+            "default_parameters": default_parameters or {},
+            "paused": paused,
+            "concurrency_limit": concurrency_limit,
+            "collision_strategy": collision_strategy,
+            "schedule_interval_seconds": schedule_interval_seconds,
+            "schedule_cron": schedule_cron,
+            "schedule_next_run_at": schedule_next_run_at,
+            "schedule_enabled": schedule_enabled,
+        }
+        rust = self._rust_deployment_dispatch("deployment_create", body)
+        if rust is not None and rust.get("ok") and rust.get("deployment") is not None:
+            return self._deployment_from_rust_json(rust["deployment"])
+        if rust is not None and rust.get("ok") is False:
+            err = rust.get("error") or {}
+            raise ValueError(str(err.get("message", "deployment_create failed")))
+
         with self._lock:
             existing = self._query_rows(
                 """
@@ -1200,6 +1273,22 @@ class InMemoryControlPlane:
             )
             if existing:
                 return self._deployment_row_to_dict(existing[0])
+
+            si = schedule_interval_seconds
+            sc = schedule_cron
+            if sc and str(sc).strip():
+                si = None
+            elif si is not None and si > 0:
+                sc = None
+
+            sched_next = schedule_next_run_at
+            if schedule_enabled and si and si > 0 and sched_next is None:
+                sched_next = self._now()
+            if schedule_enabled and sc and str(sc).strip() and sched_next is None:
+                raise ValueError(
+                    "Cron schedules require the Rust engine (bind_db) to compute the first schedule_next_run_at, "
+                    "or pass schedule_next_run_at explicitly."
+                )
 
             now = self._now()
             deployment_id = str(uuid4())
@@ -1219,12 +1308,12 @@ class InMemoryControlPlane:
                     path,
                     json.dumps(default_parameters or {}),
                     1 if paused else 0,
-                    None,
-                    "ENQUEUE",
-                    None,
-                    None,
-                    None,
-                    0,
+                    concurrency_limit,
+                    collision_strategy,
+                    si,
+                    sc,
+                    sched_next,
+                    1 if schedule_enabled else 0,
                     now,
                     now,
                 ],
@@ -1239,6 +1328,115 @@ class InMemoryControlPlane:
                 LIMIT 1
                 """,
                 [deployment_id],
+            )[0]
+            return self._deployment_row_to_dict(row)
+
+    def update_deployment(self, deployment_id: UUID, patch: dict[str, Any]) -> dict[str, Any]:
+        body = dict(patch)
+        body["deployment_id"] = str(deployment_id)
+        rust = self._rust_deployment_dispatch("deployment_update", body)
+        if rust is not None and rust.get("ok") and rust.get("deployment") is not None:
+            return self._deployment_from_rust_json(rust["deployment"])
+        if rust is not None and rust.get("ok") is False:
+            err = rust.get("error") or {}
+            msg = str(err.get("message", "deployment_update failed"))
+            if err.get("code") == "not_found":
+                raise ValueError("deployment not found")
+            raise ValueError(msg)
+
+        return self._update_deployment_python(deployment_id, patch)
+
+    def _update_deployment_python(self, deployment_id: UUID, patch: dict[str, Any]) -> dict[str, Any]:
+        with self._lock:
+            dep = self.get_deployment(deployment_id)
+            if dep is None:
+                raise ValueError("deployment not found")
+            entrypoint = dep.get("entrypoint")
+            path = dep.get("path")
+            default_parameters = dict(dep.get("default_parameters") or {})
+            paused = bool(dep.get("paused"))
+            concurrency_limit = dep.get("concurrency_limit")
+            collision_strategy = str(dep.get("collision_strategy") or "ENQUEUE")
+            schedule_interval_seconds = dep.get("schedule_interval_seconds")
+            schedule_cron = dep.get("schedule_cron")
+            schedule_next_run_at = dep.get("schedule_next_run_at")
+            schedule_enabled = bool(dep.get("schedule_enabled"))
+
+            if "entrypoint" in patch:
+                v = patch["entrypoint"]
+                entrypoint = None if v is None else str(v)
+            if "path" in patch:
+                v = patch["path"]
+                path = None if v is None else str(v)
+            if "default_parameters" in patch and patch["default_parameters"] is not None:
+                default_parameters = dict(patch["default_parameters"])
+            if "paused" in patch:
+                paused = bool(patch["paused"])
+            if "concurrency_limit" in patch:
+                concurrency_limit = patch["concurrency_limit"]
+            if "collision_strategy" in patch and patch["collision_strategy"] is not None:
+                collision_strategy = str(patch["collision_strategy"])
+            if "schedule_interval_seconds" in patch:
+                schedule_interval_seconds = patch["schedule_interval_seconds"]
+            if "schedule_cron" in patch:
+                schedule_cron = patch["schedule_cron"]
+            if "schedule_next_run_at" in patch:
+                schedule_next_run_at = patch["schedule_next_run_at"]
+            if "schedule_enabled" in patch:
+                schedule_enabled = bool(patch["schedule_enabled"])
+
+            if schedule_cron and str(schedule_cron).strip():
+                schedule_interval_seconds = None
+            elif schedule_interval_seconds is not None and int(schedule_interval_seconds) > 0:
+                schedule_cron = None
+
+            if schedule_enabled and schedule_interval_seconds and int(schedule_interval_seconds) > 0 and not schedule_next_run_at:
+                schedule_next_run_at = self._now()
+            if (
+                schedule_enabled
+                and schedule_cron
+                and str(schedule_cron).strip()
+                and not schedule_next_run_at
+            ):
+                raise ValueError(
+                    "Cron schedules require schedule_next_run_at when the Rust kernel is unavailable, "
+                    "or use the native engine with bind_db."
+                )
+
+            ts = self._now()
+            self._sqlite_conn.execute(
+                """
+                UPDATE deployments SET
+                  entrypoint = ?, path = ?, default_parameters = ?, paused = ?,
+                  concurrency_limit = ?, collision_strategy = ?,
+                  schedule_interval_seconds = ?, schedule_cron = ?, schedule_next_run_at = ?,
+                  schedule_enabled = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                [
+                    entrypoint,
+                    path,
+                    json.dumps(default_parameters),
+                    1 if paused else 0,
+                    concurrency_limit,
+                    collision_strategy,
+                    schedule_interval_seconds,
+                    schedule_cron,
+                    schedule_next_run_at,
+                    1 if schedule_enabled else 0,
+                    ts,
+                    str(deployment_id),
+                ],
+            )
+            row = self._query_rows(
+                """
+                SELECT id,name,flow_name,entrypoint,path,default_parameters,paused,
+                       concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,
+                       schedule_next_run_at,schedule_enabled,created_at,updated_at
+                FROM deployments WHERE id = ?
+                LIMIT 1
+                """,
+                [str(deployment_id)],
             )[0]
             return self._deployment_row_to_dict(row)
 
@@ -1468,6 +1666,28 @@ class InMemoryControlPlane:
             if not row:
                 return None
             return self._deployment_run_row_to_dict(row[0])
+
+    def claim_next_deployment_run_wait(
+        self, worker_name: str, lease_seconds: int = 30, wait_ms: int = 500
+    ) -> dict[str, Any] | None:
+        rust = self._rust_deployment_dispatch(
+            "deployment_claim_next_wait",
+            {"worker_name": worker_name, "lease_seconds": lease_seconds, "wait_ms": wait_ms},
+        )
+        if rust is not None:
+            if rust.get("ok"):
+                run = rust.get("run")
+                return None if run is None else run
+            err = rust.get("error") or {}
+            raise RuntimeError(str(err.get("message", "deployment claim wait failed")))
+
+        deadline = time.monotonic() + max(wait_ms, 1) / 1000.0
+        while time.monotonic() < deadline:
+            c = self.claim_next_deployment_run(worker_name, lease_seconds)
+            if c is not None:
+                return c
+            time.sleep(0.05)
+        return None
 
     def mark_deployment_run_started(self, deployment_run_id: UUID) -> None:
         rust = self._rust_deployment_dispatch(

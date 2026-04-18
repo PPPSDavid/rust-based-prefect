@@ -59,6 +59,17 @@ def _configure_ironflow_symbols(lib: ctypes.CDLL) -> None:
     lib.ironflow_control.argtypes = [ctypes.c_uint64, ctypes.c_char_p, ctypes.c_char_p]
     lib.ironflow_control.restype = ctypes.c_void_p
 
+    if hasattr(lib, "ironflow_deployment_scheduler_start"):
+        lib.ironflow_deployment_scheduler_start.argtypes = [
+            ctypes.c_uint64,
+            ctypes.c_uint64,
+            ctypes.c_int64,
+        ]
+        lib.ironflow_deployment_scheduler_start.restype = ctypes.c_bool
+    if hasattr(lib, "ironflow_deployment_scheduler_stop"):
+        lib.ironflow_deployment_scheduler_stop.argtypes = [ctypes.c_uint64]
+        lib.ironflow_deployment_scheduler_stop.restype = None
+
 
 def _decode_json_ptr(lib: ctypes.CDLL, raw_ptr: int) -> Any:
     if not raw_ptr:
@@ -112,3 +123,20 @@ class RustFsmBridge:
         if not isinstance(out, dict):
             raise RuntimeError("unexpected Rust control response")
         return out
+
+    def deployment_scheduler_start(self, handle: int, interval_ms: int, stale_after_seconds: int) -> bool:
+        fn = getattr(self._lib, "ironflow_deployment_scheduler_start", None)
+        if fn is None:
+            return False
+        return bool(
+            fn(
+                ctypes.c_uint64(handle),
+                ctypes.c_uint64(interval_ms),
+                ctypes.c_int64(stale_after_seconds),
+            )
+        )
+
+    def deployment_scheduler_stop(self, handle: int) -> None:
+        fn = getattr(self._lib, "ironflow_deployment_scheduler_stop", None)
+        if fn is not None:
+            fn(ctypes.c_uint64(handle))
