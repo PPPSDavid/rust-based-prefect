@@ -6,7 +6,7 @@ Choose a path:
 
 | Goal | Where to start |
 | --- | --- |
-| Install and run a demo flow | **[Get started → Installation](INSTALL.md)** · **[Quick start (demo flow)](QUICKSTART_DEMO.md)** |
+| Install from PyPI (`pip` / `uv`), then run a demo flow | **[Get started → Installation](INSTALL.md)** · **[Quick start (demo flow)](QUICKSTART_DEMO.md)** |
 | Self-hosted API, workers, deployments | **[Self-hosted server](SELF_HOSTED_SERVER.md)** |
 | Understand flows, tasks, runners, and states | **[Concepts overview](concepts/index.md)** |
 | Do something specific (setup, server, porting) | **[How-to guides](how-to/index.md)** |
@@ -15,7 +15,7 @@ Choose a path:
 
 Step-by-step onboarding:
 
-1. **[Install IronFlow](INSTALL.md)** — install from PyPI when published, or use TestPyPI/source paths; clone + `cargo build` remains the full-stack path.
+1. **[Install IronFlow](INSTALL.md)** — **`pip install ironflow-prefect-compat`** / **`uv pip install ironflow-prefect-compat`** from PyPI when wheels match your platform; TestPyPI or git/source paths are secondary; clone + `cargo build` is the full-stack development path.
 2. **[Quick start (demo flow)](QUICKSTART_DEMO.md)** — run a tiny `@flow` and see expected terminal output (no server required).
 3. **[Self-hosted server](SELF_HOSTED_SERVER.md)** — optional API (`ironflow_server.py`), workers, deployments, and how scheduling compares to Prefect.
 4. **Understand the stack** — read **[Architecture](architecture.md)** or **[Concepts overview](concepts/index.md)** for how Python calls into the Rust kernel.

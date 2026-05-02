@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
+### Documentation
+
+- README, **INSTALL**, **index**, **python-shim README**, **DISTRIBUTION**, and **how-to/setup** emphasize **PyPI** (`pip` / **`uv`**) as the primary install path, with git/source workflows secondary; hosted MkDocs nav labels **Installation** accordingly.
+
 ## [0.1.2] — 2026-05-02
 
 ### Added
