@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import signal
@@ -46,6 +47,58 @@ def _start_frontend(repo_root: Path, frontend_port: int) -> subprocess.Popen[str
     subprocess.run([*npm_cmd, "install"], cwd=frontend_dir, check=True)
     env = dict(os.environ, PORT=str(frontend_port))
     return subprocess.Popen([*npm_cmd, "run", "dev"], cwd=frontend_dir, env=env)
+
+
+def _backend_status(repo_root: Path) -> str:
+    server_module = repo_root / "python-shim" / "src" / "prefect_compat" / "server.py"
+    if not server_module.exists():
+        return "server-module-missing"
+    if shutil.which(sys.executable) is None:
+        return "python-missing"
+    return "ready"
+
+
+def _frontend_status(repo_root: Path) -> str:
+    frontend_dir = repo_root / "frontend"
+    if not frontend_dir.exists():
+        return "frontend-missing"
+    if _resolve_npm_command() is None:
+        return "npm-missing"
+    return "ready"
+
+
+def _rust_library_status(repo_root: Path) -> str:
+    cargo_manifest = repo_root / "rust-engine" / "Cargo.toml"
+    if not cargo_manifest.exists():
+        return "cargo-manifest-missing"
+    candidates = [
+        repo_root / "rust-engine" / "target" / "release" / "ironflow_engine.dll",
+        repo_root / "rust-engine" / "target" / "debug" / "ironflow_engine.dll",
+        repo_root / "rust-engine" / "target" / "release" / "libironflow_engine.so",
+        repo_root / "rust-engine" / "target" / "debug" / "libironflow_engine.so",
+        repo_root / "rust-engine" / "target" / "release" / "libironflow_engine.dylib",
+        repo_root / "rust-engine" / "target" / "debug" / "libironflow_engine.dylib",
+    ]
+    if any(path.exists() for path in candidates):
+        return "ready"
+    if shutil.which("cargo") is None:
+        return "cargo-missing"
+    return "not-built"
+
+
+def _doctor_snapshot(repo_root: Path) -> dict[str, str]:
+    return {
+        "backend_status": _backend_status(repo_root),
+        "frontend_status": _frontend_status(repo_root),
+        "rust_library": _rust_library_status(repo_root),
+    }
+
+
+def doctor(_: argparse.Namespace) -> int:
+    repo_root = Path(__file__).resolve().parents[1]
+    snapshot = _doctor_snapshot(repo_root)
+    print(json.dumps(snapshot, indent=2, sort_keys=True))
+    return 0 if all(value == "ready" for value in snapshot.values()) else 1
 
 
 def start(args: argparse.Namespace) -> int:
@@ -101,12 +154,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Start only API backend.",
     )
     start_parser.set_defaults(func=start)
+
+    doctor_parser = subparsers.add_parser(
+        "doctor",
+        help="Print backend/frontend/rust readiness diagnostics.",
+    )
+    doctor_parser.set_defaults(func=doctor)
     return parser
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     return args.func(args)
 
 

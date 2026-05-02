@@ -35,6 +35,16 @@ Typical URLs:
 python scripts/ironflow_server.py start --backend-only
 ```
 
+### Doctor mode
+
+Run doctor mode from the repository root to print a readiness snapshot for backend dependencies, frontend availability, and Rust library status:
+
+```bash
+python scripts/ironflow_server.py doctor
+```
+
+Use this before `start` when local setup is uncertain, or after failures to confirm which subsystem needs remediation.
+
 **Manual uvicorn** (equivalent to what the script runs for the API):
 
 ```bash

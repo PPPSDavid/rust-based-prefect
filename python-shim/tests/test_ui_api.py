@@ -4,6 +4,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from scripts import ironflow_server
 from prefect_compat.decorators import set_control_plane
 from prefect_compat.runtime import InMemoryControlPlane
 from prefect_compat.server import app, control_plane, failing_flow, mapped_flow
@@ -130,4 +131,13 @@ def test_cors_allows_local_frontend_origin(tmp_path: Path) -> None:
     )
     assert res.status_code == 200
     assert res.headers.get("access-control-allow-origin") == "http://localhost:4173"
+
+
+def test_doctor_reports_backend_frontend_keys(capsys) -> None:
+    rc = ironflow_server.main(["doctor"])
+    out = capsys.readouterr().out
+    assert rc in (0, 1)
+    assert "backend_status" in out
+    assert "frontend_status" in out
+    assert "rust_library" in out
 

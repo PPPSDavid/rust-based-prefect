@@ -129,10 +129,24 @@ Orchestration runs **in-process** through `prefect_compat`; the API and UI are o
 
 ### 4. Optional API + UI
 
-**One command** (backend + Vite dev server when `npm` is available):
+Canonical local startup flow:
+
+1. Bootstrap prerequisites and smoke checks:
+
+```bash
+python scripts/bootstrap.py
+```
+
+2. Start the local stack (backend + Vite dev server when `npm` is available):
 
 ```bash
 python scripts/ironflow_server.py start
+```
+
+3. Run readiness diagnostics anytime:
+
+```bash
+python scripts/ironflow_server.py doctor
 ```
 
 - API: `http://127.0.0.1:8000` — e.g. `GET /health`, `GET /api/flow-runs`

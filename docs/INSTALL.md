@@ -61,6 +61,15 @@ The Python shim looks for the `ironflow_engine` shared library under `rust-engin
 
 ## 4. Check that it works
 
+Canonical bootstrap flow from the repository root:
+
+```bash
+python scripts/bootstrap.py --check-only
+python scripts/bootstrap.py
+```
+
+Use `--check-only` for fast environment validation when you do not want to build and run smoke checks yet.
+
 Run the **[Quick start demo](QUICKSTART_DEMO.md)** (sets `PYTHONPATH` and runs `python-shim/examples/flow_ironflow.py`). You should see `ironflow_result=26` and an event count printed.
 
 Optionally run the test suites from the repo root:

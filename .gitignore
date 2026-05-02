@@ -31,3 +31,4 @@ docs/stress_results.json
 # Local agent / scratch
 .claude/
 baseline_stage2.*
+docs/superpowers/
