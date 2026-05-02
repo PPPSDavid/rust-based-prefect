@@ -5,11 +5,42 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ironflow-prefect-compat"
 version = "0.1.1"
-description = "Prefect-style compatibility shim for Project IronFlow."
+description = "Prefect-style compatibility shim for Project IronFlow (Rust orchestration kernel + Python authoring)."
+readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [{ name = "IronFlow contributors" }]
+keywords = [
+  "ironflow",
+  "prefect",
+  "orchestration",
+  "workflow",
+  "rust",
+  "deterministic",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Rust",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
   "pydantic>=2,<3",
 ]
+
+[project.urls]
+Homepage = "https://github.com/PPPSDavid/rust-based-prefect"
+Documentation = "https://pppsdavid.github.io/rust-based-prefect/"
+Repository = "https://github.com/PPPSDavid/rust-based-prefect"
+Issues = "https://github.com/PPPSDavid/rust-based-prefect/issues"
+Changelog = "https://github.com/PPPSDavid/rust-based-prefect/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["src"]
