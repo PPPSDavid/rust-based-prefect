@@ -93,6 +93,19 @@ Replace the tag with your target release. This install **does not** include `rus
 python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v0.1.1#subdirectory=static-planner"
 ```
 
+## 5b. Install from TestPyPI (release validation path)
+
+When maintainers publish validation wheels to TestPyPI, you can test exactly what users will install:
+
+```bash
+python -m pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ ironflow-prefect-compat==0.1.1
+python -c "from prefect_compat.rust_bridge import native_library_available as n; print('native_library_available=', n())"
+```
+
+Why the extra index: TestPyPI may not host all transitive dependencies, so `--extra-index-url https://pypi.org/simple/` lets pip resolve packages such as `pydantic`.
+
+If `native_library_available=False`, confirm you installed a platform wheel (not a source fallback) and that your OS/arch matches one of the published wheel artifacts.
+
 ## 6. Optional: API and UI
 
 After the above, you can start the bundled HTTP server and UI — see **[How to run the server and UI](how-to/server-and-ui.md)** or the repository **README** (`scripts/ironflow_server.py`, `uvicorn`, and `frontend/`). These are optional for running flows in-process.

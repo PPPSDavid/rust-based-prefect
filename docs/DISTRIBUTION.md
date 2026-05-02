@@ -31,6 +31,15 @@ There is **no** `pip install ironflow` on PyPI or `conda install ironflow` on co
 5. **Naming**  
    - Reserve a PyPI name (e.g. `ironflow` or `ironflow-prefect-compat`) and publish **version pins** aligned with `VERSION` in this repo.
 
+### Package page metadata checklist
+
+To avoid an empty-looking package page on TestPyPI/PyPI, keep `python-shim/pyproject.toml` rich enough for humans:
+
+- Add `readme` (long description), project URLs (`Homepage`, `Documentation`, `Source`, `Issues`), and maintainers/authors.
+- Add classifiers including `Programming Language :: Rust` to signal the mixed Python/Rust implementation.
+- Explicitly document the source-build behavior in long description text: wheel installs should not need Rust, source installs may require `cargo`.
+- Bump version before re-uploading metadata changes (PyPI/TestPyPI disallow overwriting files for the same version).
+
 ### CI wheel artifacts
 
 On **`main`** / PRs, **`wheel-linux`**, **`wheel-windows`**, and **`wheel-macos`** each build **`python-shim`**, smoke-install the wheel ( **`native_library_available()`** ), and upload artifacts:
@@ -42,6 +51,32 @@ On **`main`** / PRs, **`wheel-linux`**, **`wheel-windows`**, and **`wheel-macos`
 ### TestPyPI (manual)
 
 Workflow **`Publish to TestPyPI`** ( **`workflow_dispatch`** ) builds the same three wheels and uploads them to **https://test.pypi.org** using **`pypa/gh-action-pypi-publish`** (OIDC **trusted publisher** on TestPyPI recommended). Use optional **dry run** to build and download artifacts without uploading. Configure once per **[TestPyPI trusted publishing](https://docs.pypi.org/trusted-publishers/)** for this repository (or use an API token per upstream docs).
+
+### Local verification playbook (after TestPyPI upload)
+
+Use these commands to verify the published package from a clean environment.
+
+**Windows (PowerShell, conda env):**
+
+```powershell
+mamba create -n ironflow-testpypi python=3.11 -y
+conda activate ironflow-testpypi
+python -m pip install --upgrade pip
+python -m pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ ironflow-prefect-compat==0.1.1
+python -c "from prefect_compat.rust_bridge import native_library_available as n; print('native_library_available=', n())"
+```
+
+**Linux/macOS (bash, venv):**
+
+```bash
+python3 -m venv .venv-testpypi
+source .venv-testpypi/bin/activate
+python -m pip install --upgrade pip
+python -m pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ ironflow-prefect-compat==0.1.1
+python -c "from prefect_compat.rust_bridge import native_library_available as n; print('native_library_available=', n())"
+```
+
+Replace `0.1.1` with the currently published version.
 
 After that, users get:
 
