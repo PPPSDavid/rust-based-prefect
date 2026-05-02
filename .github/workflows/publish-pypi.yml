@@ -32,15 +32,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
-            slug: linux
-          - os: ubuntu-latest
-            slug: linux-aarch64
-          - os: windows-latest
-            slug: windows
-          - os: macos-latest
-            slug: macos
-    runs-on: ${{ matrix.os }}
+          - slug: linux
+            runner: ubuntu-latest
+          - slug: linux-aarch64
+            runner:
+              - self-hosted
+              - linux
+              - ARM64
+          - slug: windows
+            runner: windows-latest
+          - slug: macos
+            runner: macos-latest
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
 
@@ -74,12 +77,6 @@ jobs:
         if: matrix.slug != 'linux-aarch64'
         working-directory: python-shim
         run: python -m build --wheel
-
-      - name: Set up QEMU for Linux aarch64 builds
-        if: matrix.slug == 'linux-aarch64'
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
 
       - name: Build wheel (python-shim, Linux aarch64 via cibuildwheel)
         if: matrix.slug == 'linux-aarch64'

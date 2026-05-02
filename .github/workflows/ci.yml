@@ -81,17 +81,14 @@ jobs:
 
   wheel-linux-aarch64:
     name: Linux aarch64 wheel (bundled ironflow_engine)
-    runs-on: ubuntu-latest
+    # Native ARM64 (e.g. Raspberry Pi self-hosted runner). See .github/SELF_HOSTED_CI_RUNNER.md
+    runs-on: [self-hosted, linux, ARM64]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
       - uses: dtolnay/rust-toolchain@stable
-      - name: Set up QEMU for aarch64 wheel builds
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
       - name: Install packaging tools
         run: |
           python -m pip install --upgrade pip

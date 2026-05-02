@@ -48,7 +48,7 @@ On **`main`** / PRs, these jobs build **`python-shim`**, smoke-install the wheel
 | Job | Artifact name | Notes |
 | --- | --- | --- |
 | **`wheel-linux`** | **`ironflow-prefect-compat-wheel-linux`** | **`auditwheel repair`** when possible (**manylinux** tag). |
-| **`wheel-linux-aarch64`** | **`ironflow-prefect-compat-wheel-linux-aarch64`** | **QEMU** + **`cibuildwheel`** (aarch64 manylinux). |
+| **`wheel-linux-aarch64`** | **`ironflow-prefect-compat-wheel-linux-aarch64`** | **`cibuildwheel`** on a **self-hosted Linux ARM64** runner (e.g. Raspberry Pi); see **`.github/SELF_HOSTED_CI_RUNNER.md`**. |
 | **`wheel-windows`** | **`ironflow-prefect-compat-wheel-windows`** | **`win_amd64`** + **`ironflow_engine.dll`**. |
 | **`wheel-macos`** | **`ironflow-prefect-compat-wheel-macos`** | **`macos-latest`** (universal2 / Apple-centric runner — add an Intel-only job if **`x86_64`** wheels are required). |
 
