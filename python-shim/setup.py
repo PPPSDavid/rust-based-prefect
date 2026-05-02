@@ -7,7 +7,7 @@ import platform
 import sys
 from pathlib import Path
 
-from setuptools import setup
+from setuptools import Distribution, setup
 from setuptools.command.bdist_wheel import bdist_wheel as _bdist_wheel
 
 _HERE = Path(__file__).resolve().parent
@@ -15,6 +15,14 @@ if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
 from build_native import build_py
+
+
+class BinaryDistribution(Distribution):
+    """Treat native-enabled builds as platform wheels (platlib), not purelib."""
+
+    def has_ext_modules(self) -> bool:
+        skip_native = os.environ.get("IRONFLOW_SKIP_NATIVE_BUILD", "").lower() in ("1", "true", "yes")
+        return not skip_native
 
 
 class bdist_wheel(_bdist_wheel):
@@ -36,4 +44,4 @@ class bdist_wheel(_bdist_wheel):
         self.root_is_pure = platform.system() == "Linux"
 
 
-setup(cmdclass={"build_py": build_py, "bdist_wheel": bdist_wheel})
+setup(distclass=BinaryDistribution, cmdclass={"build_py": build_py, "bdist_wheel": bdist_wheel})
