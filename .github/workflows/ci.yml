@@ -101,7 +101,8 @@ jobs:
           CIBW_BUILD: "cp311-*"
           CIBW_ARCHS_LINUX: "aarch64"
           CIBW_SKIP: "*musllinux*"
-          CIBW_ENVIRONMENT: "IRONFLOW_FORCE_PLATFORM_WHEEL=1"
+          CIBW_BEFORE_ALL_LINUX: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal && ln -sf /root/.cargo/bin/cargo /usr/local/bin/cargo && ln -sf /root/.cargo/bin/rustc /usr/local/bin/rustc"
+          CIBW_ENVIRONMENT: "IRONFLOW_FORCE_PLATFORM_WHEEL=1 PATH=/root/.cargo/bin:$PATH"
         run: cibuildwheel --platform linux --output-dir python-shim/wheelhouse python-shim
       - name: Verify aarch64 wheel artifact exists
         shell: bash
