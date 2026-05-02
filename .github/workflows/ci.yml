@@ -81,21 +81,23 @@ jobs:
 
   wheel-linux-aarch64:
     name: Linux aarch64 wheel (bundled ironflow_engine)
-    runs-on: ubuntu-latest
+    # Native ARM64 (e.g. Raspberry Pi self-hosted runner). See .github/SELF_HOSTED_CI_RUNNER.md
+    runs-on: [self-hosted, linux, ARM64]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Set up QEMU for aarch64 wheel builds
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
-      - name: Install packaging tools
+      # setup-python does not ship arm64+Debian12 in the versions manifest; use system Python 3.11.
+      - name: Verify system Python 3.11
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install cibuildwheel
+          python3 --version
+          python3 -c "import sys; assert sys.version_info[:2] == (3, 11), sys.version"
+      - uses: dtolnay/rust-toolchain@stable
+      # Debian/Raspberry Pi OS uses PEP 668 (no pip install onto system python).
+      - name: Install packaging tools (venv)
+        run: |
+          python3 -m venv "${RUNNER_TEMP}/if-aarch64-venv"
+          echo "${RUNNER_TEMP}/if-aarch64-venv/bin" >> "$GITHUB_PATH"
+          "${RUNNER_TEMP}/if-aarch64-venv/bin/pip" install --upgrade pip
+          "${RUNNER_TEMP}/if-aarch64-venv/bin/pip" install cibuildwheel
       - name: Build aarch64 wheel (python-shim via cibuildwheel)
         env:
           CIBW_BUILD: "cp311-*"

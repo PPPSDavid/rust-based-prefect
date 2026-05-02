@@ -1,15 +1,17 @@
-# Manual publish of ironflow-prefect-compat wheels to TestPyPI.
+# Manual publish of ironflow-prefect-compat wheels to production PyPI (pypi.org).
 #
 # One-time maintainer setup:
-# 1. Create https://test.pypi.org/account/register/ and a project (or let first upload create it).
-# 2. Prefer OIDC: Project Settings → Manage → Publishing → add a "trusted publisher"
-#    for this repo + workflow file + environment (if used).
-# 3. Or create an API token on TestPyPI and store it as repo secret TEST_PYPI_API_TOKEN,
-#    then add a password step (see pypa/gh-action-pypi-publish docs).
+# 1. Ensure the project exists on https://pypi.org (first upload may create it).
+# 2. Prefer OIDC: PyPI project → Manage → Publishing → add a "trusted publisher"
+#    for this repository + workflow file (this file). Optionally use a GitHub
+#    Environment named `pypi` with approval rules — see PyPA docs.
+# 3. Or store an API token as repo secret PYPI_API_TOKEN and configure the action
+#    to use password-based auth (see pypa/gh-action-pypi-publish).
 #
-# Run: Actions → "Publish to TestPyPI" → Run workflow (optional: dry-run = build only).
+# Run: Actions → "Publish to PyPI" → Run workflow (optional: dry_run = build only).
+# Recommended: run after version bump, validation, and (optionally) TestPyPI dry run.
 
-name: Publish to TestPyPI
+name: Publish to PyPI
 
 on:
   workflow_dispatch:
@@ -123,6 +125,9 @@ jobs:
     needs: build
     if: ${{ github.event.inputs.dry_run != 'true' }}
     runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/ironflow-prefect-compat/
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -136,9 +141,9 @@ jobs:
           find wheels -name '*.whl' -exec cp -t dist {} +
           ls -la dist/
 
-      - name: Publish to TestPyPI
+      # Default repository is production PyPI (upload.pypi.org).
+      - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          repository-url: https://test.pypi.org/legacy/
           packages-dir: dist/
           skip-existing: true

@@ -27,12 +27,23 @@ The `release` workflow checks that `vX.Y.Z` (without `v`) equals `VERSION` and c
 
 If you fork, replace repository URLs in `CHANGELOG.md` with your GitHub coordinates.
 
+## PyPI (production)
+
+The **`ironflow-prefect-compat`** package is published to **https://pypi.org** via GitHub Actions (**workflow_dispatch**).
+
+1. **One-time:** On **PyPI**, open the project → **Manage** → **Publishing** → add a **trusted publisher** for this repository and workflow **`.github/workflows/publish-pypi.yml`** (same pattern as [TestPyPI trusted publishers](https://docs.pypi.org/trusted-publishers/), but against **pypi.org**). TestPyPI and PyPI trusted publishers are configured **separately**.
+2. **Before uploading:** Bump **`VERSION`** and sync versions across `VERSION`, `rust-engine/Cargo.toml`, **`python-shim/pyproject.toml`**, `static-planner/pyproject.toml`, and `frontend/package.json` (`python scripts/check_version_sync.py`). Run validation from **`AGENTS.md`**. Optionally publish to **TestPyPI** first using **`Publish to TestPyPI`**.
+3. **Upload:** **Actions** → **Publish to PyPI** → **Run workflow**. Use **`dry_run`** to build wheels and download artifacts without uploading.
+4. **Install:** `python -m pip install ironflow-prefect-compat` (see **`docs/INSTALL.md`**).
+
+The **TestPyPI** workflow (`.github/workflows/publish-testpypi.yml`) is unchanged and remains the recommended validation index before production uploads.
+
 ## Using a release (downstream)
 
 Consumers should take artifacts from [**GitHub Releases**](https://github.com/PPPSDavid/rust-based-prefect/releases), not from unlabeled `main` snapshots, when they need a reproducible version.
 
 1. **Full stack:** clone the repository and `git checkout vX.Y.Z`, then use `environment.yml` / `requirements-ci.txt` and run from the repo root — including **`rust-engine`** (see README `cargo build`), benchmarks, `scripts/`, and optional UI as in the root `README.md`.
-2. **Python packages only:** install with pip from git, for example:
+2. **Python packages only:** install from **PyPI** when published (`pip install ironflow-prefect-compat`), or from git, for example:
    - `pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@vX.Y.Z#subdirectory=python-shim"`
    - optional: `#subdirectory=static-planner` for `ironflow-static-planner`.
 3. **Documentation:** the public MkDocs site tracks **`main`**. To read docs that match a specific tag exactly, browse the repo on GitHub at that tag, or checkout the tag and run `mkdocs serve` per the README.

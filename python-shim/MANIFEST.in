@@ -1,3 +1,5 @@
 # Build hooks live next to pyproject.toml (not under src/).
 include build_native.py
 include setup.py
+# PyPI long description (must live under python-shim/; setuptools blocks parent paths).
+include README.md
