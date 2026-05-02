@@ -15,7 +15,7 @@ Choose a path:
 
 Step-by-step onboarding:
 
-1. **[Install IronFlow](INSTALL.md)** — clone the repo, set up Python, build `rust-engine` with Cargo (current supported path; no PyPI wheel yet).
+1. **[Install IronFlow](INSTALL.md)** — install from PyPI when published, or use TestPyPI/source paths; clone + `cargo build` remains the full-stack path.
 2. **[Quick start (demo flow)](QUICKSTART_DEMO.md)** — run a tiny `@flow` and see expected terminal output (no server required).
 3. **[Self-hosted server](SELF_HOSTED_SERVER.md)** — optional API (`ironflow_server.py`), workers, deployments, and how scheduling compares to Prefect.
 4. **Understand the stack** — read **[Architecture](architecture.md)** or **[Concepts overview](concepts/index.md)** for how Python calls into the Rust kernel.

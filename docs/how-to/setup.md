@@ -68,7 +68,9 @@ cargo test --manifest-path rust-engine/Cargo.toml
 
 ## 6. Install only `prefect_compat` in another project (narrow path)
 
-You can **`pip install` from Git** (still **no PyPI wheel** for the full stack):
+Preferred path when available: **`pip install ironflow-prefect-compat`** (production PyPI) or use the TestPyPI index pair documented in **[Installation](../INSTALL.md)**.
+
+You can also **`pip install` from Git**:
 
 ```bash
 python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v0.1.1#subdirectory=python-shim"
