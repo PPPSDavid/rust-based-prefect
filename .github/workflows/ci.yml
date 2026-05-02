@@ -40,6 +40,45 @@ jobs:
       - name: Rust tests
         run: cargo test --manifest-path rust-engine/Cargo.toml
 
+  wheel-linux:
+    name: Linux wheel (bundled ironflow_engine)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y patchelf
+          python -m pip install --upgrade pip
+          python -m pip install build auditwheel
+      - name: Build wheel (python-shim)
+        working-directory: python-shim
+        run: python -m build --wheel
+      - name: Auditwheel repair (manylinux tag)
+        working-directory: python-shim
+        shell: bash
+        run: |
+          mkdir -p wheelhouse
+          shopt -s nullglob
+          for f in dist/*.whl; do
+            auditwheel repair "$f" -w wheelhouse || cp "$f" wheelhouse/
+          done
+      - name: Smoke install wheel
+        shell: bash
+        run: |
+          python -m venv /tmp/ifwh
+          . /tmp/ifwh/bin/activate
+          pip install python-shim/wheelhouse/*.whl
+          python -c "from prefect_compat.rust_bridge import native_library_available as n; assert n(); print('native ok')"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ironflow-prefect-compat-wheel-linux
+          path: python-shim/wheelhouse/*.whl
+
   frontend:
     name: Frontend tests
     runs-on: ubuntu-latest

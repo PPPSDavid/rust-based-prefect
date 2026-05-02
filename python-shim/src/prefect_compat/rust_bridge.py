@@ -3,28 +3,96 @@ from __future__ import annotations
 import ctypes
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
 
-def _candidate_lib_paths() -> list[Path]:
-    env = os.getenv("IRONFLOW_RUST_LIB")
-    if env:
-        return [Path(env)]
-    repo_root = Path(__file__).resolve().parents[3]
+def _platform_lib_names() -> list[str]:
+    if sys.platform == "win32":
+        return ["ironflow_engine.dll"]
+    if sys.platform == "darwin":
+        return ["libironflow_engine.dylib"]
+    return ["libironflow_engine.so"]
+
+
+def _find_repo_root_with_rust() -> Path | None:
+    """Resolve IronFlow repo root when running from a source checkout (not site-packages)."""
+    here = Path(__file__).resolve()
+    for anc in here.parents:
+        try:
+            if (anc / "rust-engine" / "Cargo.toml").is_file() and (
+                anc / "python-shim" / "pyproject.toml"
+            ).is_file():
+                return anc
+        except OSError:
+            continue
+    return None
+
+
+def _rust_target_paths(repo: Path) -> list[Path]:
+    base = repo / "rust-engine" / "target"
     return [
-        repo_root / "rust-engine" / "target" / "release" / "ironflow_engine.dll",
-        repo_root / "rust-engine" / "target" / "debug" / "ironflow_engine.dll",
-        repo_root / "rust-engine" / "target" / "release" / "libironflow_engine.so",
-        repo_root / "rust-engine" / "target" / "debug" / "libironflow_engine.so",
-        repo_root / "rust-engine" / "target" / "release" / "libironflow_engine.dylib",
-        repo_root / "rust-engine" / "target" / "debug" / "libironflow_engine.dylib",
+        base / "release" / "ironflow_engine.dll",
+        base / "debug" / "ironflow_engine.dll",
+        base / "release" / "libironflow_engine.so",
+        base / "debug" / "libironflow_engine.so",
+        base / "release" / "libironflow_engine.dylib",
+        base / "debug" / "libironflow_engine.dylib",
     ]
+
+
+def _explicit_env_path() -> Path | None:
+    env = os.getenv("IRONFLOW_RUST_LIB")
+    if not env:
+        return None
+    return Path(env)
+
+
+def _packaged_resource_exists() -> bool:
+    try:
+        from importlib import resources
+
+        root = resources.files("prefect_compat") / "native"
+        for name in _platform_lib_names():
+            if (root / name).is_file():
+                return True
+    except (ModuleNotFoundError, FileNotFoundError, TypeError, ValueError):
+        pass
+    return False
+
+
+def _try_load_packaged() -> ctypes.CDLL | None:
+    from importlib import resources
+
+    try:
+        root = resources.files("prefect_compat") / "native"
+    except (ModuleNotFoundError, FileNotFoundError):
+        return None
+    for name in _platform_lib_names():
+        target = root / name
+        if not target.is_file():
+            continue
+        try:
+            with resources.as_file(target) as p:
+                lib = ctypes.CDLL(str(p))
+                _configure_ironflow_symbols(lib)
+                return lib
+        except OSError:
+            continue
+    return None
 
 
 def native_library_available() -> bool:
     """True when a prebuilt ``ironflow_engine`` cdylib exists on disk (release or debug)."""
-    return any(p.exists() for p in _candidate_lib_paths())
+    explicit = _explicit_env_path()
+    if explicit is not None:
+        return explicit.exists()
+    repo = _find_repo_root_with_rust()
+    if repo is not None:
+        if any(p.exists() for p in _rust_target_paths(repo)):
+            return True
+    return _packaged_resource_exists()
 
 
 _ironflow_lib: ctypes.CDLL | None = None
@@ -35,12 +103,36 @@ def load_ironflow_library() -> ctypes.CDLL:
     global _ironflow_lib
     if _ironflow_lib is not None:
         return _ironflow_lib
-    for path in _candidate_lib_paths():
-        if path.exists():
-            _ironflow_lib = ctypes.CDLL(str(path))
+
+    explicit = _explicit_env_path()
+    if explicit is not None:
+        if explicit.exists():
+            _ironflow_lib = ctypes.CDLL(str(explicit))
             _configure_ironflow_symbols(_ironflow_lib)
             return _ironflow_lib
-    raise RuntimeError("Rust ironflow_engine library not found. Build rust-engine first.")
+        raise RuntimeError(
+            f"IRONFLOW_RUST_LIB points to missing path: {explicit}. "
+            "Unset it or point at a built ironflow_engine cdylib."
+        )
+
+    repo = _find_repo_root_with_rust()
+    if repo is not None:
+        for path in _rust_target_paths(repo):
+            if path.exists():
+                _ironflow_lib = ctypes.CDLL(str(path))
+                _configure_ironflow_symbols(_ironflow_lib)
+                return _ironflow_lib
+
+    packaged = _try_load_packaged()
+    if packaged is not None:
+        _ironflow_lib = packaged
+        return _ironflow_lib
+
+    raise RuntimeError(
+        "Rust ironflow_engine library not found. "
+        "Install a wheel that bundles prefect_compat/native, build rust-engine in a repo checkout, "
+        "or set IRONFLOW_RUST_LIB to the cdylib path."
+    )
 
 
 def _configure_ironflow_symbols(lib: ctypes.CDLL) -> None:

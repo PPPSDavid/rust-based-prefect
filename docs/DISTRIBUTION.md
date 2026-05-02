@@ -9,7 +9,7 @@ Today the smoothest **supported** paths for *using* IronFlow are (also summarize
 - **Full stack:** clone the repo (optionally at a release tag), `conda`/`mamba` or `pip install -r requirements-ci.txt`, then `cargo build` for `rust-engine`. This matches how the project is developed and tested.
 - **Python packages only:**  
   `pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@vX.Y.Z#subdirectory=python-shim"`  
-  (and optionally `#subdirectory=static-planner`). That is already a **single `pip` command**, but it does **not** include a prebuilt **`rust-engine`** binary; see below.
+  (and optionally `#subdirectory=static-planner`). That is already a **single `pip` command**. When that install is built **from a checkout that ran `cargo build --release` during packaging**, the wheel can bundle **`libironflow_engine.so`** / **`ironflow_engine.dll`** under `prefect_compat/native/` (see runtime loader in `prefect_compat.rust_bridge`). **Git installs from GitHub source alone** still do not compile Rust for you unless your environment supplies **`cargo`** during the pip build or you build **`rust-engine`** separately and set **`IRONFLOW_RUST_LIB`**.
 
 There is **no** `pip install ironflow` on PyPI or `conda install ironflow` on conda-forge **yet**. Adding them is possible and would look like Prefect’s story in outline, but IronFlow is **Rust + Python**, so publishing is more like `cryptography` or `orjson` than a pure-Python package.
 
@@ -21,15 +21,19 @@ There is **no** `pip install ironflow` on PyPI or `conda install ironflow` on co
 ## PyPI (realistic shape)
 
 1. **Project layout**  
-   - Keep `python-shim/` as the installable tree (or a thin wrapper package at the repo root that depends on it).
+   - Keep `python-shim/` as the installable tree (package name **`ironflow-prefect-compat`** on PyPI when published).
 2. **Build**  
-   - Use **[Maturin](https://www.maturin.rs/)** (common for Rust+Python) or **setuptools-rust** to drive `cargo build --release` during `pip wheel` / CI.
+   - **`python-shim/build_native.py`** runs **`cargo build --release`** against **`rust-engine/`** during **`python -m build --wheel`** when **`cargo`** is on `PATH` and the repo layout is present. Set **`IRONFLOW_SKIP_NATIVE_BUILD=1`** to skip staging the cdylib (pure-Python wheel). **`setup.py`** wires the custom **`build_py`** command (some setuptools versions cannot resolve `cmdclass` from `pyproject.toml` alone).
 3. **Install layout**  
-   - Place `libironflow_engine.so` / `.dll` / `.dylib` under something like `prefect_compat/native/<platform>/` in the wheel.
+   - Platform wheels place **`libironflow_engine.so`** / **`ironflow_engine.dll`** / **`libironflow_engine.dylib`** under **`prefect_compat/native/`** (one filename per wheel).
 4. **Runtime**  
-   - Extend `prefect_compat.rust_bridge._candidate_lib_paths()` to resolve the library via **`importlib.resources`** / **`importlib.resources.files("prefect_compat")`** so loading works from `site-packages`, not only from a git checkout.
+   - **`prefect_compat.rust_bridge`** resolves the library in order: **`IRONFLOW_RUST_LIB`** → **repo checkout** (`rust-engine/target/...` when `python-shim` is next to `rust-engine`) → **`importlib.resources`** under **`prefect_compat/native/`** (installed wheel).
 5. **Naming**  
    - Reserve a PyPI name (e.g. `ironflow` or `ironflow-prefect-compat`) and publish **version pins** aligned with `VERSION` in this repo.
+
+### CI wheel artifact
+
+- **`wheel-linux`** job on **`main`** builds **`python-shim`** with **`python -m build --wheel`**, runs **`auditwheel repair`** when possible, smoke-installs the wheel, and uploads **`ironflow-prefect-compat-wheel-linux`** artifacts (proof manylinux-style tagging + bundled `.so`). macOS/Windows matrix expansion can follow the same pattern.
 
 After that, users get:
 
@@ -48,13 +52,16 @@ with the native library bundled for their platform (when a wheel exists), or a c
 
 | Goal | Command | Notes |
 | --- | --- | --- |
-| Python API only, no local git | `pip install "git+...@vX.Y.Z#subdirectory=python-shim"` | Already one line; build Rust separately if you need the kernel. |
+| Python API only, no local git | `pip install "git+...@vX.Y.Z#subdirectory=python-shim"` | Already one line; includes native kernel **when** the wheel/sdist build ran **`cargo`** against **`rust-engine`** (CI artifact), else set **`IRONFLOW_RUST_LIB`** or build locally. |
 | Full stack without PyPI | Clone + `environment.yml` + `cargo build` | Current recommended path for kernel + benchmarks + UI. |
-| Future | `pip install ironflow` | Needs wheel pipeline + `rust_bridge` install layout above. |
+| PyPI | `pip install ironflow-prefect-compat` | **Not published yet**; loader + Linux CI wheel pipeline are in-repo — publishing is wiring **Trusted Publishing** + release workflow. |
 
 ## Summary
 
 - **Yes:** PyPI and conda are standard ways to get to a **single install command**, similar in *user experience* to Prefect, but IronFlow must **bundle or build the Rust `cdylib`** and teach the loader to find it inside an installed package.
-- **Easiest next step toward PyPI:** add **`importlib.resources`-based** discovery in `rust_bridge.py` and a **manual or CI-built wheel** for one platform to prove the layout; then expand the build matrix.
+- **Done in-repo:** **`importlib.resources`** discovery in **`rust_bridge`**, **`prefect_compat/native/`** staging via **`build_native`**, platform-tagged wheels when a cdylib is present, and a **Linux wheel CI job** with **`auditwheel`** + smoke install.
 
-If you want this tracked as work, open an issue titled “PyPI wheels + rust_bridge package resources” and link to this file.
+### Follow-ups toward PyPI publishing
+
+- Trusted Publishing / PyPI upload workflow and release checklist updates.
+- Expand the wheel matrix (Windows/macOS, aarch64) using the same **`python-shim`** build hook.
