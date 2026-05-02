@@ -21,6 +21,59 @@ def test_bootstrap_reports_missing_cargo(monkeypatch, capsys):
     assert "https://rustup.rs" in out
 
 
+def test_bootstrap_hints_windows_py_launcher_when_python_missing(monkeypatch, capsys):
+    def fake_which(name: str):
+        if name == "py":
+            return "C:/Python/py.exe"
+        if name == "cargo":
+            return None
+        return None
+
+    monkeypatch.setattr(bootstrap.shutil, "which", fake_which)
+
+    rc = bootstrap.main(["--check-only"])
+    out = capsys.readouterr().out
+
+    assert rc == 1
+    assert "Python launcher found" in out
+
+
+def test_bootstrap_check_only_warns_when_pytest_missing(monkeypatch, capsys):
+    monkeypatch.setattr(bootstrap.shutil, "which", lambda _: "present")
+    real_find_spec = bootstrap.find_spec
+
+    def fake_find_spec(name):
+        if name == "pytest":
+            return None
+        return real_find_spec(name)
+
+    monkeypatch.setattr(bootstrap, "find_spec", fake_find_spec)
+
+    rc = bootstrap.main(["--check-only"])
+    out = capsys.readouterr().out
+
+    assert rc == 0
+    assert "pytest is not installed" in out
+
+
+def test_bootstrap_smoke_only_fails_when_pytest_missing(monkeypatch, capsys):
+    monkeypatch.setattr(bootstrap.shutil, "which", lambda _: "present")
+    real_find_spec = bootstrap.find_spec
+
+    def fake_find_spec(name):
+        if name == "pytest":
+            return None
+        return real_find_spec(name)
+
+    monkeypatch.setattr(bootstrap, "find_spec", fake_find_spec)
+
+    rc = bootstrap.main(["--smoke-only"])
+    out = capsys.readouterr().out
+
+    assert rc == 1
+    assert "pytest is not installed" in out
+
+
 def test_bootstrap_runs_build_and_smoke(monkeypatch, capsys):
     calls: list[list[str]] = []
 
