@@ -91,10 +91,13 @@ jobs:
           python3 --version
           python3 -c "import sys; assert sys.version_info[:2] == (3, 11), sys.version"
       - uses: dtolnay/rust-toolchain@stable
-      - name: Install packaging tools
+      # Debian/Raspberry Pi OS uses PEP 668 (no pip install onto system python).
+      - name: Install packaging tools (venv)
         run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install cibuildwheel
+          python3 -m venv "${RUNNER_TEMP}/if-aarch64-venv"
+          echo "${RUNNER_TEMP}/if-aarch64-venv/bin" >> "$GITHUB_PATH"
+          "${RUNNER_TEMP}/if-aarch64-venv/bin/pip" install --upgrade pip
+          "${RUNNER_TEMP}/if-aarch64-venv/bin/pip" install cibuildwheel
       - name: Build aarch64 wheel (python-shim via cibuildwheel)
         env:
           CIBW_BUILD: "cp311-*"

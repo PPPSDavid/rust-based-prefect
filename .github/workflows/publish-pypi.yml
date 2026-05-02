@@ -71,8 +71,10 @@ jobs:
       - name: Install packaging tools (Linux aarch64)
         if: matrix.slug == 'linux-aarch64'
         run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install cibuildwheel
+          python3 -m venv "${RUNNER_TEMP}/if-aarch64-venv"
+          echo "${RUNNER_TEMP}/if-aarch64-venv/bin" >> "$GITHUB_PATH"
+          "${RUNNER_TEMP}/if-aarch64-venv/bin/pip" install --upgrade pip
+          "${RUNNER_TEMP}/if-aarch64-venv/bin/pip" install cibuildwheel
 
       - name: Install packaging tools (Windows / macOS)
         if: runner.os != 'Linux'
