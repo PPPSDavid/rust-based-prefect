@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 import shutil
@@ -18,6 +19,16 @@ def _resolve_npm_command() -> list[str] | None:
     windows_fallback = Path(r"C:\Program Files\nodejs\npm.cmd")
     if windows_fallback.exists():
         return [str(windows_fallback)]
+    return None
+
+
+def _resolve_node_executable() -> str | None:
+    node = shutil.which("node")
+    if node:
+        return node
+    windows_fallback = Path(r"C:\Program Files\nodejs\node.exe")
+    if windows_fallback.exists():
+        return str(windows_fallback)
     return None
 
 
@@ -55,6 +66,10 @@ def _backend_status(repo_root: Path) -> str:
         return "server-module-missing"
     if shutil.which(sys.executable) is None:
         return "python-missing"
+    if importlib.util.find_spec("fastapi") is None:
+        return "fastapi-missing"
+    if importlib.util.find_spec("uvicorn") is None:
+        return "uvicorn-missing"
     return "ready"
 
 
@@ -62,12 +77,24 @@ def _frontend_status(repo_root: Path) -> str:
     frontend_dir = repo_root / "frontend"
     if not frontend_dir.exists():
         return "frontend-missing"
+    if not (frontend_dir / "package.json").exists():
+        return "package-json-missing"
+    node = _resolve_node_executable()
+    if node is None:
+        return "node-missing"
     if _resolve_npm_command() is None:
         return "npm-missing"
     return "ready"
 
 
 def _rust_library_status(repo_root: Path) -> str:
+    env_override = os.getenv("IRONFLOW_RUST_LIB")
+    if env_override:
+        candidate = Path(env_override)
+        if candidate.exists():
+            return "ready"
+        return "env-path-missing"
+
     cargo_manifest = repo_root / "rust-engine" / "Cargo.toml"
     if not cargo_manifest.exists():
         return "cargo-manifest-missing"
@@ -86,6 +113,39 @@ def _rust_library_status(repo_root: Path) -> str:
     return "not-built"
 
 
+def _remediation(repo_root: Path, snapshot: dict[str, str]) -> list[str]:
+    hints: list[str] = []
+    back = snapshot["backend_status"]
+    front = snapshot["frontend_status"]
+    rust = snapshot["rust_library"]
+
+    if back == "fastapi-missing" or back == "uvicorn-missing":
+        hints.append("Install API deps: python -m pip install -r requirements-ci.txt")
+
+    if front == "node-missing":
+        hints.append("Install Node.js LTS (includes npm) and reopen your shell.")
+    elif front == "npm-missing":
+        hints.append("npm not found on PATH. If Node is installed, ensure npm.cmd is on PATH.")
+    elif front == "package-json-missing":
+        hints.append("frontend/package.json missing — verify you have a full repo checkout.")
+
+    if rust == "env-path-missing":
+        hints.append("IRONFLOW_RUST_LIB points to a missing file — fix the path or unset it.")
+    elif rust == "cargo-missing":
+        hints.append("Install Rust via https://rustup.rs and reopen your shell.")
+    elif rust == "not-built":
+        hints.append("Build rust-engine: cargo build --manifest-path rust-engine/Cargo.toml")
+
+    if not hints:
+        return []
+
+    deduped: list[str] = []
+    for item in hints:
+        if item not in deduped:
+            deduped.append(item)
+    return deduped
+
+
 def _doctor_snapshot(repo_root: Path) -> dict[str, str]:
     return {
         "backend_status": _backend_status(repo_root),
@@ -97,7 +157,11 @@ def _doctor_snapshot(repo_root: Path) -> dict[str, str]:
 def doctor(_: argparse.Namespace) -> int:
     repo_root = Path(__file__).resolve().parents[1]
     snapshot = _doctor_snapshot(repo_root)
-    print(json.dumps(snapshot, indent=2, sort_keys=True))
+    payload: dict[str, object] = dict(snapshot)
+    remediation = _remediation(repo_root, snapshot)
+    if remediation:
+        payload["remediation"] = remediation
+    print(json.dumps(payload, indent=2, sort_keys=True))
     return 0 if all(value == "ready" for value in snapshot.values()) else 1
 
 

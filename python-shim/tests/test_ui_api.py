@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -137,7 +138,12 @@ def test_doctor_reports_backend_frontend_keys(capsys) -> None:
     rc = ironflow_server.main(["doctor"])
     out = capsys.readouterr().out
     assert rc in (0, 1)
-    assert "backend_status" in out
-    assert "frontend_status" in out
-    assert "rust_library" in out
+    payload = json.loads(out)
+    assert "backend_status" in payload
+    assert "frontend_status" in payload
+    assert "rust_library" in payload
+    if rc != 0:
+        assert "remediation" in payload
+        assert isinstance(payload["remediation"], list)
+        assert payload["remediation"]
 
