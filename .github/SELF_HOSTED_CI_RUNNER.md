@@ -22,6 +22,8 @@ So **`cibuildwheel`** runs on a **native ARM64** machine (for example a Raspberr
 
   Sign out and back in (or reboot) so **`docker`** group applies. Verify: `docker run --rm hello-world`.
 
+- **CPython 3.12 wheels on aarch64** are produced **inside** `cibuildwheel`’s manylinux Docker images (`CIBW_BUILD` includes **`cp311-*`** and **`cp312-*`**); the Pi host only supplies **`cibuildwheel`** via the ephemeral **venv**—no host Python 3.12 install required.
+
 - **Python 3.11.x** as **`/usr/bin/python3`** (Debian **bookworm** ships 3.11). The aarch64 jobs **do not** use `actions/setup-python` because GitHub’s manifest does not publish an arm64 + Debian 12 build for that action; CI asserts `sys.version_info[:2] == (3, 11)` instead.
 - **PEP 668:** Raspberry Pi OS / Debian mark the system interpreter as **externally managed**, so workflows install **`pip`** / **`cibuildwheel`** into a short-lived **`venv`** under `$RUNNER_TEMP`, then prepend its **`bin`** to **`GITHUB_PATH`** for later steps.
 

@@ -7,7 +7,7 @@ IronFlow can be used in three ways: **prebuilt wheels** (recommended when availa
 | Requirement | Notes |
 | --- | --- |
 | **Git** | To clone and update the repository (source / git-install paths). |
-| **Python 3.11+** | `environment.yml` in the repo pins 3.12; 3.11 matches CI. |
+| **Python 3.11+** | PyPI ships **wheels for 3.11 and 3.12**; `environment.yml` pins 3.12 for the full dev stack. |
 | **Rust toolchain** | Needed only for **source** workflows: building `rust-engine/` from a checkout, or building the shim when **`cargo`** runs during an sdist/wheel build. **Not** required when you install a **prebuilt wheel** that includes `prefect_compat/native/*`. |
 | **Conda or venv** | Either is fine; conda is what the repo’s `environment.yml` is written for. |
 
@@ -30,14 +30,18 @@ You want **`native_library_available=True`** when using the intended Rust-backed
 **Package name:** `ironflow-prefect-compat`  
 Maintainers may publish to **TestPyPI** (validation) and/or **production PyPI**; see [Distribution](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/DISTRIBUTION.md) and [Releasing](https://github.com/PPPSDavid/rust-based-prefect/blob/main/RELEASING.md) (maintainer-oriented files; not part of the hosted MkDocs site).
 
-Wheels are built for **CPython 3.11** on:
+Prebuilt wheels are published for **CPython 3.11 and 3.12** on:
 
 | Platform | Typical wheel tag |
 | --- | --- |
-| Linux x86_64 | `manylinux_*_x86_64` |
-| Linux aarch64 (e.g. Raspberry Pi 64-bit) | `manylinux_*_aarch64` |
-| Windows x86_64 | `win_amd64` |
-| macOS (universal2 from CI) | `macosx_*_universal2` |
+| Linux x86_64 | `manylinux_*_x86_64` · `cp311` / `cp312` |
+| Linux aarch64 (e.g. Raspberry Pi 64-bit) | `manylinux_*_aarch64` · `cp311` / `cp312` |
+| Windows x86_64 | `win_amd64` · `cp311` / `cp312` |
+| macOS (universal2 from CI) | `macosx_*_universal2` · `cp311` / `cp312` |
+
+**CPython 3.13 and newer** are not guaranteed to have prebuilt wheels yet; **`pip`** may fall back to **sdist** (needs Rust/`cargo` during install) or fail until wheels exist—use **3.11** or **3.12** for the smoothest install, or a full checkout + `cargo build`.
+
+Other Python versions may install from **sdist** or need a **source build**; check PyPI “Download files” or use a full checkout + `cargo build`.
 
 ### Production PyPI (pypi.org)
 

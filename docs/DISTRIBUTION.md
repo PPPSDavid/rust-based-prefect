@@ -9,7 +9,7 @@
 | Path | When to use |
 | --- | --- |
 | **Production PyPI** | Default **`pip install ironflow-prefect-compat`** when wheels are published (see **`RELEASING.md`**). |
-| **TestPyPI wheels** | Validation installs with **`pip install`** + dual index (see [INSTALL.md](INSTALL.md)); ships **`ironflow_engine`** per platform when a wheel exists for **CPython 3.11**. |
+| **TestPyPI wheels** | Validation installs with **`pip install`** + dual index (see [INSTALL.md](INSTALL.md)); ships **`ironflow_engine`** when a wheel exists for your **platform + CPython 3.11 or 3.12**. |
 | **GitHub clone + `cargo build`** | Full repo: benchmarks, scripts, optional UI, kernel development. |
 | **`pip install git+…#subdirectory=python-shim`** | Python-only integration without TestPyPI; native kernel only if the build ran **`cargo`** or you set **`IRONFLOW_RUST_LIB`**. |
 
@@ -45,20 +45,20 @@ Keep **`MANIFEST.in`** in **`python-shim/`** so **`README.md`** / **`LICENSE`** 
 
 On **`main`** / PRs, these jobs build **`python-shim`**, smoke-install the wheel (**`native_library_available()`**), and upload artifacts:
 
-| Job | Artifact name | Notes |
+| Job | Artifact name pattern | Notes |
 | --- | --- | --- |
-| **`wheel-linux`** | **`ironflow-prefect-compat-wheel-linux`** | **`auditwheel repair`** when possible (**manylinux** tag). |
-| **`wheel-linux-aarch64`** | **`ironflow-prefect-compat-wheel-linux-aarch64`** | **`cibuildwheel`** on a **self-hosted Linux ARM64** runner (e.g. Raspberry Pi); see **`.github/SELF_HOSTED_CI_RUNNER.md`**. |
-| **`wheel-windows`** | **`ironflow-prefect-compat-wheel-windows`** | **`win_amd64`** + **`ironflow_engine.dll`**. |
-| **`wheel-macos`** | **`ironflow-prefect-compat-wheel-macos`** | **`macos-latest`** (universal2 / Apple-centric runner — add an Intel-only job if **`x86_64`** wheels are required). |
+| **`wheel-linux`** | **`ironflow-prefect-compat-wheel-linux-3.11`** / **`-3.12`** | **`auditwheel repair`** when possible (**manylinux** tag); one wheel per CPython minor. |
+| **`wheel-linux-aarch64`** | **`ironflow-prefect-compat-wheel-linux-aarch64`** | **`cibuildwheel`** (**`cp311` + `cp312`** in one job) on a **self-hosted Linux ARM64** runner; see **`.github/SELF_HOSTED_CI_RUNNER.md`**. |
+| **`wheel-windows`** | **`ironflow-prefect-compat-wheel-windows-3.11`** / **`-3.12`** | **`win_amd64`** + **`ironflow_engine.dll`**. |
+| **`wheel-macos`** | **`ironflow-prefect-compat-wheel-macos-3.11`** / **`-3.12`** | **`macos-latest`** (universal2 / Apple-centric runner — add an Intel-only job if **`x86_64`** wheels are required). |
 
 ### PyPI production (manual)
 
-Workflow **`Publish to PyPI`** (**`.github/workflows/publish-pypi.yml`**, **`workflow_dispatch`**) builds the **same four wheels** as TestPyPI and uploads them to **https://pypi.org** (default **`repository-url`** for **`gh-action-pypi-publish`**). Configure **trusted publishing** on **pypi.org** for this workflow file separately from TestPyPI. Use **`dry_run`** to build artifacts without uploading.
+Workflow **`Publish to PyPI`** (**`.github/workflows/publish-pypi.yml`**, **`workflow_dispatch`**) runs **eight** hosted builds (Linux x86_64, Windows, and macOS × **`cp311` + `cp312`**) plus **one** Linux aarch64 job that emits **both** **`cp311`** and **`cp312`** wheels via **`cibuildwheel`**, then uploads all **`.whl`** files to **https://pypi.org** (default **`repository-url`** for **`gh-action-pypi-publish`**). Configure **trusted publishing** on **pypi.org** for this workflow file separately from TestPyPI. Use **`dry_run`** to build artifacts without uploading.
 
 ### TestPyPI (manual)
 
-Workflow **`Publish to TestPyPI`** (**`workflow_dispatch`**) builds **Linux x86_64**, **Linux aarch64**, **Windows**, and **macOS** wheels and uploads them to **https://test.pypi.org** via **`pypa/gh-action-pypi-publish`** (OIDC **trusted publisher** on TestPyPI recommended). Use the **dry run** input to build and download artifacts without uploading. Configure once per **[TestPyPI trusted publishing](https://docs.pypi.org/trusted-publishers/)** (or an API token per PyPA docs).
+Workflow **`Publish to TestPyPI`** (**`workflow_dispatch`**) builds the **same matrix** as production (including **`cp311` / `cp312`** per platform and dual ABI on aarch64) and uploads them to **https://test.pypi.org** via **`pypa/gh-action-pypi-publish`** (OIDC **trusted publisher** on TestPyPI recommended). Use the **dry run** input to build and download artifacts without uploading. Configure once per **[TestPyPI trusted publishing](https://docs.pypi.org/trusted-publishers/)** (or an API token per PyPA docs).
 
 **Example install** (TestPyPI + main PyPI index for dependencies):
 
@@ -79,7 +79,7 @@ python -m pip install \
 
 | Goal | Command | Notes |
 | --- | --- | --- |
-| TestPyPI validation | `pip install` with **TestPyPI** + **pypi.org** extra index (see [INSTALL.md](INSTALL.md)) | Prebuilt **`ironflow_engine`** when a wheel matches **platform + CPython 3.11**. |
+| TestPyPI validation | `pip install` with **TestPyPI** + **pypi.org** extra index (see [INSTALL.md](INSTALL.md)) | Prebuilt **`ironflow_engine`** when a wheel matches **platform + CPython 3.11 or 3.12**. |
 | Python API from Git, no local clone of your app | `pip install "git+...@vX.Y.Z#subdirectory=python-shim"` | Native kernel if **`cargo`** ran at build time, else **`IRONFLOW_RUST_LIB`** or local **`cargo build`**. |
 | Full stack, no index | Clone + `environment.yml` + `cargo build` | Current path for kernel + benchmarks + UI. |
 | Production **PyPI** | `pip install ironflow-prefect-compat` | Requires a maintainer **Publish to PyPI** run and **trusted publisher** on **pypi.org** (see **`RELEASING.md`**). |

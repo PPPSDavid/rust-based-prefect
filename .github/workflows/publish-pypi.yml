@@ -34,15 +34,34 @@ jobs:
         include:
           - slug: linux
             runner: ubuntu-latest
+            python-version: "3.11"
+            artifact-name: wheel-linux-py311
+          - slug: linux
+            runner: ubuntu-latest
+            python-version: "3.12"
+            artifact-name: wheel-linux-py312
           - slug: linux-aarch64
             runner:
               - self-hosted
               - linux
               - ARM64
+            artifact-name: wheel-linux-aarch64
           - slug: windows
             runner: windows-latest
+            python-version: "3.11"
+            artifact-name: wheel-windows-py311
+          - slug: windows
+            runner: windows-latest
+            python-version: "3.12"
+            artifact-name: wheel-windows-py312
           - slug: macos
             runner: macos-latest
+            python-version: "3.11"
+            artifact-name: wheel-macos-py311
+          - slug: macos
+            runner: macos-latest
+            python-version: "3.12"
+            artifact-name: wheel-macos-py312
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -50,7 +69,7 @@ jobs:
       - uses: actions/setup-python@v5
         if: matrix.slug != 'linux-aarch64'
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
 
       - name: Verify system Python 3.11 (self-hosted aarch64)
         if: matrix.slug == 'linux-aarch64'
@@ -90,7 +109,7 @@ jobs:
       - name: Build wheel (python-shim, Linux aarch64 via cibuildwheel)
         if: matrix.slug == 'linux-aarch64'
         env:
-          CIBW_BUILD: "cp311-*"
+          CIBW_BUILD: "cp311-* cp312-*"
           CIBW_ARCHS_LINUX: "aarch64"
           CIBW_SKIP: "*musllinux*"
           CIBW_BEFORE_ALL_LINUX: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal && ln -sf /root/.cargo/bin/cargo /usr/local/bin/cargo && ln -sf /root/.cargo/bin/rustc /usr/local/bin/rustc"
@@ -118,7 +137,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: wheel-${{ matrix.slug }}
+          name: ${{ matrix.artifact-name }}
           path: python-shim/wheelhouse/*.whl
 
   publish:
