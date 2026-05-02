@@ -79,6 +79,41 @@ jobs:
           name: ironflow-prefect-compat-wheel-linux
           path: python-shim/wheelhouse/*.whl
 
+  wheel-linux-aarch64:
+    name: Linux aarch64 wheel (bundled ironflow_engine)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Set up QEMU for aarch64 wheel builds
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - name: Install packaging tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install cibuildwheel
+      - name: Build aarch64 wheel (python-shim via cibuildwheel)
+        env:
+          CIBW_BUILD: "cp311-*"
+          CIBW_ARCHS_LINUX: "aarch64"
+          CIBW_SKIP: "*musllinux*"
+          CIBW_BEFORE_ALL_LINUX: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal && ln -sf /root/.cargo/bin/cargo /usr/local/bin/cargo && ln -sf /root/.cargo/bin/rustc /usr/local/bin/rustc"
+          CIBW_ENVIRONMENT: "IRONFLOW_FORCE_PLATFORM_WHEEL=1 PATH=/root/.cargo/bin:$PATH"
+        run: cibuildwheel --platform linux --output-dir python-shim/wheelhouse python-shim
+      - name: Verify aarch64 wheel artifact exists
+        shell: bash
+        run: |
+          ls -la python-shim/wheelhouse/
+          ls python-shim/wheelhouse/*aarch64*.whl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ironflow-prefect-compat-wheel-linux-aarch64
+          path: python-shim/wheelhouse/*.whl
+
   wheel-windows:
     name: Windows wheel (bundled ironflow_engine)
     runs-on: windows-latest
