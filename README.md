@@ -109,7 +109,7 @@ python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v
 
 Replace `v0.1.1` with the [latest release tag](https://github.com/PPPSDavid/rust-based-prefect/releases).
 
-**Install guide (users):** see [docs/INSTALL.md](docs/INSTALL.md) on the hosted docs site. **PyPI wheels** are not published yet; future packaging work is described for maintainers in [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md).
+**Install guide (users):** see [docs/INSTALL.md](docs/INSTALL.md) on the hosted docs site. Use `pip install ironflow-prefect-compat` when wheels are published for your platform/version; otherwise use the documented TestPyPI or source-install fallback paths. Packaging details for maintainers are in [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md).
 
 **Docs vs releases:** The [hosted MkDocs site](https://pppsdavid.github.io/rust-based-prefect/) tracks the **`main`** branch. For documentation that exactly matches a tag, use GitHub’s file browser at that tag, or checkout the tag locally and run `mkdocs serve` (see **Building docs locally**).
 
