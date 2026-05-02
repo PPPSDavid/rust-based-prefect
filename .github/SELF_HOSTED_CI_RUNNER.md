@@ -22,7 +22,7 @@ So **`cibuildwheel`** runs on a **native ARM64** machine (for example a Raspberr
 
   Sign out and back in (or reboot) so **`docker`** group applies. Verify: `docker run --rm hello-world`.
 
-- **Python 3.11** available as `python3` / `python` on PATH for Actions (the workflow pins **3.11** via `actions/setup-python`; that still expects a usable base environment).
+- **Python 3.11.x** as **`/usr/bin/python3`** (Debian **bookworm** ships 3.11). The aarch64 jobs **do not** use `actions/setup-python` because GitHub’s manifest does not publish an arm64 + Debian 12 build for that action; CI asserts `sys.version_info[:2] == (3, 11)` instead.
 
 ## Register the runner (GitHub UI)
 
