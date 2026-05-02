@@ -31,9 +31,17 @@ There is **no** `pip install ironflow` on PyPI or `conda install ironflow` on co
 5. **Naming**  
    - Reserve a PyPI name (e.g. `ironflow` or `ironflow-prefect-compat`) and publish **version pins** aligned with `VERSION` in this repo.
 
-### CI wheel artifact
+### CI wheel artifacts
 
-- **`wheel-linux`** job on **`main`** builds **`python-shim`** with **`python -m build --wheel`**, runs **`auditwheel repair`** when possible, smoke-installs the wheel, and uploads **`ironflow-prefect-compat-wheel-linux`** artifacts (proof manylinux-style tagging + bundled `.so`). macOS/Windows matrix expansion can follow the same pattern.
+On **`main`** / PRs, **`wheel-linux`**, **`wheel-windows`**, and **`wheel-macos`** each build **`python-shim`**, smoke-install the wheel ( **`native_library_available()`** ), and upload artifacts:
+
+- **`ironflow-prefect-compat-wheel-linux`** — **`auditwheel repair`** when possible (manylinux tag).
+- **`ironflow-prefect-compat-wheel-windows`** — Windows **`win_*`** wheel with **`ironflow_engine.dll`**.
+- **`ironflow-prefect-compat-wheel-macos`** — Apple Silicon runners today (**`macos-latest`**); add an Intel macOS job later if you need **`x86_64`** wheels.
+
+### TestPyPI (manual)
+
+Workflow **`Publish to TestPyPI`** ( **`workflow_dispatch`** ) builds the same three wheels and uploads them to **https://test.pypi.org** using **`pypa/gh-action-pypi-publish`** (OIDC **trusted publisher** on TestPyPI recommended). Use optional **dry run** to build and download artifacts without uploading. Configure once per **[TestPyPI trusted publishing](https://docs.pypi.org/trusted-publishers/)** for this repository (or use an API token per upstream docs).
 
 After that, users get:
 
@@ -59,9 +67,9 @@ with the native library bundled for their platform (when a wheel exists), or a c
 ## Summary
 
 - **Yes:** PyPI and conda are standard ways to get to a **single install command**, similar in *user experience* to Prefect, but IronFlow must **bundle or build the Rust `cdylib`** and teach the loader to find it inside an installed package.
-- **Done in-repo:** **`importlib.resources`** discovery in **`rust_bridge`**, **`prefect_compat/native/`** staging via **`build_native`**, platform-tagged wheels when a cdylib is present, and a **Linux wheel CI job** with **`auditwheel`** + smoke install.
+- **Done in-repo:** **`importlib.resources`** discovery in **`rust_bridge`**, **`prefect_compat/native/`** staging via **`build_native`**, platform-tagged wheels when a cdylib is present, **Linux / Windows / macOS** wheel CI jobs, and a **manual TestPyPI** publish workflow.
 
 ### Follow-ups toward PyPI publishing
 
-- Trusted Publishing / PyPI upload workflow and release checklist updates.
-- Expand the wheel matrix (Windows/macOS, aarch64) using the same **`python-shim`** build hook.
+- Production **PyPI** workflow (mirror **`publish-testpypi.yml`** against **`pypi.org`**) and release checklist updates.
+- Optional extra wheels: **Linux aarch64**, **macOS x86_64** runners, or fat/universal macOS strategy if demand appears.

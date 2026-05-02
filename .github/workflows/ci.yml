@@ -79,6 +79,77 @@ jobs:
           name: ironflow-prefect-compat-wheel-linux
           path: python-shim/wheelhouse/*.whl
 
+  wheel-windows:
+    name: Windows wheel (bundled ironflow_engine)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install packaging tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build
+      - name: Build wheel (python-shim)
+        working-directory: python-shim
+        run: python -m build --wheel
+      - name: Stage wheel for artifact
+        shell: bash
+        working-directory: python-shim
+        run: |
+          mkdir -p wheelhouse
+          cp dist/*.whl wheelhouse/
+      - name: Smoke install wheel
+        shell: pwsh
+        run: |
+          $venv = Join-Path $env:RUNNER_TEMP "ifwh-win"
+          python -m venv $venv
+          $pip = Join-Path $venv "Scripts\pip.exe"
+          $py = Join-Path $venv "Scripts\python.exe"
+          $whl = (Get-Item "python-shim\wheelhouse\*.whl" | Select-Object -First 1).FullName
+          & $pip install $whl
+          & $py -c "from prefect_compat.rust_bridge import native_library_available as n; assert n(); print('native ok')"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ironflow-prefect-compat-wheel-windows
+          path: python-shim/wheelhouse/*.whl
+
+  wheel-macos:
+    name: macOS wheel (bundled ironflow_engine)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install packaging tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build
+      - name: Build wheel (python-shim)
+        working-directory: python-shim
+        run: python -m build --wheel
+      - name: Stage wheel for artifact
+        shell: bash
+        working-directory: python-shim
+        run: |
+          mkdir -p wheelhouse
+          cp dist/*.whl wheelhouse/
+      - name: Smoke install wheel
+        shell: bash
+        run: |
+          python -m venv /tmp/ifwh-macos
+          . /tmp/ifwh-macos/bin/activate
+          pip install python-shim/wheelhouse/*.whl
+          python -c "from prefect_compat.rust_bridge import native_library_available as n; assert n(); print('native ok')"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ironflow-prefect-compat-wheel-macos
+          path: python-shim/wheelhouse/*.whl
+
   frontend:
     name: Frontend tests
     runs-on: ubuntu-latest
