@@ -25,10 +25,10 @@ You want **`native_library_available=True`** when using the intended Rust-backed
 
 ---
 
-## 1. Prebuilt wheels (TestPyPI — validation index)
+## 1. Prebuilt wheels (`ironflow-prefect-compat`)
 
 **Package name:** `ironflow-prefect-compat`  
-**Status:** Release candidates and validation builds are published to **TestPyPI** first; **production PyPI** is a separate follow-up (see [DISTRIBUTION.md](DISTRIBUTION.md)).
+Maintainers may publish to **TestPyPI** (validation) and/or **production PyPI**; see [DISTRIBUTION.md](DISTRIBUTION.md) and [RELEASING.md](../RELEASING.md).
 
 Wheels are built for **CPython 3.11** on:
 
@@ -38,6 +38,19 @@ Wheels are built for **CPython 3.11** on:
 | Linux aarch64 (e.g. Raspberry Pi 64-bit) | `manylinux_*_aarch64` |
 | Windows x86_64 | `win_amd64` |
 | macOS (universal2 from CI) | `macosx_*_universal2` |
+
+### Production PyPI (pypi.org)
+
+When wheels are available on the default index:
+
+```bash
+python -m pip install --upgrade pip
+python -m pip install ironflow-prefect-compat
+```
+
+Then run the **quick check** at the top of this page.
+
+### TestPyPI (validation index)
 
 TestPyPI does not mirror all upstream dependencies. Install with **both** TestPyPI and the real PyPI index so transitive packages resolve:
 
@@ -154,5 +167,5 @@ After the above, you can start the bundled HTTP server and UI — see **[How to 
 
 ## What is not available yet
 
-- **Production PyPI** (`pypi.org`) may not list this package until maintainers add a **publish-to-PyPI** workflow; use **TestPyPI** or **git + cargo** until then.
 - **conda-forge** packages with prebuilt native libraries are **not** published yet.
+- If **`pip install ironflow-prefect-compat`** fails (no matching wheel yet), use **TestPyPI**, **git install**, or a **full checkout** + **`cargo build`** as described above.

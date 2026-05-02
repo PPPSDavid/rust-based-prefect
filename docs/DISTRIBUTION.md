@@ -8,6 +8,7 @@
 
 | Path | When to use |
 | --- | --- |
+| **Production PyPI** | Default **`pip install ironflow-prefect-compat`** when wheels are published (see **`RELEASING.md`**). |
 | **TestPyPI wheels** | Validation installs with **`pip install`** + dual index (see [INSTALL.md](INSTALL.md)); ships **`ironflow_engine`** per platform when a wheel exists for **CPython 3.11**. |
 | **GitHub clone + `cargo build`** | Full repo: benchmarks, scripts, optional UI, kernel development. |
 | **`pip install git+…#subdirectory=python-shim`** | Python-only integration without TestPyPI; native kernel only if the build ran **`cargo`** or you set **`IRONFLOW_RUST_LIB`**. |
@@ -51,6 +52,10 @@ On **`main`** / PRs, these jobs build **`python-shim`**, smoke-install the wheel
 | **`wheel-windows`** | **`ironflow-prefect-compat-wheel-windows`** | **`win_amd64`** + **`ironflow_engine.dll`**. |
 | **`wheel-macos`** | **`ironflow-prefect-compat-wheel-macos`** | **`macos-latest`** (universal2 / Apple-centric runner — add an Intel-only job if **`x86_64`** wheels are required). |
 
+### PyPI production (manual)
+
+Workflow **`Publish to PyPI`** (**`.github/workflows/publish-pypi.yml`**, **`workflow_dispatch`**) builds the **same four wheels** as TestPyPI and uploads them to **https://pypi.org** (default **`repository-url`** for **`gh-action-pypi-publish`**). Configure **trusted publishing** on **pypi.org** for this workflow file separately from TestPyPI. Use **`dry_run`** to build artifacts without uploading.
+
 ### TestPyPI (manual)
 
 Workflow **`Publish to TestPyPI`** (**`workflow_dispatch`**) builds **Linux x86_64**, **Linux aarch64**, **Windows**, and **macOS** wheels and uploads them to **https://test.pypi.org** via **`pypa/gh-action-pypi-publish`** (OIDC **trusted publisher** on TestPyPI recommended). Use the **dry run** input to build and download artifacts without uploading. Configure once per **[TestPyPI trusted publishing](https://docs.pypi.org/trusted-publishers/)** (or an API token per PyPA docs).
@@ -77,14 +82,14 @@ python -m pip install \
 | TestPyPI validation | `pip install` with **TestPyPI** + **pypi.org** extra index (see [INSTALL.md](INSTALL.md)) | Prebuilt **`ironflow_engine`** when a wheel matches **platform + CPython 3.11**. |
 | Python API from Git, no local clone of your app | `pip install "git+...@vX.Y.Z#subdirectory=python-shim"` | Native kernel if **`cargo`** ran at build time, else **`IRONFLOW_RUST_LIB`** or local **`cargo build`**. |
 | Full stack, no index | Clone + `environment.yml` + `cargo build` | Current path for kernel + benchmarks + UI. |
-| Production **PyPI** | `pip install ironflow-prefect-compat` | **Follow-up:** trusted publishing to **pypi.org** (not only TestPyPI). |
+| Production **PyPI** | `pip install ironflow-prefect-compat` | Requires a maintainer **Publish to PyPI** run and **trusted publisher** on **pypi.org** (see **`RELEASING.md`**). |
 
 ## Summary
 
-- **Done in-repo:** **`importlib.resources`** in **`rust_bridge`**, **`prefect_compat/native/`** via **`build_native`**, platform-tagged wheels, **Linux (x86_64 + aarch64) / Windows / macOS** CI, **TestPyPI** publish workflow, and **PyPI-oriented metadata** in **`pyproject.toml`**.
+- **Done in-repo:** **`importlib.resources`** in **`rust_bridge`**, **`prefect_compat/native/`** via **`build_native`**, platform-tagged wheels, **Linux (x86_64 + aarch64) / Windows / macOS** CI, **TestPyPI** and **production PyPI** publish workflows, and **PyPI-oriented metadata** in **`pyproject.toml`**.
 - **Encodes “needs Rust”:** classifiers and docs; **pip** does not install Rust — wheels **embed** the built **`cdylib`**, or document **source build** / **`IRONFLOW_RUST_LIB`**.
 
-### Follow-ups toward production PyPI
+### Follow-ups
 
-- **PyPI.org** publish workflow (mirror **`publish-testpypi.yml`** against **`https://pypi.org`**) and **`RELEASING.md`** checklist.
-- Optional: **macOS x86_64-only** job if **`universal2`** is not enough for your support matrix.
+- Optional: **macOS x86_64-only** CI job if **`universal2`** is not enough for your support matrix.
+- **conda-forge** feedstock (still optional).

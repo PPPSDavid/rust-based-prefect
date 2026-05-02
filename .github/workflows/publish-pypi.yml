@@ -1,0 +1,140 @@
+# Manual publish of ironflow-prefect-compat wheels to production PyPI (pypi.org).
+#
+# One-time maintainer setup:
+# 1. Ensure the project exists on https://pypi.org (first upload may create it).
+# 2. Prefer OIDC: PyPI project → Manage → Publishing → add a "trusted publisher"
+#    for this repository + workflow file (this file). Optionally use a GitHub
+#    Environment named `pypi` with approval rules — see PyPA docs.
+# 3. Or store an API token as repo secret PYPI_API_TOKEN and configure the action
+#    to use password-based auth (see pypa/gh-action-pypi-publish).
+#
+# Run: Actions → "Publish to PyPI" → Run workflow (optional: dry_run = build only).
+# Recommended: run after version bump, validation, and (optionally) TestPyPI dry run.
+
+name: Publish to PyPI
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build wheels only (skip upload)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            slug: linux
+          - os: ubuntu-latest
+            slug: linux-aarch64
+          - os: windows-latest
+            slug: windows
+          - os: macos-latest
+            slug: macos
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install packaging tools (Linux)
+        if: runner.os == 'Linux' && matrix.slug != 'linux-aarch64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y patchelf
+          python -m pip install --upgrade pip
+          python -m pip install build auditwheel
+
+      - name: Install packaging tools (Linux aarch64)
+        if: matrix.slug == 'linux-aarch64'
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install cibuildwheel
+
+      - name: Install packaging tools (Windows / macOS)
+        if: runner.os != 'Linux'
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build
+
+      - name: Build wheel (python-shim)
+        if: matrix.slug != 'linux-aarch64'
+        working-directory: python-shim
+        run: python -m build --wheel
+
+      - name: Set up QEMU for Linux aarch64 builds
+        if: matrix.slug == 'linux-aarch64'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Build wheel (python-shim, Linux aarch64 via cibuildwheel)
+        if: matrix.slug == 'linux-aarch64'
+        env:
+          CIBW_BUILD: "cp311-*"
+          CIBW_ARCHS_LINUX: "aarch64"
+          CIBW_SKIP: "*musllinux*"
+          CIBW_BEFORE_ALL_LINUX: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal && ln -sf /root/.cargo/bin/cargo /usr/local/bin/cargo && ln -sf /root/.cargo/bin/rustc /usr/local/bin/rustc"
+          CIBW_ENVIRONMENT: "IRONFLOW_FORCE_PLATFORM_WHEEL=1 PATH=/root/.cargo/bin:$PATH"
+        run: cibuildwheel --platform linux --output-dir python-shim/wheelhouse python-shim
+
+      - name: Auditwheel repair (Linux)
+        if: runner.os == 'Linux' && matrix.slug != 'linux-aarch64'
+        working-directory: python-shim
+        shell: bash
+        run: |
+          mkdir -p wheelhouse
+          shopt -s nullglob
+          for f in dist/*.whl; do
+            auditwheel repair "$f" -w wheelhouse || cp "$f" wheelhouse/
+          done
+
+      - name: Stage wheel (Windows / macOS)
+        if: runner.os != 'Linux'
+        shell: bash
+        working-directory: python-shim
+        run: |
+          mkdir -p wheelhouse
+          cp dist/*.whl wheelhouse/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ matrix.slug }}
+          path: python-shim/wheelhouse/*.whl
+
+  publish:
+    needs: build
+    if: ${{ github.event.inputs.dry_run != 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheel-*
+          path: wheels
+          merge-multiple: true
+
+      - name: Collect wheels for upload
+        run: |
+          mkdir -p dist
+          find wheels -name '*.whl' -exec cp -t dist {} +
+          ls -la dist/
+
+      # Default repository is production PyPI (upload.pypi.org).
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          skip-existing: true

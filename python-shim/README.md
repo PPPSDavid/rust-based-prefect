@@ -16,7 +16,12 @@ python -m pip install \
   ironflow-prefect-compat
 ```
 
-**Production PyPI** (`pypi.org`) follows the same package name when maintainers enable publishing there.
+**Production PyPI** (`pypi.org`), after maintainers publish wheels:
+
+```bash
+python -m pip install --upgrade pip
+python -m pip install ironflow-prefect-compat
+```
 
 ## Verify the native library
 
