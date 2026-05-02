@@ -28,7 +28,7 @@ You want **`native_library_available=True`** when using the intended Rust-backed
 ## 1. Prebuilt wheels (`ironflow-prefect-compat`)
 
 **Package name:** `ironflow-prefect-compat`  
-Maintainers may publish to **TestPyPI** (validation) and/or **production PyPI**; see [DISTRIBUTION.md](DISTRIBUTION.md) and [RELEASING.md](../RELEASING.md).
+Maintainers may publish to **TestPyPI** (validation) and/or **production PyPI**; see [Distribution](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/DISTRIBUTION.md) and [Releasing](https://github.com/PPPSDavid/rust-based-prefect/blob/main/RELEASING.md) (maintainer-oriented files; not part of the hosted MkDocs site).
 
 Wheels are built for **CPython 3.11** on:
 
@@ -163,7 +163,7 @@ After the above, you can start the bundled HTTP server and UI — see **[How to 
 ## See also
 
 - **[How to set up IronFlow](how-to/setup.md)** — condensed setup and environment variables in one place.
-- **[Distribution](DISTRIBUTION.md)** — maintainer notes on wheels, CI, TestPyPI vs production PyPI.
+- **[Distribution](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/DISTRIBUTION.md)** — maintainer notes on wheels, CI, TestPyPI vs production PyPI.
 
 ## What is not available yet
 
