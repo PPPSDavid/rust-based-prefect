@@ -11,6 +11,16 @@ dependencies = [
   "pydantic>=2,<3",
 ]
 
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+prefect_compat = [
+  "native/*.so",
+  "native/*.dll",
+  "native/*.dylib",
+]
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]

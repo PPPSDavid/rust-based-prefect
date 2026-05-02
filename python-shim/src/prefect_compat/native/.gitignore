@@ -1,0 +1,3 @@
+# Built cdylib artifacts staged here by build_native (do not commit).
+*
+!.gitignore
