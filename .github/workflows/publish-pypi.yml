@@ -119,6 +119,9 @@ jobs:
     needs: build
     if: ${{ github.event.inputs.dry_run != 'true' }}
     runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/ironflow-prefect-compat/
     steps:
       - uses: actions/download-artifact@v4
         with:
