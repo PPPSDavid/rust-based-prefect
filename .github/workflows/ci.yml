@@ -101,6 +101,7 @@ jobs:
           CIBW_BUILD: "cp311-*"
           CIBW_ARCHS_LINUX: "aarch64"
           CIBW_SKIP: "*musllinux*"
+          IRONFLOW_FORCE_PLATFORM_WHEEL: "1"
         run: cibuildwheel --platform linux --output-dir python-shim/wheelhouse python-shim
       - name: Verify aarch64 wheel artifact exists
         shell: bash
