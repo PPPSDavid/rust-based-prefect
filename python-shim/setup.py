@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -20,14 +21,10 @@ class bdist_wheel(_bdist_wheel):
 
     def finalize_options(self) -> None:
         super().finalize_options()
-        native_dir = _HERE / "src" / "prefect_compat" / "native"
-        has_binary = False
-        if native_dir.is_dir():
-            for p in native_dir.iterdir():
-                if p.is_file() and p.suffix.lower() in (".so", ".dll", ".dylib"):
-                    has_binary = True
-                    break
-        self.root_is_pure = not has_binary
+        skip_native = os.environ.get("IRONFLOW_SKIP_NATIVE_BUILD", "").lower() in ("1", "true", "yes")
+        # build_py stages the cdylib later in the build lifecycle, so decide purity
+        # from intent: non-skip builds should always produce platform-tagged wheels.
+        self.root_is_pure = skip_native
 
 
 setup(cmdclass={"build_py": build_py, "bdist_wheel": bdist_wheel})
