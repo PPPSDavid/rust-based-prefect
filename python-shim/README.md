@@ -2,7 +2,7 @@
 
 **IronFlow** — Prefect-style **`@flow` / `@task`** authoring (`prefect_compat`) backed by a **Rust orchestration kernel** shipped as a **`ctypes`** shared library (`ironflow_engine`).
 
-This PyPI distribution bundles **prebuilt native wheels** per platform where CI publishes them (**CPython 3.11**). You **do not** need Rust installed to **use** those wheels; Rust is used **when building** the package from source.
+This PyPI distribution bundles **prebuilt native wheels** per platform where CI publishes them (**CPython 3.11 and 3.12**). You **do not** need Rust installed to **use** those wheels; Rust is used **when building** the package from source.
 
 ## Install
 

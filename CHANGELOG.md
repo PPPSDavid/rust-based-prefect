@@ -4,6 +4,17 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
+## [0.1.2] — 2026-05-02
+
+### Added
+
+- **PyPI wheels for CPython 3.12** alongside **3.11** on Linux x86_64, Windows, and macOS.
+- **Linux aarch64:** **cp311** and **cp312** wheels from a single **`cibuildwheel`** run on the self-hosted ARM64 runner.
+
+### Documentation
+
+- README, **INSTALL**, **DISTRIBUTION**, and **COMPATIBILITY** updated for the published wheel matrix and Python-version expectations.
+
 ## [0.1.1] — 2026-04-17
 
 ### Fixed
@@ -19,6 +30,7 @@ All notable changes to this project are documented here. Version numbers follow 
 
 Initial public-oriented packaging: Apache-2.0 license, compatibility matrix, benchmarks, prototype UI, CI, MkDocs site, and Prefect→IronFlow mapping.
 
-[Unreleased]: https://github.com/PPPSDavid/rust-based-prefect/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/PPPSDavid/rust-based-prefect/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/PPPSDavid/rust-based-prefect/releases/tag/v0.1.2
 [0.1.1]: https://github.com/PPPSDavid/rust-based-prefect/releases/tag/v0.1.1
 [0.1.0]: https://github.com/PPPSDavid/rust-based-prefect/releases/tag/v0.1.0

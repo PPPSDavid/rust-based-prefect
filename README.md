@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/PPPSDavid/rust-based-prefect/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/PPPSDavid/rust-based-prefect/actions/workflows/ci.yml)
 [![Docs](https://github.com/PPPSDavid/rust-based-prefect/actions/workflows/docs.yml/badge.svg?branch=main)](https://github.com/PPPSDavid/rust-based-prefect/actions/workflows/docs.yml)
+[![PyPI ironflow-prefect-compat](https://img.shields.io/pypi/v/ironflow-prefect-compat)](https://pypi.org/project/ironflow-prefect-compat/)
 [![Release](https://img.shields.io/github/v/release/PPPSDavid/rust-based-prefect?sort=semver)](https://github.com/PPPSDavid/rust-based-prefect/releases)
 [![License](https://img.shields.io/github/license/PPPSDavid/rust-based-prefect)](LICENSE)
 
@@ -14,6 +15,7 @@ Project IronFlow is a **hybrid MVP** built around a **Rust orchestration kernel*
 | Layered doc home (hosted) | [docs/index.md](docs/index.md) |
 | How Rust and Python fit together | [docs/architecture.md](docs/architecture.md) |
 | **Install (current; hosted docs)** | [docs/INSTALL.md](docs/INSTALL.md) |
+| **PyPI package (`ironflow-prefect-compat`)** | [https://pypi.org/project/ironflow-prefect-compat/](https://pypi.org/project/ironflow-prefect-compat/) — `pip install ironflow-prefect-compat` (see INSTALL for CPython versions shipped as wheels). |
 | PyPI / conda packaging roadmap (contributors) | [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) |
 | Performance vs Prefect (expectations, caveats) | [docs/PERFORMANCE_OVERVIEW.md](docs/PERFORMANCE_OVERVIEW.md) |
 | Quick start (demo flow, hosted docs) | [docs/QUICKSTART_DEMO.md](docs/QUICKSTART_DEMO.md) |
@@ -77,7 +79,15 @@ python -m venv .venv
 python -m pip install -r requirements-ci.txt
 ```
 
-Python **3.11+** is supported; `environment.yml` currently pins **3.12**.
+Python **3.11+** is supported; `environment.yml` currently pins **3.12**. Published wheels on PyPI target **CPython 3.11 and 3.12** (see [COMPATIBILITY.md](COMPATIBILITY.md)); other versions may install from **sdist** or require a source checkout + `cargo build`.
+
+### Install from PyPI (Python 3.11 / 3.12)
+
+```bash
+python -m pip install --upgrade pip
+python -m pip install ironflow-prefect-compat
+python -c "from prefect_compat.rust_bridge import native_library_available; print(native_library_available())"
+```
 
 ### Using a numbered release (e.g. v0.1.1)
 

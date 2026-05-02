@@ -8,6 +8,12 @@ This document tracks compatibility targets against Prefect OSS.
 - Baseline major/minor: `3.x`
 - Initial validation target: `3.0.0`
 
+## Python versions & PyPI (`ironflow-prefect-compat`)
+
+- **`requires-python`:** `>=3.11` (see `python-shim/pyproject.toml`).
+- **Prebuilt wheels:** CI publishes **manylinux** (x86_64 + aarch64), **Windows** (`win_amd64`), and **macOS** wheels for **CPython 3.11 and 3.12**. Confirm exact filenames on [PyPI → Download files](https://pypi.org/project/ironflow-prefect-compat/#files).
+- **Other CPython versions** (for example 3.13): may resolve to **sdist** or fail until wheels exist — build from a **full checkout** with **`cargo build`** and/or set **`IRONFLOW_RUST_LIB`** per the hosted [Installation](https://pppsdavid.github.io/rust-based-prefect/INSTALL/) guide (see also [`docs/INSTALL.md` on GitHub](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/INSTALL.md)).
+
 ## Phase 1 runtime compatibility (current MVP target)
 
 - Supported:
