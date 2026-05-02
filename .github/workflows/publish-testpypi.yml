@@ -1,0 +1,112 @@
+# Manual publish of ironflow-prefect-compat wheels to TestPyPI.
+#
+# One-time maintainer setup:
+# 1. Create https://test.pypi.org/account/register/ and a project (or let first upload create it).
+# 2. Prefer OIDC: Project Settings → Manage → Publishing → add a "trusted publisher"
+#    for this repo + workflow file + environment (if used).
+# 3. Or create an API token on TestPyPI and store it as repo secret TEST_PYPI_API_TOKEN,
+#    then add a password step (see pypa/gh-action-pypi-publish docs).
+#
+# Run: Actions → "Publish to TestPyPI" → Run workflow (optional: dry-run = build only).
+
+name: Publish to TestPyPI
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build wheels only (skip upload)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            slug: linux
+          - os: windows-latest
+            slug: windows
+          - os: macos-latest
+            slug: macos
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install packaging tools (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y patchelf
+          python -m pip install --upgrade pip
+          python -m pip install build auditwheel
+
+      - name: Install packaging tools (Windows / macOS)
+        if: runner.os != 'Linux'
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build
+
+      - name: Build wheel (python-shim)
+        working-directory: python-shim
+        run: python -m build --wheel
+
+      - name: Auditwheel repair (Linux)
+        if: runner.os == 'Linux'
+        working-directory: python-shim
+        shell: bash
+        run: |
+          mkdir -p wheelhouse
+          shopt -s nullglob
+          for f in dist/*.whl; do
+            auditwheel repair "$f" -w wheelhouse || cp "$f" wheelhouse/
+          done
+
+      - name: Stage wheel (Windows / macOS)
+        if: runner.os != 'Linux'
+        shell: bash
+        working-directory: python-shim
+        run: |
+          mkdir -p wheelhouse
+          cp dist/*.whl wheelhouse/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ matrix.slug }}
+          path: python-shim/wheelhouse/*.whl
+
+  publish:
+    needs: build
+    if: ${{ github.event.inputs.dry_run != 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheel-*
+          path: wheels
+          merge-multiple: true
+
+      - name: Collect wheels for upload
+        run: |
+          mkdir -p dist
+          find wheels -name '*.whl' -exec cp -t dist {} +
+          ls -la dist/
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist/
