@@ -35,3 +35,6 @@ docs/stress_results.json
 .claude/
 baseline_stage2.*
 docs/superpowers/
+
+# Local-only traction plan (not tracked)
+docs/plans/oss-traction-8wk.md
