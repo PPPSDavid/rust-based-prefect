@@ -15,6 +15,7 @@ exclude_docs: |
   perf_design_note.md
   perf_matrix_summary.md
   perf_methodology.md
+  compatibility_review_workflow.md
   ui_phase1_api_contract.md
 
 theme:

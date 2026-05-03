@@ -2,6 +2,8 @@
 
 This document tracks compatibility targets against Prefect OSS.
 
+Maintainers should use `docs/compatibility_review_workflow.md` before changing this matrix or choosing a new Prefect-alignment feature. The workflow keeps upstream comparison, gap selection, documentation, and implementation decisions tied together.
+
 ## Baseline
 
 - Upstream project: `prefecthq/prefect` (self-hosted OSS context)
