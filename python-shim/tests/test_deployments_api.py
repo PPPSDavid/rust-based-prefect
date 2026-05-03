@@ -102,3 +102,31 @@ def test_patch_deployment_schedule(tmp_path: Path) -> None:
     assert body["schedule_enabled"] is True
     assert body["schedule_interval_seconds"] == 3600
     assert UUID(body["id"]) == UUID(deployment_id)
+
+
+def test_patch_deployment_rrule_metadata(tmp_path: Path) -> None:
+    _swap_plane(tmp_path)
+    client = TestClient(app)
+    create = client.post(
+        "/api/deployments",
+        json={
+            "name": "patch-rrule",
+            "flow_name": "simple_flow",
+            "default_parameters": {"n": 1},
+            "paused": False,
+        },
+    )
+    assert create.status_code == 200
+    deployment_id = create.json()["id"]
+    patch = client.patch(
+        f"/api/deployments/{deployment_id}",
+        json={
+            "schedule_enabled": False,
+            "schedule_rrule": "FREQ=HOURLY;INTERVAL=2",
+        },
+    )
+    assert patch.status_code == 200
+    body = patch.json()
+    assert body["schedule_rrule"] == "FREQ=HOURLY;INTERVAL=2"
+    assert body["schedule_cron"] is None
+    assert body["schedule_interval_seconds"] is None

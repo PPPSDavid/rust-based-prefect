@@ -232,6 +232,7 @@ class InMemoryControlPlane:
             "collision_strategy": d.get("collision_strategy") or "ENQUEUE",
             "schedule_interval_seconds": d.get("schedule_interval_seconds"),
             "schedule_cron": d.get("schedule_cron"),
+            "schedule_rrule": d.get("schedule_rrule"),
             "schedule_next_run_at": d.get("schedule_next_run_at"),
             "schedule_enabled": bool(d.get("schedule_enabled")),
             "created_at": d["created_at"],
@@ -273,6 +274,57 @@ class InMemoryControlPlane:
         )
         return int(cur.rowcount or 0)
 
+    @staticmethod
+    def _parse_rrule_until(value: str) -> datetime:
+        raw = value.strip()
+        if raw.endswith("Z") and "T" in raw and "-" not in raw:
+            raw = raw[:-1]
+        try:
+            if "-" in raw:
+                return datetime.fromisoformat(raw.replace("Z", "+00:00")).astimezone(UTC)
+            return datetime.strptime(raw, "%Y%m%dT%H%M%S").replace(tzinfo=UTC)
+        except ValueError as exc:
+            raise ValueError(f"invalid RRule UNTIL: {exc}") from exc
+
+    @classmethod
+    def _next_rrule_occurrence(cls, expr: str, after: datetime | None = None) -> str:
+        parts: dict[str, str] = {}
+        for raw_part in expr.split(";"):
+            part = raw_part.strip()
+            if not part:
+                continue
+            key, sep, value = part.partition("=")
+            if not sep:
+                raise ValueError(f"invalid RRule component: {part}")
+            normalized_key = key.strip().upper()
+            if normalized_key not in {"FREQ", "INTERVAL", "UNTIL", "COUNT"}:
+                raise ValueError(f"unsupported RRule component: {normalized_key}")
+            parts[normalized_key] = value.strip()
+
+        freq = parts.get("FREQ", "").upper()
+        if freq not in {"MINUTELY", "HOURLY", "DAILY", "WEEKLY"}:
+            raise ValueError(f"unsupported RRule FREQ: {freq or '<missing>'}")
+        if "COUNT" in parts:
+            raise ValueError("RRule COUNT is not supported; use UNTIL or trigger fixed runs manually")
+
+        interval = int(parts.get("INTERVAL", "1"))
+        if interval <= 0:
+            raise ValueError("RRule INTERVAL must be positive")
+        unit = {
+            "MINUTELY": timedelta(minutes=interval),
+            "HOURLY": timedelta(hours=interval),
+            "DAILY": timedelta(days=interval),
+            "WEEKLY": timedelta(weeks=interval),
+        }[freq]
+        base = after.astimezone(UTC) if after is not None else datetime.now(UTC)
+        nxt = base + unit
+        until_raw = parts.get("UNTIL")
+        if until_raw:
+            until = cls._parse_rrule_until(until_raw)
+            if nxt > until:
+                raise ValueError("RRule has no upcoming occurrence before UNTIL")
+        return nxt.isoformat()
+
     def deployment_maintenance_tick(self, stale_after_seconds: int = 120) -> dict[str, Any]:
         """Reclaim leases, fire due schedules, mark stale workers — prefers a single Rust FFI call."""
         rust = self._rust_deployment_dispatch(
@@ -312,6 +364,29 @@ class InMemoryControlPlane:
             except ValueError:
                 continue
             nxt = (datetime.now(UTC) + timedelta(seconds=interval_sec)).isoformat()
+            ts = self._now()
+            self._sqlite_conn.execute(
+                "UPDATE deployments SET schedule_next_run_at = ?, updated_at = ? WHERE id = ?",
+                [nxt, ts, str(dep_id)],
+            )
+            fired += 1
+        due_rrule = self._query_rows(
+            """
+            SELECT id, schedule_rrule FROM deployments
+            WHERE schedule_enabled = 1 AND paused = 0
+              AND schedule_rrule IS NOT NULL AND trim(schedule_rrule) != ''
+              AND schedule_next_run_at IS NOT NULL AND schedule_next_run_at <= ?
+            """,
+            [now],
+        )
+        for row in due_rrule:
+            dep_id = UUID(row["id"])
+            rrule = str(row["schedule_rrule"])
+            try:
+                self.trigger_deployment_run(dep_id, parameters={}, idempotency_key=None)
+                nxt = self._next_rrule_occurrence(rrule, datetime.now(UTC))
+            except ValueError:
+                continue
             ts = self._now()
             self._sqlite_conn.execute(
                 "UPDATE deployments SET schedule_next_run_at = ?, updated_at = ? WHERE id = ?",
@@ -1235,6 +1310,7 @@ class InMemoryControlPlane:
         collision_strategy: str = "ENQUEUE",
         schedule_interval_seconds: int | None = None,
         schedule_cron: str | None = None,
+        schedule_rrule: str | None = None,
         schedule_next_run_at: str | None = None,
         schedule_enabled: bool = False,
     ) -> dict[str, Any]:
@@ -1249,12 +1325,15 @@ class InMemoryControlPlane:
             "collision_strategy": collision_strategy,
             "schedule_interval_seconds": schedule_interval_seconds,
             "schedule_cron": schedule_cron,
+            "schedule_rrule": schedule_rrule,
             "schedule_next_run_at": schedule_next_run_at,
             "schedule_enabled": schedule_enabled,
         }
-        rust = self._rust_deployment_dispatch("deployment_create", body)
+        rrule_requested = bool(schedule_rrule and str(schedule_rrule).strip())
+        rust = None if rrule_requested else self._rust_deployment_dispatch("deployment_create", body)
         if rust is not None and rust.get("ok") and rust.get("deployment") is not None:
-            return self._deployment_from_rust_json(rust["deployment"])
+            deployment = self._deployment_from_rust_json(rust["deployment"])
+            return deployment
         if rust is not None and rust.get("ok") is False:
             err = rust.get("error") or {}
             raise ValueError(str(err.get("message", "deployment_create failed")))
@@ -1263,7 +1342,7 @@ class InMemoryControlPlane:
             existing = self._query_rows(
                 """
                 SELECT id,name,flow_name,entrypoint,path,default_parameters,paused,
-                       concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,
+                       concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,
                        schedule_next_run_at,schedule_enabled,created_at,updated_at
                 FROM deployments
                 WHERE name = ?
@@ -1276,14 +1355,22 @@ class InMemoryControlPlane:
 
             si = schedule_interval_seconds
             sc = schedule_cron
-            if sc and str(sc).strip():
+            sr = schedule_rrule
+            if sr and str(sr).strip():
                 si = None
+                sc = None
+            elif sc and str(sc).strip():
+                si = None
+                sr = None
             elif si is not None and si > 0:
                 sc = None
+                sr = None
 
             sched_next = schedule_next_run_at
             if schedule_enabled and si and si > 0 and sched_next is None:
                 sched_next = self._now()
+            if schedule_enabled and sr and str(sr).strip() and sched_next is None:
+                sched_next = self._next_rrule_occurrence(str(sr), datetime.now(UTC))
             if schedule_enabled and sc and str(sc).strip() and sched_next is None:
                 raise ValueError(
                     "Cron schedules require the Rust engine (bind_db) to compute the first schedule_next_run_at, "
@@ -1296,9 +1383,9 @@ class InMemoryControlPlane:
                 """
                 INSERT INTO deployments
                 (id,name,flow_name,entrypoint,path,default_parameters,paused,
-                 concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,
+                 concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,
                  schedule_next_run_at,schedule_enabled,created_at,updated_at)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 [
                     deployment_id,
@@ -1312,6 +1399,7 @@ class InMemoryControlPlane:
                     collision_strategy,
                     si,
                     sc,
+                    sr,
                     sched_next,
                     1 if schedule_enabled else 0,
                     now,
@@ -1321,7 +1409,7 @@ class InMemoryControlPlane:
             row = self._query_rows(
                 """
                 SELECT id,name,flow_name,entrypoint,path,default_parameters,paused,
-                       concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,
+                       concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,
                        schedule_next_run_at,schedule_enabled,created_at,updated_at
                 FROM deployments
                 WHERE id = ?
@@ -1334,9 +1422,11 @@ class InMemoryControlPlane:
     def update_deployment(self, deployment_id: UUID, patch: dict[str, Any]) -> dict[str, Any]:
         body = dict(patch)
         body["deployment_id"] = str(deployment_id)
-        rust = self._rust_deployment_dispatch("deployment_update", body)
+        rrule_requested = bool(patch.get("schedule_rrule") and str(patch.get("schedule_rrule")).strip())
+        rust = None if rrule_requested else self._rust_deployment_dispatch("deployment_update", body)
         if rust is not None and rust.get("ok") and rust.get("deployment") is not None:
-            return self._deployment_from_rust_json(rust["deployment"])
+            deployment = self._deployment_from_rust_json(rust["deployment"])
+            return deployment
         if rust is not None and rust.get("ok") is False:
             err = rust.get("error") or {}
             msg = str(err.get("message", "deployment_update failed"))
@@ -1359,6 +1449,7 @@ class InMemoryControlPlane:
             collision_strategy = str(dep.get("collision_strategy") or "ENQUEUE")
             schedule_interval_seconds = dep.get("schedule_interval_seconds")
             schedule_cron = dep.get("schedule_cron")
+            schedule_rrule = dep.get("schedule_rrule")
             schedule_next_run_at = dep.get("schedule_next_run_at")
             schedule_enabled = bool(dep.get("schedule_enabled"))
 
@@ -1380,18 +1471,27 @@ class InMemoryControlPlane:
                 schedule_interval_seconds = patch["schedule_interval_seconds"]
             if "schedule_cron" in patch:
                 schedule_cron = patch["schedule_cron"]
+            if "schedule_rrule" in patch:
+                schedule_rrule = patch["schedule_rrule"]
             if "schedule_next_run_at" in patch:
                 schedule_next_run_at = patch["schedule_next_run_at"]
             if "schedule_enabled" in patch:
                 schedule_enabled = bool(patch["schedule_enabled"])
 
-            if schedule_cron and str(schedule_cron).strip():
+            if schedule_rrule and str(schedule_rrule).strip():
                 schedule_interval_seconds = None
+                schedule_cron = None
+            elif schedule_cron and str(schedule_cron).strip():
+                schedule_interval_seconds = None
+                schedule_rrule = None
             elif schedule_interval_seconds is not None and int(schedule_interval_seconds) > 0:
                 schedule_cron = None
+                schedule_rrule = None
 
             if schedule_enabled and schedule_interval_seconds and int(schedule_interval_seconds) > 0 and not schedule_next_run_at:
                 schedule_next_run_at = self._now()
+            if schedule_enabled and schedule_rrule and str(schedule_rrule).strip() and not schedule_next_run_at:
+                schedule_next_run_at = self._next_rrule_occurrence(str(schedule_rrule), datetime.now(UTC))
             if (
                 schedule_enabled
                 and schedule_cron
@@ -1409,7 +1509,7 @@ class InMemoryControlPlane:
                 UPDATE deployments SET
                   entrypoint = ?, path = ?, default_parameters = ?, paused = ?,
                   concurrency_limit = ?, collision_strategy = ?,
-                  schedule_interval_seconds = ?, schedule_cron = ?, schedule_next_run_at = ?,
+                  schedule_interval_seconds = ?, schedule_cron = ?, schedule_rrule = ?, schedule_next_run_at = ?,
                   schedule_enabled = ?, updated_at = ?
                 WHERE id = ?
                 """,
@@ -1422,6 +1522,7 @@ class InMemoryControlPlane:
                     collision_strategy,
                     schedule_interval_seconds,
                     schedule_cron,
+                    schedule_rrule,
                     schedule_next_run_at,
                     1 if schedule_enabled else 0,
                     ts,
@@ -1431,7 +1532,7 @@ class InMemoryControlPlane:
             row = self._query_rows(
                 """
                 SELECT id,name,flow_name,entrypoint,path,default_parameters,paused,
-                       concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,
+                       concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,
                        schedule_next_run_at,schedule_enabled,created_at,updated_at
                 FROM deployments WHERE id = ?
                 LIMIT 1
@@ -1443,7 +1544,7 @@ class InMemoryControlPlane:
     def list_deployments(self, limit: int = 200, cursor: str | None = None) -> PageResult:
         query = (
             "SELECT seq,id,name,flow_name,entrypoint,path,default_parameters,paused,"
-            " concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,"
+            " concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,"
             " schedule_next_run_at,schedule_enabled,created_at,updated_at "
             "FROM deployments"
         )
@@ -1462,7 +1563,7 @@ class InMemoryControlPlane:
         rows = self._query_rows(
             """
             SELECT id,name,flow_name,entrypoint,path,default_parameters,paused,
-                   concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,
+                   concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,
                    schedule_next_run_at,schedule_enabled,created_at,updated_at
             FROM deployments
             WHERE id = ?
@@ -2036,6 +2137,7 @@ class InMemoryControlPlane:
                 collision_strategy TEXT NOT NULL DEFAULT 'ENQUEUE',
                 schedule_interval_seconds INTEGER,
                 schedule_cron TEXT,
+                schedule_rrule TEXT,
                 schedule_next_run_at TEXT,
                 schedule_enabled INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL,
@@ -2105,6 +2207,8 @@ class InMemoryControlPlane:
             conn.execute("ALTER TABLE deployments ADD COLUMN schedule_interval_seconds INTEGER")
         if "schedule_cron" not in dep_cols:
             conn.execute("ALTER TABLE deployments ADD COLUMN schedule_cron TEXT")
+        if "schedule_rrule" not in dep_cols:
+            conn.execute("ALTER TABLE deployments ADD COLUMN schedule_rrule TEXT")
         if "schedule_next_run_at" not in dep_cols:
             conn.execute("ALTER TABLE deployments ADD COLUMN schedule_next_run_at TEXT")
         if "schedule_enabled" not in dep_cols:
@@ -2377,6 +2481,7 @@ class InMemoryControlPlane:
             "collision_strategy": col("collision_strategy") or "ENQUEUE",
             "schedule_interval_seconds": col("schedule_interval_seconds"),
             "schedule_cron": col("schedule_cron"),
+            "schedule_rrule": col("schedule_rrule"),
             "schedule_next_run_at": col("schedule_next_run_at"),
             "schedule_enabled": bool(col("schedule_enabled", 0)),
             "created_at": row["created_at"],

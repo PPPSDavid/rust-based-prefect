@@ -27,7 +27,8 @@ fn merge_parameters(default_parameters: &str, requested: Option<&Value>) -> Resu
 
 fn deployment_row_to_json(row: &rusqlite::Row) -> SqlResult<Value> {
     let default_parameters: Value =
-        serde_json::from_str(row.get::<_, String>("default_parameters")?.as_str()).unwrap_or(json!({}));
+        serde_json::from_str(row.get::<_, String>("default_parameters")?.as_str())
+            .unwrap_or(json!({}));
     Ok(json!({
         "id": row.get::<_, String>("id")?,
         "name": row.get::<_, String>("name")?,
@@ -40,6 +41,7 @@ fn deployment_row_to_json(row: &rusqlite::Row) -> SqlResult<Value> {
         "collision_strategy": row.get::<_, Option<String>>("collision_strategy")?.unwrap_or_else(|| "ENQUEUE".to_string()),
         "schedule_interval_seconds": row.get::<_, Option<i64>>("schedule_interval_seconds")?,
         "schedule_cron": row.get::<_, Option<String>>("schedule_cron")?,
+        "schedule_rrule": row.get::<_, Option<String>>("schedule_rrule")?,
         "schedule_next_run_at": row.get::<_, Option<String>>("schedule_next_run_at")?,
         "schedule_enabled": row.get::<_, i64>("schedule_enabled")? != 0,
         "created_at": row.get::<_, String>("created_at")?,
@@ -48,10 +50,12 @@ fn deployment_row_to_json(row: &rusqlite::Row) -> SqlResult<Value> {
 }
 
 fn deployment_run_row_to_json(row: &rusqlite::Row) -> SqlResult<Value> {
-    let requested: Value = serde_json::from_str(row.get::<_, String>("requested_parameters")?.as_str())
-        .unwrap_or(json!({}));
-    let resolved: Value = serde_json::from_str(row.get::<_, String>("resolved_parameters")?.as_str())
-        .unwrap_or(json!({}));
+    let requested: Value =
+        serde_json::from_str(row.get::<_, String>("requested_parameters")?.as_str())
+            .unwrap_or(json!({}));
+    let resolved: Value =
+        serde_json::from_str(row.get::<_, String>("resolved_parameters")?.as_str())
+            .unwrap_or(json!({}));
     Ok(json!({
         "id": row.get::<_, String>("id")?,
         "deployment_id": row.get::<_, String>("deployment_id")?,
@@ -214,7 +218,8 @@ pub fn trigger_deployment_run_tx(
         .optional()
         .map_err(|e| e.to_string())?;
 
-    let Some((dep_id, default_parameters, paused, concurrency_limit, collision_strategy)) = dep else {
+    let Some((dep_id, default_parameters, paused, concurrency_limit, collision_strategy)) = dep
+    else {
         return Err("deployment not found".to_string());
     };
 
@@ -318,7 +323,7 @@ pub fn create_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
     let existing: Option<Value> = conn
         .query_row(
             "SELECT id,name,flow_name,entrypoint,path,default_parameters,paused,\
-             concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,\
+             concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,\
              schedule_next_run_at,schedule_enabled,created_at,updated_at \
              FROM deployments WHERE name = ?1 LIMIT 1",
             params![name],
@@ -332,41 +337,87 @@ pub fn create_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
 
     let entrypoint = body.get("entrypoint").and_then(|v| v.as_str());
     let path = body.get("path").and_then(|v| v.as_str());
-    let default_parameters = serde_json::to_string(body.get("default_parameters").unwrap_or(&json!({})))
-        .map_err(|e| e.to_string())?;
-    let paused = body.get("paused").and_then(|v| v.as_bool()).unwrap_or(false) as i64;
+    let default_parameters =
+        serde_json::to_string(body.get("default_parameters").unwrap_or(&json!({})))
+            .map_err(|e| e.to_string())?;
+    let paused = body
+        .get("paused")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false) as i64;
     let concurrency_limit = body
         .get("concurrency_limit")
         .and_then(|v| v.as_i64())
-        .or_else(|| body.get("concurrency_limit").and_then(|v| v.as_u64().map(|u| u as i64)));
+        .or_else(|| {
+            body.get("concurrency_limit")
+                .and_then(|v| v.as_u64().map(|u| u as i64))
+        });
     let collision_strategy = body
         .get("collision_strategy")
         .and_then(|v| v.as_str())
         .unwrap_or("ENQUEUE");
-    let mut schedule_interval_seconds = body.get("schedule_interval_seconds").and_then(|v| v.as_i64());
+    let mut schedule_interval_seconds = body
+        .get("schedule_interval_seconds")
+        .and_then(|v| v.as_i64());
     let mut schedule_cron = body
         .get("schedule_cron")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
-    let schedule_enabled = body.get("schedule_enabled").and_then(|v| v.as_bool()).unwrap_or(false);
+    let mut schedule_rrule = body
+        .get("schedule_rrule")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let schedule_enabled = body
+        .get("schedule_enabled")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     let mut schedule_next_run_at = body
         .get("schedule_next_run_at")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
 
-    if schedule_cron.as_ref().map(|s| !s.trim().is_empty()).unwrap_or(false) {
+    if schedule_rrule
+        .as_ref()
+        .map(|s| !s.trim().is_empty())
+        .unwrap_or(false)
+    {
+        schedule_interval_seconds = None;
+        schedule_cron = None;
+    } else if schedule_cron
+        .as_ref()
+        .map(|s| !s.trim().is_empty())
+        .unwrap_or(false)
+    {
+        schedule_rrule = None;
         schedule_interval_seconds = None;
     } else if schedule_interval_seconds.map(|s| s > 0).unwrap_or(false) {
         schedule_cron = None;
+        schedule_rrule = None;
     }
 
     if schedule_enabled {
-        if schedule_interval_seconds.map(|s| s > 0).unwrap_or(false) && schedule_next_run_at.is_none() {
+        if schedule_interval_seconds.map(|s| s > 0).unwrap_or(false)
+            && schedule_next_run_at.is_none()
+        {
             schedule_next_run_at = Some(now_iso());
         }
-        if schedule_cron.as_ref().map(|s| !s.trim().is_empty()).unwrap_or(false) && schedule_next_run_at.is_none() {
+        if schedule_cron
+            .as_ref()
+            .map(|s| !s.trim().is_empty())
+            .unwrap_or(false)
+            && schedule_next_run_at.is_none()
+        {
             let expr = schedule_cron.as_ref().map(|s| s.as_str()).unwrap_or("");
             let next = next_cron_occurrence(expr, Utc::now())?;
+            schedule_next_run_at = Some(next.to_rfc3339());
+        }
+        if schedule_rrule
+            .as_ref()
+            .map(|s| !s.trim().is_empty())
+            .unwrap_or(false)
+            && schedule_next_run_at.is_none()
+        {
+            let expr = schedule_rrule.as_ref().map(|s| s.as_str()).unwrap_or("");
+            let next = next_rrule_occurrence(expr, Utc::now())?;
             schedule_next_run_at = Some(next.to_rfc3339());
         }
     }
@@ -376,9 +427,9 @@ pub fn create_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
     conn.execute(
         "INSERT INTO deployments \
          (id,name,flow_name,entrypoint,path,default_parameters,paused,\
-          concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,\
+          concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,\
           schedule_next_run_at,schedule_enabled,created_at,updated_at) \
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)",
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16)",
         params![
             deployment_id,
             name,
@@ -391,6 +442,7 @@ pub fn create_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
             collision_strategy,
             schedule_interval_seconds,
             schedule_cron,
+            schedule_rrule,
             schedule_next_run_at,
             if schedule_enabled { 1 } else { 0 },
             now,
@@ -401,7 +453,7 @@ pub fn create_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
 
     conn.query_row(
         "SELECT id,name,flow_name,entrypoint,path,default_parameters,paused,\
-         concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,\
+         concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,\
          schedule_next_run_at,schedule_enabled,created_at,updated_at \
          FROM deployments WHERE id = ?1",
         params![deployment_id],
@@ -418,6 +470,101 @@ fn next_cron_occurrence(expr: &str, after: DateTime<Utc>) -> Result<DateTime<Utc
         .ok_or_else(|| "cron expression has no upcoming occurrence".to_string())
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RRuleFrequency {
+    Minutely,
+    Hourly,
+    Daily,
+    Weekly,
+}
+
+#[derive(Debug, Clone)]
+struct SimpleRRule {
+    freq: RRuleFrequency,
+    interval: i64,
+    until: Option<DateTime<Utc>>,
+}
+
+fn parse_rrule_datetime(value: &str) -> Result<DateTime<Utc>, String> {
+    if let Ok(dt) = DateTime::parse_from_rfc3339(value) {
+        return Ok(dt.with_timezone(&Utc));
+    }
+    let normalized = value.trim().trim_end_matches('Z');
+    chrono::NaiveDateTime::parse_from_str(normalized, "%Y%m%dT%H%M%S")
+        .map(|dt| dt.and_utc())
+        .map_err(|e| format!("invalid RRule UNTIL: {e}"))
+}
+
+fn parse_simple_rrule(expr: &str) -> Result<SimpleRRule, String> {
+    let mut freq: Option<RRuleFrequency> = None;
+    let mut interval: i64 = 1;
+    let mut until: Option<DateTime<Utc>> = None;
+    for part in expr.split(';') {
+        let trimmed = part.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let Some((raw_key, raw_value)) = trimmed.split_once('=') else {
+            return Err(format!("invalid RRule component: {trimmed}"));
+        };
+        let key = raw_key.trim().to_ascii_uppercase();
+        let value = raw_value.trim();
+        match key.as_str() {
+            "FREQ" => {
+                freq = Some(match value.to_ascii_uppercase().as_str() {
+                    "MINUTELY" => RRuleFrequency::Minutely,
+                    "HOURLY" => RRuleFrequency::Hourly,
+                    "DAILY" => RRuleFrequency::Daily,
+                    "WEEKLY" => RRuleFrequency::Weekly,
+                    other => return Err(format!("unsupported RRule FREQ: {other}")),
+                });
+            }
+            "INTERVAL" => {
+                interval = value
+                    .parse::<i64>()
+                    .map_err(|e| format!("invalid RRule INTERVAL: {e}"))?;
+                if interval <= 0 {
+                    return Err("RRule INTERVAL must be positive".to_string());
+                }
+            }
+            "UNTIL" => {
+                until = Some(parse_rrule_datetime(value)?);
+            }
+            "COUNT" => {
+                return Err(
+                    "RRule COUNT is not supported; use UNTIL or trigger fixed runs manually"
+                        .to_string(),
+                );
+            }
+            _ => {
+                return Err(format!("unsupported RRule component: {key}"));
+            }
+        }
+    }
+    Ok(SimpleRRule {
+        freq: freq.ok_or_else(|| "RRule FREQ is required".to_string())?,
+        interval,
+        until,
+    })
+}
+
+fn next_rrule_occurrence(expr: &str, after: DateTime<Utc>) -> Result<DateTime<Utc>, String> {
+    let rule = parse_simple_rrule(expr)?;
+    let step = match rule.freq {
+        RRuleFrequency::Minutely => Duration::minutes(rule.interval),
+        RRuleFrequency::Hourly => Duration::hours(rule.interval),
+        RRuleFrequency::Daily => Duration::days(rule.interval),
+        RRuleFrequency::Weekly => Duration::weeks(rule.interval),
+    };
+    let next = after + step;
+    if let Some(until) = rule.until {
+        if next > until {
+            return Err("RRule has no upcoming occurrence before UNTIL".to_string());
+        }
+    }
+    Ok(next)
+}
+
 /// Partial update of a deployment row (`null` JSON fields mean leave unchanged).
 pub fn update_deployment(conn: &Connection, body: &Value) -> Result<Value, String> {
     let deployment_id = body
@@ -428,7 +575,7 @@ pub fn update_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
     let row = conn
         .query_row(
             "SELECT id,name,flow_name,entrypoint,path,default_parameters,paused,\
-             concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,\
+             concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,\
              schedule_next_run_at,schedule_enabled,created_at,updated_at \
              FROM deployments WHERE id = ?1 LIMIT 1",
             params![deployment_id],
@@ -454,8 +601,14 @@ pub fn update_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
             v.as_str().map(|s| s.to_string())
         }
     });
-    let mut default_parameters = current.get("default_parameters").cloned().unwrap_or(json!({}));
-    let mut paused = current.get("paused").and_then(|v| v.as_bool()).unwrap_or(false);
+    let mut default_parameters = current
+        .get("default_parameters")
+        .cloned()
+        .unwrap_or(json!({}));
+    let mut paused = current
+        .get("paused")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     let mut concurrency_limit = current
         .get("concurrency_limit")
         .and_then(|v| v.as_i64().or_else(|| v.as_u64().map(|u| u as i64)));
@@ -464,13 +617,25 @@ pub fn update_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
         .and_then(|v| v.as_str())
         .unwrap_or("ENQUEUE")
         .to_string();
-    let mut schedule_interval_seconds = current.get("schedule_interval_seconds").and_then(|v| v.as_i64());
-    let mut schedule_cron = current.get("schedule_cron").and_then(|v| v.as_str()).map(|s| s.to_string());
+    let mut schedule_interval_seconds = current
+        .get("schedule_interval_seconds")
+        .and_then(|v| v.as_i64());
+    let mut schedule_cron = current
+        .get("schedule_cron")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let mut schedule_rrule = current
+        .get("schedule_rrule")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
     let mut schedule_next_run_at = current
         .get("schedule_next_run_at")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
-    let mut schedule_enabled = current.get("schedule_enabled").and_then(|v| v.as_bool()).unwrap_or(false);
+    let mut schedule_enabled = current
+        .get("schedule_enabled")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
 
     if let Some(v) = body.get("entrypoint") {
         if v.is_null() {
@@ -522,6 +687,13 @@ pub fn update_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
             schedule_cron = v.as_str().map(|s| s.to_string());
         }
     }
+    if let Some(v) = body.get("schedule_rrule") {
+        if v.is_null() {
+            schedule_rrule = None;
+        } else {
+            schedule_rrule = v.as_str().map(|s| s.to_string());
+        }
+    }
     if let Some(v) = body.get("schedule_next_run_at") {
         if v.is_null() {
             schedule_next_run_at = None;
@@ -535,32 +707,63 @@ pub fn update_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
         }
     }
 
-    if schedule_cron.as_ref().map(|s| !s.trim().is_empty()).unwrap_or(false) {
+    if schedule_rrule
+        .as_ref()
+        .map(|s| !s.trim().is_empty())
+        .unwrap_or(false)
+    {
+        schedule_interval_seconds = None;
+        schedule_cron = None;
+    } else if schedule_cron
+        .as_ref()
+        .map(|s| !s.trim().is_empty())
+        .unwrap_or(false)
+    {
+        schedule_rrule = None;
         schedule_interval_seconds = None;
     } else if schedule_interval_seconds.map(|s| s > 0).unwrap_or(false) {
         schedule_cron = None;
+        schedule_rrule = None;
     }
 
     if schedule_enabled {
-        if schedule_interval_seconds.map(|s| s > 0).unwrap_or(false) && schedule_next_run_at.is_none() {
+        if schedule_interval_seconds.map(|s| s > 0).unwrap_or(false)
+            && schedule_next_run_at.is_none()
+        {
             schedule_next_run_at = Some(now_iso());
         }
-        if schedule_cron.as_ref().map(|s| !s.trim().is_empty()).unwrap_or(false) && schedule_next_run_at.is_none() {
+        if schedule_cron
+            .as_ref()
+            .map(|s| !s.trim().is_empty())
+            .unwrap_or(false)
+            && schedule_next_run_at.is_none()
+        {
             let expr = schedule_cron.as_ref().map(|s| s.as_str()).unwrap_or("");
             let next = next_cron_occurrence(expr, Utc::now())?;
             schedule_next_run_at = Some(next.to_rfc3339());
         }
+        if schedule_rrule
+            .as_ref()
+            .map(|s| !s.trim().is_empty())
+            .unwrap_or(false)
+            && schedule_next_run_at.is_none()
+        {
+            let expr = schedule_rrule.as_ref().map(|s| s.as_str()).unwrap_or("");
+            let next = next_rrule_occurrence(expr, Utc::now())?;
+            schedule_next_run_at = Some(next.to_rfc3339());
+        }
     }
 
-    let default_parameters_str = serde_json::to_string(&default_parameters).map_err(|e| e.to_string())?;
+    let default_parameters_str =
+        serde_json::to_string(&default_parameters).map_err(|e| e.to_string())?;
     let ts = now_iso();
     conn.execute(
         "UPDATE deployments SET \
          entrypoint = ?1, path = ?2, default_parameters = ?3, paused = ?4, \
          concurrency_limit = ?5, collision_strategy = ?6, \
-         schedule_interval_seconds = ?7, schedule_cron = ?8, schedule_next_run_at = ?9, \
-         schedule_enabled = ?10, updated_at = ?11 \
-         WHERE id = ?12",
+         schedule_interval_seconds = ?7, schedule_cron = ?8, schedule_rrule = ?9, schedule_next_run_at = ?10, \
+         schedule_enabled = ?11, updated_at = ?12 \
+         WHERE id = ?13",
         params![
             entrypoint,
             path,
@@ -570,6 +773,7 @@ pub fn update_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
             collision_strategy,
             schedule_interval_seconds,
             schedule_cron,
+            schedule_rrule,
             schedule_next_run_at,
             if schedule_enabled { 1 } else { 0 },
             ts,
@@ -580,7 +784,7 @@ pub fn update_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
 
     conn.query_row(
         "SELECT id,name,flow_name,entrypoint,path,default_parameters,paused,\
-         concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,\
+         concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,\
          schedule_next_run_at,schedule_enabled,created_at,updated_at \
          FROM deployments WHERE id = ?1",
         params![deployment_id],
@@ -631,7 +835,7 @@ fn tick_interval_schedules(conn: &Connection) -> Result<u64, String> {
     Ok(fired)
 }
 
-/// Cron-based schedules (mutually exclusive with interval in application logic).
+/// Cron-based schedules (mutually exclusive with interval/RRule in application logic).
 fn tick_cron_schedules(conn: &Connection) -> Result<u64, String> {
     let now = now_iso();
     let mut stmt = conn
@@ -640,6 +844,7 @@ fn tick_cron_schedules(conn: &Connection) -> Result<u64, String> {
              FROM deployments \
              WHERE schedule_enabled = 1 AND paused = 0 \
              AND schedule_cron IS NOT NULL AND trim(schedule_cron) != '' \
+             AND (schedule_rrule IS NULL OR trim(schedule_rrule) = '') \
              AND (schedule_interval_seconds IS NULL OR schedule_interval_seconds <= 0) \
              AND schedule_next_run_at IS NOT NULL AND schedule_next_run_at <= ?1",
         )
@@ -675,14 +880,60 @@ fn tick_cron_schedules(conn: &Connection) -> Result<u64, String> {
     Ok(fired)
 }
 
-/// Fire due interval and cron schedules.
+/// RRule-based schedules (small deterministic subset).
+fn tick_rrule_schedules(conn: &Connection) -> Result<u64, String> {
+    let now = now_iso();
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, schedule_rrule, schedule_next_run_at \
+             FROM deployments \
+             WHERE schedule_enabled = 1 AND paused = 0 \
+             AND schedule_rrule IS NOT NULL AND trim(schedule_rrule) != '' \
+             AND schedule_next_run_at IS NOT NULL AND schedule_next_run_at <= ?1",
+        )
+        .map_err(|e| e.to_string())?;
+    let ids: Vec<(String, String)> = stmt
+        .query_map(params![now], |row| Ok((row.get(0)?, row.get(1)?)))
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    drop(stmt);
+
+    let mut fired: u64 = 0;
+    for (dep_id, rrule_expr) in ids {
+        let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        if let Err(e) = trigger_deployment_run_tx(&tx, &dep_id, Some(&json!({})), None) {
+            tx.rollback().map_err(|e| e.to_string())?;
+            if e == "deployment not found" {
+                continue;
+            }
+            return Err(e);
+        }
+        let next = next_rrule_occurrence(&rrule_expr, Utc::now())?.to_rfc3339();
+        let ts = now_iso();
+        tx.execute(
+            "UPDATE deployments SET schedule_next_run_at = ?1, updated_at = ?2 WHERE id = ?3",
+            params![next, ts, dep_id],
+        )
+        .map_err(|e| e.to_string())?;
+        tx.commit().map_err(|e| e.to_string())?;
+        fired += 1;
+    }
+    Ok(fired)
+}
+
+/// Fire due interval, cron, and RRule schedules.
 pub fn tick_deployment_schedules(conn: &Connection) -> Result<u64, String> {
     let a = tick_interval_schedules(conn)?;
     let b = tick_cron_schedules(conn)?;
-    Ok(a + b)
+    let c = tick_rrule_schedules(conn)?;
+    Ok(a + b + c)
 }
 
-pub fn mark_deployment_run_started(conn: &Connection, deployment_run_id: &str) -> Result<(), String> {
+pub fn mark_deployment_run_started(
+    conn: &Connection,
+    deployment_run_id: &str,
+) -> Result<(), String> {
     let now = now_iso();
     conn.execute(
         "UPDATE deployment_runs SET status = 'RUNNING', started_at = ?1, updated_at = ?1 WHERE id = ?2",
@@ -710,7 +961,10 @@ pub fn mark_deployment_run_finished(
 }
 
 /// One FFI round-trip: reclaim leases, fire due schedules, mark stale workers offline.
-pub fn deployment_maintenance(conn: &Connection, stale_after_seconds: i64) -> Result<Value, String> {
+pub fn deployment_maintenance(
+    conn: &Connection,
+    stale_after_seconds: i64,
+) -> Result<Value, String> {
     let reclaimed = reclaim_expired_claims(conn)?;
     let triggered = tick_deployment_schedules(conn)?;
     let reaped = reap_stale_workers(conn, stale_after_seconds)?;
@@ -730,5 +984,20 @@ mod tests {
         let t0 = Utc::now();
         let t1 = next_cron_occurrence("0 * * * * *", t0).expect("parse");
         assert!(t1 > t0);
+    }
+
+    #[test]
+    fn next_rrule_occurrence_advances() {
+        let t0 = Utc::now();
+        let t1 = next_rrule_occurrence("FREQ=MINUTELY;INTERVAL=5", t0).expect("parse");
+        assert!(t1 > t0);
+        assert_eq!(t1 - t0, Duration::minutes(5));
+    }
+
+    #[test]
+    fn next_rrule_rejects_count() {
+        let err =
+            next_rrule_occurrence("FREQ=DAILY;COUNT=3", Utc::now()).expect_err("COUNT rejected");
+        assert!(err.contains("COUNT"));
     }
 }

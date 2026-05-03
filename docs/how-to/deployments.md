@@ -5,7 +5,7 @@ This guide focuses on deployment lifecycle operations in IronFlow's self-hosted 
 - create deployments
 - update deployments
 - trigger deployment runs
-- enable interval or cron schedules
+- enable interval, cron, or RRule schedules
 
 It assumes the API is already running (see [How to run the server and UI](server-and-ui.md)).
 
@@ -35,6 +35,7 @@ Schedule fields are also accepted on create:
 - `schedule_enabled` (bool)
 - `schedule_interval_seconds` (positive integer)
 - `schedule_cron` (cron expression)
+- `schedule_rrule` (Rust-preferred subset: `FREQ=MINUTELY|HOURLY|DAILY|WEEKLY`, optional positive `INTERVAL`, optional `UNTIL`; no `COUNT`)
 - `schedule_next_run_at` (RFC3339 timestamp)
 
 ## 3. Update a deployment
@@ -72,7 +73,18 @@ curl -s -X PATCH http://127.0.0.1:8000/api/deployments/DEPLOYMENT_ID \
   }' | python -m json.tool
 ```
 
-Interval and cron are mutually exclusive in deployment state. Setting one schedule type clears the other.
+### Schedule update example (RRule)
+
+```bash
+curl -s -X PATCH http://127.0.0.1:8000/api/deployments/DEPLOYMENT_ID \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "schedule_enabled": true,
+    "schedule_rrule": "FREQ=HOURLY;INTERVAL=2"
+  }' | python -m json.tool
+```
+
+Interval, cron, and RRule are mutually exclusive in deployment state. Setting one schedule type clears the others.
 
 ## 4. Trigger a deployment run manually
 
@@ -93,8 +105,9 @@ With the default embedded worker enabled, deployment runs progress from `SCHEDUL
 
 ## Notes
 
-- Cron scheduling is Rust-first when the native engine is available with DB binding.
-- Without that Rust path, cron schedules may require `schedule_next_run_at` to be provided explicitly.
+- Cron and RRule scheduling are Rust-preferred when the native engine is available with DB binding.
+- Without that Rust path, cron schedules may require `schedule_next_run_at` to be provided explicitly; simple RRule schedules use the Python fallback.
+- RRule support is intentionally limited to simple frequency/interval rules (`MINUTELY`, `HOURLY`, `DAILY`, `WEEKLY`) plus optional `UNTIL`.
 - IronFlow currently provides a local subset of deployment/worker behavior, not full Prefect Cloud parity.
 
 See also: [Self-hosted server](../SELF_HOSTED_SERVER.md), [Compatibility matrix](../compatibility.md), and [Prefect concepts -> IronFlow](../PREFECT_IRONFLOW_MAPPING.md).

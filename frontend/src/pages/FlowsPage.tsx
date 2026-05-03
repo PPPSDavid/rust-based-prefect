@@ -50,6 +50,8 @@ export function FlowsPage() {
                     — schedule:{" "}
                     {deployment.schedule_cron && deployment.schedule_cron.trim() !== ""
                       ? `cron ${deployment.schedule_cron}`
+                      : deployment.schedule_rrule && deployment.schedule_rrule.trim() !== ""
+                        ? `rrule ${deployment.schedule_rrule}`
                       : deployment.schedule_interval_seconds != null
                         ? `every ${deployment.schedule_interval_seconds}s`
                         : "on"}
