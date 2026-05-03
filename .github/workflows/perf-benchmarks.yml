@@ -5,6 +5,7 @@ on:
     paths:
       - "benchmarks/**"
       - "python-shim/src/prefect_compat/**"
+      - "rust-engine/**"
       - "docs/perf_*.md"
       - ".github/workflows/perf-benchmarks.yml"
   push:
@@ -37,6 +38,34 @@ jobs:
           path: |
             docs/perf_pr_results.json
             docs/perf_pr_summary.md
+
+  perf-pr-cross:
+    if: github.event_name == 'pull_request'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install benchmark deps (CI list)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-ci.txt
+      - name: Run lite suite (informational, per-OS)
+        run: |
+          python benchmarks/perf_matrix.py run --preset lite --repetitions 1 --warmups 0 --jobs 2 --out-json docs/perf_pr_cross_results.json --out-md docs/perf_pr_cross_summary.md
+      - name: Upload cross-OS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-pr-cross-${{ matrix.os }}
+          path: |
+            docs/perf_pr_cross_results.json
+            docs/perf_pr_cross_summary.md
 
   perf-main:
     if: github.event_name != 'pull_request'

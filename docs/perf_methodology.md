@@ -117,7 +117,8 @@ Outputs:
 
 Workflow: `.github/workflows/perf-benchmarks.yml`
 
-- PRs: reduced stable suite (`--preset pr --repetitions 3 --warmups 1`)
+- PRs (Linux `perf-pr`): reduced stable suite (`--preset lite --repetitions 2 --warmups 1 --jobs 2`); uploads JSON + markdown. This is the primary PR gate path on **ubuntu-latest** only.
+- PRs (`perf-pr-cross`): the same **lite** recipe set runs on **ubuntu-latest**, **windows-latest**, and **macos-latest** with lighter sampling (`--repetitions 1 --warmups 0 --jobs 2`) and **per-OS artifact uploads only** (informational signal; no `perf_matrix compare` across OS against a single baseline, which would be invalid for `matrix_compare_key` / methodology reasons).
 - main/schedule: fuller suite (`--preset full --repetitions 5 --warmups 2`)
 - artifacts uploaded:
   - benchmark JSON
