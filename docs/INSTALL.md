@@ -1,6 +1,8 @@
 # Installation
 
-IronFlow can be used in three ways: **prebuilt wheels** (recommended when available for your platform), **`pip` from Git** (Python packages only), or a **full source checkout** (kernel, benchmarks, UI). The Rust **`ironflow_engine`** shared library is **bundled inside platform wheels** when you install a compatible wheel; you **do not** need the Rust toolchain on the machine in that case.
+**Primary path:** install **`ironflow-prefect-compat`** from **PyPI** with **`pip`** or **`uv`** — the same workflow as other wheel-published Python packages. On supported platforms, **prebuilt wheels bundle** the Rust **`ironflow_engine`** library under `prefect_compat/native/`; you **do not** need a Rust toolchain for those wheels.
+
+**Secondary paths:** install **from Git** (narrow Python-only integration) or **clone the repository** to build **`rust-engine`** from source (development, benchmarks, optional UI, or when no wheel matches your platform/Python ABI).
 
 ## Prerequisites
 
@@ -25,9 +27,10 @@ You want **`native_library_available=True`** when using the intended Rust-backed
 
 ---
 
-## 1. Prebuilt wheels (`ironflow-prefect-compat`)
+## 1. PyPI — `pip` / `uv` (`ironflow-prefect-compat`)
 
-**Package name:** `ironflow-prefect-compat`  
+**Package name:** `ironflow-prefect-compat` — **PyPI:** [`ironflow-prefect-compat`](https://pypi.org/project/ironflow-prefect-compat/) · **`requires-python`:** `>=3.11` (see `python-shim/pyproject.toml`).
+
 Maintainers may publish to **TestPyPI** (validation) and/or **production PyPI**; see [Distribution](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/DISTRIBUTION.md) and [Releasing](https://github.com/PPPSDavid/rust-based-prefect/blob/main/RELEASING.md) (maintainer-oriented files; not part of the hosted MkDocs site).
 
 Prebuilt wheels are published for **CPython 3.11 and 3.12** on:
@@ -39,20 +42,30 @@ Prebuilt wheels are published for **CPython 3.11 and 3.12** on:
 | Windows x86_64 | `win_amd64` · `cp311` / `cp312` |
 | macOS (universal2 from CI) | `macosx_*_universal2` · `cp311` / `cp312` |
 
-**CPython 3.13 and newer** are not guaranteed to have prebuilt wheels yet; **`pip`** may fall back to **sdist** (needs Rust/`cargo` during install) or fail until wheels exist—use **3.11** or **3.12** for the smoothest install, or a full checkout + `cargo build`.
+**CPython 3.13 and newer** are not guaranteed to have prebuilt wheels yet; **`pip`** / **`uv`** may fall back to **sdist** (needs Rust/`cargo` during install) or fail until wheels exist—use **3.11** or **3.12** for the smoothest install, or a full checkout + `cargo build`.
 
 Other Python versions may install from **sdist** or need a **source build**; check PyPI “Download files” or use a full checkout + `cargo build`.
 
 ### Production PyPI (pypi.org)
-
-When wheels are available on the default index:
 
 ```bash
 python -m pip install --upgrade pip
 python -m pip install ironflow-prefect-compat
 ```
 
-Then run the **quick check** at the top of this page.
+With **[uv](https://docs.astral.sh/uv/)** (after [`uv`](https://docs.astral.sh/uv/getting-started/installation/) is installed):
+
+```bash
+uv pip install ironflow-prefect-compat
+```
+
+Then run the **quick check** above.
+
+### Wheels vs source builds (honest limits)
+
+Use the **platform matrix** above. Confirm filenames for your platform on PyPI → **Download files**.
+
+Maintainer packaging notes: [Distribution](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/DISTRIBUTION.md) and [Releasing](https://github.com/PPPSDavid/rust-based-prefect/blob/main/RELEASING.md) (not published on the hosted MkDocs site).
 
 ### TestPyPI (validation index)
 
@@ -148,7 +161,7 @@ cargo test --manifest-path rust-engine/Cargo.toml
 
 ## 6. Install only the Python packages (narrow use)
 
-If you need `prefect_compat` inside **another project** without cloning the full tree, you can install the shim **from Git**:
+Prefer **`pip install ironflow-prefect-compat`** or **`uv pip install ironflow-prefect-compat`** from PyPI when a wheel matches your platform (see **[§1](#1-pypi-pip-uv-ironflow-prefect-compat)**). If you need a **Git URL** pin instead (pre-release testing or fork), install the shim **from Git**:
 
 ```bash
 python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v0.1.1#subdirectory=python-shim"

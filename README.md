@@ -8,15 +8,38 @@
 
 Project IronFlow is a **hybrid MVP** built around a **Rust orchestration kernel** (`rust-engine/`) and **Prefect-style** Python authoring (`@flow` / `@task` via `prefect_compat/`). It is aimed at developers who already know **Prefect 3.x** and want a deterministic, locally persisted control plane where **orchestration semantics live in Rust** and Python carries authoring and integration.
 
+## Install from PyPI
+
+The published package is **`ironflow-prefect-compat`** on [PyPI](https://pypi.org/project/ironflow-prefect-compat/). On supported platforms, **prebuilt wheels include the Rust engine** — install like any other wheel-backed package (**no Rust toolchain required** for those wheels). Use **CPython 3.11 or 3.12** for the published wheel matrix; other versions may fall back to **sdist** (needs `cargo`) — see [COMPATIBILITY.md](COMPATIBILITY.md) and [docs/INSTALL.md](docs/INSTALL.md).
+
+```bash
+python -m pip install --upgrade pip
+python -m pip install ironflow-prefect-compat
+```
+
+With **[uv](https://docs.astral.sh/uv/)**:
+
+```bash
+uv pip install ironflow-prefect-compat
+```
+
+Quick check:
+
+```bash
+python -c "from prefect_compat.rust_bridge import native_library_available; print(native_library_available())"
+```
+
+Expect **`True`** when a matching wheel loaded. **Developing the repo**, integrating from **git**, or running on an **unsupported ABI** may still require a **source checkout** and `cargo build` — see **Quickstart** below and the hosted [Installation](https://pppsdavid.github.io/rust-based-prefect/INSTALL/) guide.
+
 **Hosted docs (MkDocs):** [https://pppsdavid.github.io/rust-based-prefect/](https://pppsdavid.github.io/rust-based-prefect/) — the site is organized into **Get started**, **Concepts**, **How-to guides**, and **Reference** (see [docs/index.md](docs/index.md)); the [Prefect → IronFlow mapping](https://pppsdavid.github.io/rust-based-prefect/PREFECT_IRONFLOW_MAPPING/) remains the main Prefect-oriented entry. Enable GitHub Pages per [RELEASING.md](RELEASING.md).
 
 | If you want… | Go to… |
 | --- | --- |
 | Layered doc home (hosted) | [docs/index.md](docs/index.md) |
 | How Rust and Python fit together | [docs/architecture.md](docs/architecture.md) |
-| **Install (current; hosted docs)** | [docs/INSTALL.md](docs/INSTALL.md) |
-| **PyPI package (`ironflow-prefect-compat`)** | [https://pypi.org/project/ironflow-prefect-compat/](https://pypi.org/project/ironflow-prefect-compat/) — `pip install ironflow-prefect-compat` (see INSTALL for CPython versions shipped as wheels). |
-| PyPI / conda packaging roadmap (contributors) | [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) |
+| **Install (hosted docs; PyPI first)** | [docs/INSTALL.md](docs/INSTALL.md) |
+| **PyPI (`ironflow-prefect-compat`)** | [https://pypi.org/project/ironflow-prefect-compat/](https://pypi.org/project/ironflow-prefect-compat/) — `pip install ironflow-prefect-compat` (see INSTALL for CPython versions shipped as wheels). |
+| PyPI / conda packaging notes (contributors) | [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) |
 | Performance vs Prefect (expectations, caveats) | [docs/PERFORMANCE_OVERVIEW.md](docs/PERFORMANCE_OVERVIEW.md) |
 | Quick start (demo flow, hosted docs) | [docs/QUICKSTART_DEMO.md](docs/QUICKSTART_DEMO.md) |
 | Self-hosted server (API, workers, deployments, schedules; hosted docs) | [docs/SELF_HOSTED_SERVER.md](docs/SELF_HOSTED_SERVER.md) |
@@ -61,6 +84,8 @@ Project IronFlow is a **hybrid MVP** built around a **Rust orchestration kernel*
 See [docs/architecture.md](docs/architecture.md) for the runtime data path (Python → shim → Rust engine).
 
 ## Quickstart
+
+Use **[Install from PyPI](#install-from-pypi)** above when you only need the **`prefect_compat`** library in your environment. The steps below focus on a **full repository checkout** (kernel sources, tests, benchmarks, scripts, optional UI).
 
 ### 1. Environment
 

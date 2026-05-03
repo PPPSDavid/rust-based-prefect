@@ -13,12 +13,12 @@
 | **GitHub clone + `cargo build`** | Full repo: benchmarks, scripts, optional UI, kernel development. |
 | **`pip install git+…#subdirectory=python-shim`** | Python-only integration without TestPyPI; native kernel only if the build ran **`cargo`** or you set **`IRONFLOW_RUST_LIB`**. |
 
-IronFlow is **Rust + Python**. Publishing is closer to **`cryptography`** / **`orjson`** than to a pure-Python package: wheels must **bundle** the **`cdylib`** or users fall back to env overrides / source builds.
+IronFlow is **Rust + Python**. For **end users on supported platforms**, **`pip install ironflow-prefect-compat`** / **`uv pip install ironflow-prefect-compat`** is the same style of install as other wheel-published packages—the complexity below is **why CI ships per-platform wheels** and why unsupported ABIs fall back to **sdist** / source builds.
 
-## Why it is harder than `pip install prefect`
+## Why we ship native wheels (not “pure Python”)
 
-- **`rust-engine`** ships as a **`cdylib`** loaded with **`ctypes`**. A wheel must **ship** native libraries **per OS/arch/ABI** **or** require users to install Rust (poor “one click” experience).
-- CI maintains a **wheel build matrix** (Linux **x86_64** + **aarch64**, Windows **win_amd64**, macOS **universal2**).
+- **`rust-engine`** ships as a **`cdylib`** loaded with **`ctypes`**. A wheel must **bundle** native libraries **per OS/arch/Python ABI** **or** installs fall back to **sdist** / local **`cargo`** builds.
+- CI maintains a **wheel build matrix** (Linux **x86_64** + **aarch64**, Windows **win_amd64**, macOS **universal2**, **cp311** + **cp312**).
 
 ## PyPI package layout
 

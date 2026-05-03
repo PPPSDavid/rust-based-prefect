@@ -34,7 +34,7 @@ theme:
 nav:
   - Home: index.md
   - Get started:
-      - Installation: INSTALL.md
+      - "Installation (PyPI · pip / uv)": INSTALL.md
       - "Quick start (demo flow)": QUICKSTART_DEMO.md
       - "Self-hosted server": SELF_HOSTED_SERVER.md
       - "Optional: verify the web UI": ui_e2e_visual_check.md
