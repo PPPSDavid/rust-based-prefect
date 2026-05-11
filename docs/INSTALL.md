@@ -23,6 +23,22 @@ From an environment where `prefect_compat` is installed:
 python -c "from prefect_compat.rust_bridge import native_library_available; print('native_library_available=', native_library_available())"
 ```
 
+If you have a **repository checkout** (so `scripts/` is on disk), you can run the same checks through **`scripts/bootstrap.py`**:
+
+- **PyPI / wheel-style check** (no `pytest`, `cargo`, or repo-root layout required; works from any working directory as long as the package is importable):
+
+```bash
+python scripts/bootstrap.py --native-check
+```
+
+- **Repository development check** (toolchain diagnostics only; full bootstrap is in **[§5](#5-check-that-it-works-from-repo-root)**):
+
+```bash
+python scripts/bootstrap.py --check-only
+```
+
+If you installed **only** the wheel and do not have `scripts/bootstrap.py`, use the **`python -c`** one-liner above.
+
 You want **`native_library_available=True`** when using the intended Rust-backed path. If it is **`False`**, see **`IRONFLOW_RUST_LIB`** and [how-to/setup.md](how-to/setup.md).
 
 ---

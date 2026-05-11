@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import importlib
+
 from pathlib import Path
 from types import SimpleNamespace
+
+import pytest
 
 import scripts.bootstrap as bootstrap
 
@@ -74,6 +78,20 @@ def test_bootstrap_smoke_only_fails_when_pytest_missing(monkeypatch, capsys):
     assert "pytest is not installed" in out
 
 
+def test_bootstrap_build_failure_prints_install_hint(monkeypatch, capsys):
+    def fake_run(cmd, **kwargs):
+        return SimpleNamespace(returncode=1, stdout="", stderr="cargo error detail")
+
+    monkeypatch.setattr(bootstrap, "_run_checked", fake_run)
+    monkeypatch.setattr(bootstrap.shutil, "which", lambda _: "present")
+
+    rc = bootstrap.main([])
+    out = capsys.readouterr().out
+
+    assert rc == 1
+    assert "docs/INSTALL.md §4" in out
+
+
 def test_bootstrap_runs_build_and_smoke(monkeypatch, capsys):
     calls: list[list[str]] = []
 
@@ -107,6 +125,52 @@ def test_bootstrap_fails_when_smoke_fails(monkeypatch, capsys):
 
     assert rc == 1
     assert "Smoke verification failed" in out
+    assert "docs/INSTALL.md §5" in out
+
+
+def test_bootstrap_native_check_runs_minimal_flow(monkeypatch, capsys):
+    """In-process smoke only; native availability is patched so cargo is not required."""
+    rb = importlib.import_module("prefect_compat.rust_bridge")
+    monkeypatch.setattr(rb, "native_library_available", lambda: True)
+
+    rc = bootstrap.main(["--native-check"])
+    out = capsys.readouterr().out
+
+    assert rc == 0
+    assert "native_library_available: True" in out
+    assert "minimal_flow_result: 42" in out
+    assert "[ok] Native check passed" in out
+
+
+def test_bootstrap_native_check_fails_without_native_or_ironflow_lib(monkeypatch, capsys):
+    rb = importlib.import_module("prefect_compat.rust_bridge")
+    monkeypatch.setattr(rb, "native_library_available", lambda: False)
+    monkeypatch.delenv("IRONFLOW_RUST_LIB", raising=False)
+
+    rc = bootstrap.main(["--native-check"])
+    out = capsys.readouterr().out
+
+    assert rc == 1
+    assert "native_library_available: False" in out
+    assert "IRONFLOW_RUST_LIB" in out
+
+
+def test_bootstrap_native_check_mutually_exclusive_with_check_only():
+    with pytest.raises(SystemExit):
+        bootstrap.main(["--native-check", "--check-only"])
+
+
+def test_bootstrap_native_check_passes_when_ironflow_lib_set_despite_native_false(monkeypatch, capsys):
+    rb = importlib.import_module("prefect_compat.rust_bridge")
+    monkeypatch.setattr(rb, "native_library_available", lambda: False)
+    monkeypatch.setenv("IRONFLOW_RUST_LIB", "/tmp/ironflow_engine_dummy.so")
+
+    rc = bootstrap.main(["--native-check"])
+    out = capsys.readouterr().out
+
+    assert rc == 0
+    assert "native_library_available: False" in out
+    assert "[ok] Native check passed" in out
 
 
 def test_docs_reference_bootstrap_and_doctor():
@@ -115,4 +179,5 @@ def test_docs_reference_bootstrap_and_doctor():
     hosted = Path("docs/SELF_HOSTED_SERVER.md").read_text(encoding="utf-8")
     assert "python scripts/bootstrap.py" in readme
     assert "python scripts/bootstrap.py" in install
+    assert "python scripts/bootstrap.py --native-check" in install
     assert "python scripts/ironflow_server.py doctor" in hosted
