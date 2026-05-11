@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import ctypes
 import json
+import logging
 import os
 import sys
 from pathlib import Path
 from typing import Any
+
+_logger = logging.getLogger(__name__)
 
 
 def _platform_lib_names() -> list[str]:
@@ -161,6 +164,63 @@ def _configure_ironflow_symbols(lib: ctypes.CDLL) -> None:
     if hasattr(lib, "ironflow_deployment_scheduler_stop"):
         lib.ironflow_deployment_scheduler_stop.argtypes = [ctypes.c_uint64]
         lib.ironflow_deployment_scheduler_stop.restype = None
+
+    fn = getattr(lib, "ironflow_projection_update_task_run", None)
+    if fn is not None:
+        fn.argtypes = [
+            ctypes.c_char_p,
+            ctypes.c_char_p,
+            ctypes.c_char_p,
+            ctypes.c_int64,
+            ctypes.c_char_p,
+        ]
+        fn.restype = ctypes.c_int
+
+
+def try_rust_projection_update_task_run(
+    db_path: str,
+    task_run_id: str,
+    state: str,
+    version: int,
+    updated_at: str,
+) -> bool:
+    """When ``IRONFLOW_RUST_PROJECTION`` is enabled and the native symbol exists, run the SQLite UPDATE.
+
+    Returns ``True`` if the Rust path applied successfully (caller should skip the Python sqlite write).
+    Returns ``False`` to fall back to Python — logs at debug only.
+    """
+    flag = os.getenv("IRONFLOW_RUST_PROJECTION", "").strip().lower()
+    if flag not in ("1", "true", "yes"):
+        return False
+    try:
+        lib = load_ironflow_library()
+    except RuntimeError:
+        _logger.debug(
+            "IRONFLOW_RUST_PROJECTION enabled but ironflow_engine library not found; using Python sqlite path"
+        )
+        return False
+    fn = getattr(lib, "ironflow_projection_update_task_run", None)
+    if fn is None:
+        _logger.debug(
+            "IRONFLOW_RUST_PROJECTION enabled but ironflow_projection_update_task_run missing; using Python sqlite path"
+        )
+        return False
+    rc = int(
+        fn(
+            db_path.encode("utf-8"),
+            task_run_id.encode("utf-8"),
+            state.encode("utf-8"),
+            ctypes.c_int64(version),
+            updated_at.encode("utf-8"),
+        )
+    )
+    if rc != 0:
+        _logger.debug(
+            "rust projection update_task_run returned %s; using Python sqlite path",
+            rc,
+        )
+        return False
+    return True
 
 
 def _decode_json_ptr(lib: ctypes.CDLL, raw_ptr: int) -> Any:

@@ -14,10 +14,13 @@ from typing import Any
 from uuid import UUID, uuid4
 
 try:
-    from .rust_bridge import RustFsmBridge, RustQueryBridge
+    from .rust_bridge import RustFsmBridge, RustQueryBridge, try_rust_projection_update_task_run
 except Exception:  # pragma: no cover - best-effort optional accelerator
     RustQueryBridge = None  # type: ignore[assignment]
     RustFsmBridge = None  # type: ignore[assignment]
+
+    def try_rust_projection_update_task_run(*args: Any, **kwargs: Any) -> bool:  # type: ignore[no-redef]
+        return False
 
 
 class RunState(str, Enum):
@@ -2149,9 +2152,18 @@ class InMemoryControlPlane:
         )
 
     def _update_task_row(self, task: TaskRunRecord) -> None:
+        now = self._now()
+        if try_rust_projection_update_task_run(
+            str(self._sqlite_path),
+            str(task.task_run_id),
+            task.state.value,
+            int(task.version),
+            now,
+        ):
+            return
         self._sqlite_conn.execute(
             "UPDATE task_runs SET state = ?, version = ?, updated_at = ? WHERE id = ?",
-            [task.state.value, task.version, self._now(), str(task.task_run_id)],
+            [task.state.value, task.version, now, str(task.task_run_id)],
         )
 
     def _insert_event_row(self, event: dict[str, Any]) -> None:

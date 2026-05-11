@@ -13,6 +13,7 @@ use crate::deployment_ops;
 use crate::engine::{
     Engine, EngineError, FlowRun, SetStateRequest, SetTaskStateRequest, TaskRun,
 };
+use crate::projection;
 use crate::ui_read;
 use crate::ui_write;
 
@@ -821,6 +822,36 @@ pub extern "C" fn ironflow_control(
         Err(e) => {
             let payload = format!(r#"{{"ok":false,"error":{{"code":"ffi","message":"{}"}}}}"#, e.replace('"', "\\\""));
             CString::new(payload).unwrap_or_default().into_raw()
+        }
+    }
+}
+
+/// Spike: SQLite read-model write for `task_runs` (`UPDATE` only).
+///
+/// Returns `0` on success, `1` on invalid FFI input, `2` on database/SQL error.
+#[no_mangle]
+pub extern "C" fn ironflow_projection_update_task_run(
+    db_path: *const c_char,
+    task_run_id: *const c_char,
+    state: *const c_char,
+    version: i64,
+    updated_at: *const c_char,
+) -> i32 {
+    let parsed = (|| -> Result<(), String> {
+        let db_path = cstr_to_string(db_path)?;
+        let task_run_id = cstr_to_string(task_run_id)?;
+        let state = cstr_to_string(state)?;
+        let updated_at = cstr_to_string(updated_at)?;
+        projection::update_task_run_row(&db_path, &task_run_id, &state, version, &updated_at)
+    })();
+    match parsed {
+        Ok(()) => 0,
+        Err(e) => {
+            if e == "received null pointer" || e.contains("utf-8") || e.contains("Utf8Error") {
+                1
+            } else {
+                2
+            }
         }
     }
 }
