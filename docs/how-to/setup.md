@@ -2,6 +2,8 @@
 
 If you only need the **`prefect_compat`** library, start with **[Installation](../INSTALL.md)** — **`pip install ironflow-prefect-compat`** or **`uv pip install ironflow-prefect-compat`** from PyPI when a wheel matches your platform.
 
+After install, use the **Quick check after any install** on that page: the **`python -c`** one-liner, or (from a repo checkout) **`python scripts/bootstrap.py --native-check`** for a short in-process flow smoke. For clone-based development, **`python scripts/bootstrap.py --check-only`** validates toolchain hints before you build Rust.
+
 This page consolidates the **repository / source** path: Python environment, **Rust** `rust-engine` build, and the environment variables the shim respects. For a minimal end-to-end check after setup, see **[Quick start (demo flow)](../QUICKSTART_DEMO.md)**.
 
 ## 1. Get the code

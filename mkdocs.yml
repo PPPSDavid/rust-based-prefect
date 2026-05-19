@@ -6,6 +6,7 @@ edit_uri: edit/main/docs/
 
 # Published site = end-user docs only. Maintainer/roadmap/CI notes stay in-repo for GitHub browsing.
 exclude_docs: |
+  plans/**
   MEMORY_BANK.md
   DISTRIBUTION.md
   benchmark_baseline.md
