@@ -91,6 +91,7 @@ export type Deployment = {
   collision_strategy?: string;
   schedule_interval_seconds?: number | null;
   schedule_cron?: string | null;
+  schedule_rrule?: string | null;
   schedule_next_run_at?: string | null;
   schedule_enabled?: boolean;
   created_at: string;

@@ -12,7 +12,7 @@ If you only need a minimal in-process flow with no network stack, use **[Quick s
 | **“Server”** | A **FastAPI** app: `prefect_compat.server` (uvicorn). It exposes REST endpoints for runs, deployments, and streams. It is **not** the Prefect OSS API or Prefect Cloud. |
 | **Worker** | A process (or thread) that **claims** queued **deployment runs** and executes the referenced `@flow`. The bundled server starts a **local in-process worker** by default. |
 | **Deployment** | A **named** binding: flow name, optional `module:function` **entrypoint**, default parameters, pause flag. Stored in the control plane (SQLite read model beside JSONL history). |
-| **Schedule** | Deployments support **interval** (`schedule_interval_seconds`) and **cron** (`schedule_cron`) schedules, with shared timing state (`schedule_next_run_at`, `schedule_enabled`). The server maintenance loop evaluates due schedules and enqueues deployment runs. |
+| **Schedule** | Deployments support **interval** (`schedule_interval_seconds`), **cron** (`schedule_cron`), and a Rust-first **RRule subset** (`schedule_rrule`), with shared timing state (`schedule_next_run_at`, `schedule_enabled`). The server maintenance loop evaluates due schedules and enqueues deployment runs. |
 
 For Prefect terminology mapping, see **[Prefect → IronFlow](PREFECT_IRONFLOW_MAPPING.md)**. For exact feature boundaries, **[Compatibility](compatibility.md)** is authoritative.
 
@@ -58,7 +58,7 @@ The API uses the same **persistence defaults** as in-process flows: JSONL histor
 When the FastAPI app loads, it:
 
 1. **Registers** a small set of built-in benchmark flows (`simple_flow`, `wide_flow`, …) and **creates a deployment per flow** (e.g. `simple_flow-local`) with default parameters.
-2. Starts a **scheduler thread** (unless disabled) that periodically runs `deployment_maintenance_tick()` — reclaims stale leases, marks stale workers offline, and **fires due interval or cron schedules**.
+2. Starts a **scheduler thread** (unless disabled) that periodically runs `deployment_maintenance_tick()` — reclaims stale leases, marks stale workers offline, and **fires due interval, cron, or RRule schedules**.
 3. Starts a **local worker thread** (unless disabled) that repeatedly **claims** the next `SCHEDULED` deployment run and runs the flow **in that process**.
 
 So a single `ironflow_server.py start` gives you API + **embedded worker + scheduler** for local development. This is **not** the same as Prefect’s separate `prefect worker` process model; it is a deliberate **single-process** convenience for the MVP.
@@ -104,7 +104,8 @@ curl -s -X POST http://127.0.0.1:8000/api/deployments \
 
 - `schedule_enabled` (bool)
 - `schedule_interval_seconds` (int, > 0)
-- `schedule_cron` (string, mutually exclusive with positive interval)
+- `schedule_cron` (string, mutually exclusive with positive interval and RRule)
+- `schedule_rrule` (string, Rust-preferred subset: `FREQ=MINUTELY|HOURLY|DAILY|WEEKLY`, optional positive `INTERVAL`, optional `UNTIL`; no `COUNT`)
 - `schedule_next_run_at` (RFC3339 timestamp; optional when the Rust engine can compute the next run)
 
 **Trigger** a run (replace `DEPLOYMENT_ID` with the `id` from the response or list):
@@ -119,11 +120,11 @@ With the default local worker enabled, the deployment run moves from `SCHEDULED`
 
 **Concurrency:** deployments support a **concurrency limit** and **collision strategy** (`ENQUEUE` vs `CANCEL_NEW`) in the data model (see tests in `python-shim/tests/test_deployments_runtime.py`). The HTTP `POST /api/deployments` body in the current server is minimal; advanced policy may require updating the row (maintainers / direct SQLite) until the API grows — see **[Compatibility](compatibility.md)**.
 
-## 4. Schedules (interval + cron)
+## 4. Schedules (interval + cron + RRule)
 
 Scheduling is enforced inside **`deployment_maintenance_tick`**: when `schedule_enabled` is true and `schedule_next_run_at` is due, the control plane inserts a new deployment run and advances the next tick according to the deployment schedule.
 
-Use **either** interval or cron on a deployment (not both). The runtime normalizes this by clearing `schedule_cron` when a positive interval is set, or clearing interval when cron is set.
+Use **one** schedule type on a deployment: interval, cron, or RRule. The runtime normalizes this by clearing the other schedule fields when one type is selected.
 
 You can also patch scheduling after creation:
 
@@ -137,6 +138,8 @@ curl -s -X PATCH http://127.0.0.1:8000/api/deployments/DEPLOYMENT_ID \
 ```
 
 When running without the Rust engine (`bind_db` unavailable), cron schedules require `schedule_next_run_at` to be provided explicitly. With Rust enabled, the control plane computes the next cron tick.
+
+RRule schedule ticks run in Rust when the native engine is bound, with a Python fallback for the same narrow deterministic subset: `FREQ=MINUTELY|HOURLY|DAILY|WEEKLY`, optional positive `INTERVAL`, and optional `UNTIL`. Advanced `dateutil`/iCalendar rules and `COUNT` are not implemented yet.
 
 For production-style **external** orchestration (Kubernetes CronJob, systemd timer, CI), the supported pattern is often: call **`POST /api/deployments/{id}/run`** on a timer rather than relying on embedded schedules.
 

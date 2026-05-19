@@ -172,6 +172,49 @@ def test_update_deployment_enables_schedule(tmp_path: Path) -> None:
     assert updated["schedule_interval_seconds"] == 120
 
 
+def test_rrule_schedule_sets_next_tick_and_clears_other_schedule_types(tmp_path: Path) -> None:
+    _swap_plane(tmp_path)
+    dep = control_plane.create_deployment(
+        name="rrule-flow",
+        flow_name="simple_flow",
+        default_parameters={"n": 1},
+        paused=False,
+        schedule_enabled=True,
+        schedule_rrule="FREQ=MINUTELY;INTERVAL=5",
+    )
+    assert dep["schedule_rrule"] == "FREQ=MINUTELY;INTERVAL=5"
+    assert dep["schedule_cron"] is None
+    assert dep["schedule_interval_seconds"] is None
+    assert dep["schedule_next_run_at"]
+
+
+def test_disabled_rrule_metadata_can_be_stored_without_scheduler(tmp_path: Path) -> None:
+    _swap_plane(tmp_path)
+    dep = control_plane.create_deployment(
+        name="rrule-disabled",
+        flow_name="simple_flow",
+        default_parameters={"n": 1},
+        paused=False,
+        schedule_enabled=False,
+        schedule_rrule="FREQ=DAILY;INTERVAL=1",
+    )
+    assert dep["schedule_enabled"] is False
+    assert dep["schedule_rrule"] == "FREQ=DAILY;INTERVAL=1"
+
+
+def test_rrule_count_is_rejected(tmp_path: Path) -> None:
+    _swap_plane(tmp_path)
+    with pytest.raises(ValueError, match="COUNT"):
+        control_plane.create_deployment(
+            name="rrule-count",
+            flow_name="simple_flow",
+            default_parameters={"n": 1},
+            paused=False,
+            schedule_enabled=True,
+            schedule_rrule="FREQ=DAILY;COUNT=3",
+        )
+
+
 def test_deployment_maintenance_prefers_rust_when_bound(tmp_path: Path) -> None:
     """Smoke: maintenance tick runs without error; Rust path is used when FSM + DB are bound."""
     _swap_plane(tmp_path)

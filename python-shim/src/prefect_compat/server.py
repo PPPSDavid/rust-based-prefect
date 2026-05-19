@@ -39,6 +39,7 @@ class DeploymentCreateRequest(BaseModel):
     collision_strategy: str = "ENQUEUE"
     schedule_interval_seconds: int | None = None
     schedule_cron: str | None = None
+    schedule_rrule: str | None = None
     schedule_next_run_at: str | None = None
     schedule_enabled: bool = False
 
@@ -52,6 +53,7 @@ class DeploymentPatchRequest(BaseModel):
     collision_strategy: str | None = None
     schedule_interval_seconds: int | None = None
     schedule_cron: str | None = None
+    schedule_rrule: str | None = None
     schedule_next_run_at: str | None = None
     schedule_enabled: bool | None = None
 
@@ -441,6 +443,7 @@ def create_deployment(req: DeploymentCreateRequest) -> dict:
         collision_strategy=req.collision_strategy,
         schedule_interval_seconds=req.schedule_interval_seconds,
         schedule_cron=req.schedule_cron,
+        schedule_rrule=req.schedule_rrule,
         schedule_next_run_at=req.schedule_next_run_at,
         schedule_enabled=req.schedule_enabled,
     )
