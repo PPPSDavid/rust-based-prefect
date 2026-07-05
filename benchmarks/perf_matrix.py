@@ -208,6 +208,17 @@ def _recipe_catalog() -> dict[str, WorkloadRecipe]:
             sqlite_enabled=True,
             mixed_reader_count=2,
         ),
+        "medium_narrow_heavy_mixed_4readers_warm": WorkloadRecipe(
+            name="medium_narrow_heavy_mixed_4readers_warm",
+            flow_count=40,
+            tasks_per_flow=8,
+            task_events_per_task=5,
+            read_ratio=0.50,
+            mixed=True,
+            cold_start=False,
+            sqlite_enabled=True,
+            mixed_reader_count=4,
+        ),
         "medium_narrow_fsm_batch_warm": WorkloadRecipe(
             name="medium_narrow_fsm_batch_warm",
             flow_count=40,
@@ -323,6 +334,7 @@ def _presets() -> dict[str, list[str]]:
         "concurrency": [
             "medium_narrow_fsm_batch_warm",
             "medium_narrow_heavy_mixed_2readers_warm",
+            "medium_narrow_heavy_mixed_4readers_warm",
         ],
         "full": [
             k
