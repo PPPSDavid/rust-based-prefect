@@ -13,13 +13,16 @@ from uuid import UUID, uuid4
 
 from .hooks import TransitionContext, TransitionHookSpec, compile_transition_hooks, dispatch_transition_hooks
 from .runtime import InMemoryControlPlane, RunState, SetStateResult, TaskRunRecord
-from .task_runners import MapTaskRunner, ProcessPoolTaskRunner, default_task_runner_from_env
+from .task_runners import MapTaskRunner, ProcessPoolTaskRunner, ThreadPoolTaskRunner, default_task_runner_from_env
 
 # Reused when ``transition_hooks`` is set (avoids per-submit list literals on the hot path).
 _TASK_HOOK_START_EDGES: tuple[tuple[RunState, RunState, str, dict[str, Any] | None], ...] = (
     (RunState.SCHEDULED, RunState.PENDING, "task_pending", None),
     (RunState.PENDING, RunState.RUNNING, "task_running", None),
 )
+
+# Static planner output keyed by flow callable identity (source is stable per decorated function).
+_FORECAST_BY_FLOW_FN: dict[int, dict[str, Any]] = {}
 
 T = TypeVar("T")
 
@@ -77,12 +80,12 @@ class TaskWrapper:
         if wait_for:
             wait(wait_for)
 
-        latest_flow = _CONTROL_PLANE.latest_flow()
+        flow_run_id = _ACTIVE_FLOW_RUN.get()
         task_run = None
-        if latest_flow is not None:
-            planned_node_id = _CONTROL_PLANE.next_planned_node_id(latest_flow.run_id, self.name)
+        if flow_run_id is not None:
+            planned_node_id = _CONTROL_PLANE.next_planned_node_id(flow_run_id, self.name)
             task_run = _CONTROL_PLANE.create_task_run(
-                latest_flow.run_id, self.name, planned_node_id=planned_node_id
+                flow_run_id, self.name, planned_node_id=planned_node_id
             )
             _CONTROL_PLANE.record_task_events_batch(
                 task_run.task_run_id,
@@ -155,6 +158,8 @@ class TaskWrapper:
         wf: list[TaskFuture[Any]] | None = list(wait_for) if wait_for else None
         if isinstance(runner, ProcessPoolTaskRunner):
             return self._map_process_pool(vals, wf, runner)
+        if isinstance(runner, ThreadPoolTaskRunner) and len(vals) > 1 and runner.resolve_max_workers() > 1:
+            return self._map_thread_pool(vals, wf, runner)
         assert isinstance(runner, MapTaskRunner)
         return runner.map_values(
             self,
@@ -164,26 +169,15 @@ class TaskWrapper:
             lambda v: self.submit(v, wait_for=None),
         )
 
-    def _map_process_pool(
-        self,
-        vals: list[Any],
-        wait_for: list[TaskFuture[Any]] | None,
-        runner: ProcessPoolTaskRunner,
-    ) -> list[TaskFuture[T]]:
-        """Map via child processes; task body must be picklable (single positional arg per value)."""
-        if wait_for:
-            wait(wait_for)
-        if not vals:
-            return []
-        mx = min(len(vals), runner.resolve_max_workers())
-        metas: list[tuple[Any, Any]] = []
+    def _prepare_map_task_runs(self, vals: list[Any]) -> list[tuple[TaskRunRecord | None, Any]]:
+        flow_run_id = _ACTIVE_FLOW_RUN.get()
+        metas: list[tuple[TaskRunRecord | None, Any]] = []
         for v in vals:
-            latest_flow = _CONTROL_PLANE.latest_flow()
             task_run = None
-            if latest_flow is not None:
-                planned_node_id = _CONTROL_PLANE.next_planned_node_id(latest_flow.run_id, self.name)
+            if flow_run_id is not None:
+                planned_node_id = _CONTROL_PLANE.next_planned_node_id(flow_run_id, self.name)
                 task_run = _CONTROL_PLANE.create_task_run(
-                    latest_flow.run_id, self.name, planned_node_id=planned_node_id
+                    flow_run_id, self.name, planned_node_id=planned_node_id
                 )
                 _CONTROL_PLANE.record_task_events_batch(
                     task_run.task_run_id,
@@ -196,11 +190,11 @@ class TaskWrapper:
                 if th:
                     _emit_task_transition_edges(th, task_run, self.name, _TASK_HOOK_START_EDGES)
             metas.append((task_run, v))
+        return metas
 
-        fn = self.fn
-        with ProcessPoolExecutor(max_workers=mx) as pool:
-            outs = list(pool.map(fn, [m[1] for m in metas]))
-
+    def _finalize_map_task_runs(
+        self, metas: list[tuple[TaskRunRecord | None, Any]], outs: list[Any]
+    ) -> list[TaskFuture[T]]:
         out: list[TaskFuture[T]] = []
         for (task_run, _v), raw in zip(metas, outs, strict=True):
             if task_run is not None:
@@ -226,6 +220,80 @@ class TaskWrapper:
                 )
             )
         return out
+
+    def _fail_map_task_runs(
+        self, metas: list[tuple[TaskRunRecord | None, Any]], exc: Exception
+    ) -> None:
+        for task_run, _v in metas:
+            if task_run is None:
+                continue
+            try:
+                st = _CONTROL_PLANE.get_task_run(task_run.task_run_id).state
+            except Exception:
+                st = None
+            if st != RunState.RUNNING:
+                continue
+            _CONTROL_PLANE.record_task_event(
+                task_run.task_run_id,
+                "task_failed",
+                {"task_name": self.name, "error": str(exc)},
+            )
+            th = self._transition_hooks
+            if th:
+                _emit_task_single_hook_edge(
+                    th,
+                    task_run,
+                    self.name,
+                    RunState.RUNNING,
+                    RunState.FAILED,
+                    "task_failed",
+                    {"task_name": self.name, "error": str(exc)},
+                )
+
+    def _map_thread_pool(
+        self,
+        vals: list[Any],
+        wait_for: list[TaskFuture[Any]] | None,
+        runner: ThreadPoolTaskRunner,
+    ) -> list[TaskFuture[T]]:
+        """Map with task bodies in a thread pool; control-plane work stays on the caller thread."""
+        if wait_for:
+            wait(wait_for)
+        if not vals:
+            return []
+        metas = self._prepare_map_task_runs(vals)
+        mx = min(len(vals), runner.resolve_max_workers())
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=mx) as pool:
+            try:
+                outs = list(pool.map(self.fn, [m[1] for m in metas]))
+            except Exception as exc:
+                self._fail_map_task_runs(metas, exc)
+                raise
+        return self._finalize_map_task_runs(metas, outs)
+
+    def _map_process_pool(
+        self,
+        vals: list[Any],
+        wait_for: list[TaskFuture[Any]] | None,
+        runner: ProcessPoolTaskRunner,
+    ) -> list[TaskFuture[T]]:
+        """Map via child processes; task body must be picklable (single positional arg per value)."""
+        if wait_for:
+            wait(wait_for)
+        if not vals:
+            return []
+        metas = self._prepare_map_task_runs(vals)
+        mx = min(len(vals), runner.resolve_max_workers())
+        fn = self.fn
+        with ProcessPoolExecutor(max_workers=mx) as pool:
+            try:
+                outs = list(pool.map(fn, [m[1] for m in metas]))
+            except Exception as exc:
+                self._fail_map_task_runs(metas, exc)
+                raise
+        return self._finalize_map_task_runs(metas, outs)
 
 
 def task(
@@ -412,6 +480,17 @@ def _resolve(value: Any) -> Any:
 
 
 def _compile_forecast_for_flow(flow_fn: Callable[..., Any], flow_name: str) -> dict[str, Any]:
+    cache_key = id(flow_fn)
+    cached = _FORECAST_BY_FLOW_FN.get(cache_key)
+    if cached is not None and cached.get("flow_name") == flow_name:
+        return cached["info"]
+
+    info = _compile_forecast_for_flow_uncached(flow_fn, flow_name)
+    _FORECAST_BY_FLOW_FN[cache_key] = {"flow_name": flow_name, "info": info}
+    return info
+
+
+def _compile_forecast_for_flow_uncached(flow_fn: Callable[..., Any], flow_name: str) -> dict[str, Any]:
     try:
         from static_planner import compile_and_forecast
     except Exception:
