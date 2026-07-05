@@ -2118,6 +2118,10 @@ class InMemoryControlPlane:
         finally:
             self._history_file = None
 
+    def close_io_handles(self) -> None:
+        """Release open JSONL handles (required on Windows before tempdir teardown)."""
+        self._flush_jsonl_buffer()
+
     def _load_from_history(self) -> None:
         if self._history_path is None or not self._history_path.exists():
             return

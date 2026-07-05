@@ -440,6 +440,12 @@ def _noop_transition_hook(_ctx: Any) -> None:
 
 def _close_plane_footprint(plane: InMemoryControlPlane) -> None:
     """Close SQLite + native engine resources (Windows-safe tempdir teardown)."""
+    close_io = getattr(plane, "close_io_handles", None)
+    if callable(close_io):
+        try:
+            close_io()
+        except Exception:
+            pass
     conn = getattr(plane, "_sqlite_conn", None)
     if conn is not None:
         try:
