@@ -27,6 +27,8 @@ def _seed_data(tmp_path: Path) -> str:
     control_plane._rust_fsm_bridge = plane._rust_fsm_bridge
     control_plane._rust_fsm_handle = plane._rust_fsm_handle
     control_plane._rust_native_persistence = plane._rust_native_persistence
+    control_plane._rust_db_bound = plane._rust_db_bound
+    control_plane._lock = plane._lock
     control_plane._test_plane_ref = plane
     # Other tests call ``set_control_plane`` on a different instance; align the shim.
     set_control_plane(control_plane)
@@ -101,6 +103,8 @@ def test_dag_marks_not_reachable_after_failure(tmp_path: Path) -> None:
     control_plane._rust_fsm_bridge = plane._rust_fsm_bridge
     control_plane._rust_fsm_handle = plane._rust_fsm_handle
     control_plane._rust_native_persistence = plane._rust_native_persistence
+    control_plane._rust_db_bound = plane._rust_db_bound
+    control_plane._lock = plane._lock
     control_plane._test_plane_ref = plane
     set_control_plane(control_plane)
 

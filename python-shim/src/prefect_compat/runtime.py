@@ -20,6 +20,9 @@ except Exception:  # pragma: no cover - best-effort optional accelerator
     RustFsmBridge = None  # type: ignore[assignment]
 
 
+DEFAULT_WORK_POOL_ID = "default-process-pool"
+
+
 class RunState(str, Enum):
     SCHEDULED = "SCHEDULED"
     PENDING = "PENDING"
@@ -95,6 +98,7 @@ class InMemoryControlPlane:
         self._sqlite_conn = self._open_sqlite_connection(sqlite_path)
         self._init_sqlite_schema(self._sqlite_conn)
         self._ensure_schema_upgrades(self._sqlite_conn)
+        self._ensure_default_work_pool()
         self._replay_to_sqlite = self._read_db_empty_unlocked()
         self._rust_bridge = None
         self._rust_fsm_bridge = None
@@ -235,6 +239,7 @@ class InMemoryControlPlane:
             "schedule_rrule": d.get("schedule_rrule"),
             "schedule_next_run_at": d.get("schedule_next_run_at"),
             "schedule_enabled": bool(d.get("schedule_enabled")),
+            "work_pool_id": d.get("work_pool_id") or DEFAULT_WORK_POOL_ID,
             "created_at": d["created_at"],
             "updated_at": d["updated_at"],
         }
@@ -395,22 +400,25 @@ class InMemoryControlPlane:
             fired += 1
         return fired
 
-    def worker_heartbeat(self, worker_name: str) -> None:
-        rust = self._rust_deployment_dispatch("deployment_worker_heartbeat", {"worker_name": worker_name})
-        if rust is not None and rust.get("ok"):
-            return
+    def worker_heartbeat(self, worker_name: str, work_pool_id: str | None = None) -> None:
+        pool_id = work_pool_id or os.getenv("IRONFLOW_WORK_POOL", DEFAULT_WORK_POOL_ID)
+        self._rust_deployment_dispatch(
+            "deployment_worker_heartbeat",
+            {"worker_name": worker_name, "work_pool_id": pool_id},
+        )
         now = self._now()
         with self._lock:
             self._sqlite_conn.execute(
                 """
-                INSERT INTO workers(name,last_heartbeat,status,updated_at)
-                VALUES(?,?,?,?)
+                INSERT INTO workers(name,last_heartbeat,status,updated_at,work_pool_id)
+                VALUES(?,?,?,?,?)
                 ON CONFLICT(name) DO UPDATE SET
                     last_heartbeat=excluded.last_heartbeat,
                     status=excluded.status,
-                    updated_at=excluded.updated_at
+                    updated_at=excluded.updated_at,
+                    work_pool_id=excluded.work_pool_id
                 """,
-                [worker_name, now, "ONLINE", now],
+                [worker_name, now, "ONLINE", now, pool_id],
             )
 
     def _rust_register_flow(self, record: FlowRunRecord) -> None:
@@ -1122,14 +1130,22 @@ class InMemoryControlPlane:
     def get_flow_run_detail(self, flow_run_id: UUID) -> dict[str, Any] | None:
         rust_result = self._query_rust("flow_run_detail", {"flow_run_id": str(flow_run_id)})
         if rust_result is not None:
-            return rust_result
-        rows = self._query_rows(
-            "SELECT seq,id,name,state,version,created_at,updated_at FROM flow_runs WHERE id = ? LIMIT 1",
+            result = rust_result
+        else:
+            rows = self._query_rows(
+                "SELECT seq,id,name,state,version,created_at,updated_at FROM flow_runs WHERE id = ? LIMIT 1",
+                [str(flow_run_id)],
+            )
+            if not rows:
+                return None
+            result = self._flow_row_to_dict(rows[0])
+        dep_rows = self._query_rows(
+            "SELECT deployment_id FROM deployment_runs WHERE flow_run_id = ? ORDER BY created_at DESC LIMIT 1",
             [str(flow_run_id)],
         )
-        if not rows:
-            return None
-        return self._flow_row_to_dict(rows[0])
+        if dep_rows:
+            result["deployment_id"] = dep_rows[0]["deployment_id"]
+        return result
 
     def list_task_runs(
         self, flow_run_id: UUID, limit: int = 200, cursor: str | None = None
@@ -1313,7 +1329,9 @@ class InMemoryControlPlane:
         schedule_rrule: str | None = None,
         schedule_next_run_at: str | None = None,
         schedule_enabled: bool = False,
+        work_pool_id: str | None = None,
     ) -> dict[str, Any]:
+        pool_id = work_pool_id or DEFAULT_WORK_POOL_ID
         body: dict[str, Any] = {
             "name": name,
             "flow_name": flow_name,
@@ -1328,6 +1346,7 @@ class InMemoryControlPlane:
             "schedule_rrule": schedule_rrule,
             "schedule_next_run_at": schedule_next_run_at,
             "schedule_enabled": schedule_enabled,
+            "work_pool_id": pool_id,
         }
         rrule_requested = bool(schedule_rrule and str(schedule_rrule).strip())
         rust = None if rrule_requested else self._rust_deployment_dispatch("deployment_create", body)
@@ -1384,8 +1403,8 @@ class InMemoryControlPlane:
                 INSERT INTO deployments
                 (id,name,flow_name,entrypoint,path,default_parameters,paused,
                  concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,
-                 schedule_next_run_at,schedule_enabled,created_at,updated_at)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                 schedule_next_run_at,schedule_enabled,work_pool_id,created_at,updated_at)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 [
                     deployment_id,
@@ -1402,6 +1421,7 @@ class InMemoryControlPlane:
                     sr,
                     sched_next,
                     1 if schedule_enabled else 0,
+                    pool_id,
                     now,
                     now,
                 ],
@@ -1452,6 +1472,7 @@ class InMemoryControlPlane:
             schedule_rrule = dep.get("schedule_rrule")
             schedule_next_run_at = dep.get("schedule_next_run_at")
             schedule_enabled = bool(dep.get("schedule_enabled"))
+            work_pool_id = dep.get("work_pool_id") or DEFAULT_WORK_POOL_ID
 
             if "entrypoint" in patch:
                 v = patch["entrypoint"]
@@ -1477,6 +1498,8 @@ class InMemoryControlPlane:
                 schedule_next_run_at = patch["schedule_next_run_at"]
             if "schedule_enabled" in patch:
                 schedule_enabled = bool(patch["schedule_enabled"])
+            if "work_pool_id" in patch and patch["work_pool_id"] is not None:
+                work_pool_id = str(patch["work_pool_id"])
 
             if schedule_rrule and str(schedule_rrule).strip():
                 schedule_interval_seconds = None
@@ -1510,7 +1533,7 @@ class InMemoryControlPlane:
                   entrypoint = ?, path = ?, default_parameters = ?, paused = ?,
                   concurrency_limit = ?, collision_strategy = ?,
                   schedule_interval_seconds = ?, schedule_cron = ?, schedule_rrule = ?, schedule_next_run_at = ?,
-                  schedule_enabled = ?, updated_at = ?
+                  schedule_enabled = ?, work_pool_id = ?, updated_at = ?
                 WHERE id = ?
                 """,
                 [
@@ -1525,6 +1548,7 @@ class InMemoryControlPlane:
                     schedule_rrule,
                     schedule_next_run_at,
                     1 if schedule_enabled else 0,
+                    work_pool_id,
                     ts,
                     str(deployment_id),
                 ],
@@ -1533,7 +1557,7 @@ class InMemoryControlPlane:
                 """
                 SELECT id,name,flow_name,entrypoint,path,default_parameters,paused,
                        concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,
-                       schedule_next_run_at,schedule_enabled,created_at,updated_at
+                       schedule_next_run_at,schedule_enabled,work_pool_id,created_at,updated_at
                 FROM deployments WHERE id = ?
                 LIMIT 1
                 """,
@@ -1697,10 +1721,168 @@ class InMemoryControlPlane:
         next_cursor = str(rows[-1]["seq"]) if len(rows) == limit else None
         return PageResult(items=items, next_cursor=next_cursor)
 
-    def claim_next_deployment_run(self, worker_name: str, lease_seconds: int = 30) -> dict[str, Any] | None:
+    def cancel_flow_run(self, flow_run_id: UUID) -> dict[str, Any]:
+        detail = self.get_flow_run_detail(flow_run_id)
+        if detail is None:
+            raise ValueError("flow run not found")
+        state = str(detail["state"])
+        if state in {"COMPLETED", "FAILED", "CANCELLED"}:
+            return detail
+        if state not in {"SCHEDULED", "PENDING", "RUNNING"}:
+            raise ValueError(f"cannot cancel from state {state}")
+
+        token = uuid4()
+        try:
+            self.set_flow_state(flow_run_id, RunState.CANCELLED, token, "user_cancel")
+        except ValueError:
+            refreshed = self.get_flow_run_detail(flow_run_id)
+            if refreshed and refreshed["state"] == "CANCELLED":
+                return refreshed
+            raise
+
+        now = self._now()
+        with self._lock:
+            self._sqlite_conn.execute(
+                """
+                UPDATE task_runs
+                SET state = 'CANCELLED', updated_at = ?
+                WHERE flow_run_id = ? AND state IN ('SCHEDULED','PENDING','RUNNING')
+                """,
+                [now, str(flow_run_id)],
+            )
+            for task in self._tasks.values():
+                if str(task.flow_run_id) == str(flow_run_id) and task.state.value in {
+                    "SCHEDULED",
+                    "PENDING",
+                    "RUNNING",
+                }:
+                    task.state = RunState.CANCELLED
+        refreshed = self.get_flow_run_detail(flow_run_id)
+        if refreshed is None:
+            raise ValueError("flow run not found")
+        return refreshed
+
+    def retry_flow_run(self, flow_run_id: UUID) -> dict[str, Any]:
+        rows = self._query_rows(
+            """
+            SELECT deployment_id, requested_parameters
+            FROM deployment_runs
+            WHERE flow_run_id = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            [str(flow_run_id)],
+        )
+        if not rows:
+            raise ValueError("flow run is not deployment-backed")
+        deployment_id = UUID(str(rows[0]["deployment_id"]))
+        requested = json.loads(rows[0]["requested_parameters"] or "{}")
+        return self.trigger_deployment_run(deployment_id, parameters=requested)
+
+    def list_work_pools(self, limit: int = 50, cursor: str | None = None) -> PageResult:
+        query = "SELECT rowid AS seq, id, name, type, paused, created_at, updated_at FROM work_pools"
+        params: list[Any] = []
+        if cursor:
+            query += " WHERE rowid < ?"
+            params.append(int(cursor))
+        query += " ORDER BY rowid DESC LIMIT ?"
+        params.append(limit)
+        rows = self._query_rows(query, params)
+        items = [self._work_pool_row_to_dict(r) for r in rows]
+        next_cursor = str(rows[-1]["seq"]) if len(rows) == limit else None
+        return PageResult(items=items, next_cursor=next_cursor)
+
+    def get_work_pool(self, work_pool_id: str) -> dict[str, Any] | None:
+        rows = self._query_rows(
+            "SELECT rowid AS seq, id, name, type, paused, created_at, updated_at FROM work_pools WHERE id = ? LIMIT 1",
+            [work_pool_id],
+        )
+        if not rows:
+            return None
+        return self._work_pool_row_to_dict(rows[0])
+
+    def create_work_pool(self, name: str, pool_type: str = "process") -> dict[str, Any]:
+        if pool_type != "process":
+            raise ValueError("only process work pools are supported in MVP")
+        existing = self._query_rows(
+            "SELECT rowid AS seq, id, name, type, paused, created_at, updated_at FROM work_pools WHERE name = ? LIMIT 1",
+            [name],
+        )
+        if existing:
+            return self._work_pool_row_to_dict(existing[0])
+        now = self._now()
+        pool_id = str(uuid4())
+        with self._lock:
+            self._sqlite_conn.execute(
+                "INSERT INTO work_pools(id,name,type,paused,created_at,updated_at) VALUES(?,?,?,?,?,?)",
+                [pool_id, name, pool_type, 0, now, now],
+            )
+        created = self.get_work_pool(pool_id)
+        if created is None:
+            raise RuntimeError("failed to create work pool")
+        return created
+
+    def patch_work_pool(self, work_pool_id: str, patch: dict[str, Any]) -> dict[str, Any]:
+        current = self.get_work_pool(work_pool_id)
+        if current is None:
+            raise ValueError("work pool not found")
+        paused = current["paused"]
+        if "paused" in patch:
+            paused = bool(patch["paused"])
+        now = self._now()
+        with self._lock:
+            self._sqlite_conn.execute(
+                "UPDATE work_pools SET paused = ?, updated_at = ? WHERE id = ?",
+                [1 if paused else 0, now, work_pool_id],
+            )
+        updated = self.get_work_pool(work_pool_id)
+        if updated is None:
+            raise ValueError("work pool not found")
+        return updated
+
+    def list_workers(
+        self, work_pool_id: str | None = None, limit: int = 100, cursor: str | None = None
+    ) -> PageResult:
+        query = "SELECT rowid AS seq, name, last_heartbeat, status, updated_at, work_pool_id FROM workers"
+        params: list[Any] = []
+        conditions: list[str] = []
+        if work_pool_id:
+            conditions.append("work_pool_id = ?")
+            params.append(work_pool_id)
+        if cursor:
+            conditions.append("rowid < ?")
+            params.append(int(cursor))
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        query += " ORDER BY rowid DESC LIMIT ?"
+        params.append(limit)
+        rows = self._query_rows(query, params)
+        items = [self._worker_row_to_dict(r) for r in rows]
+        next_cursor = str(rows[-1]["seq"]) if len(rows) == limit else None
+        return PageResult(items=items, next_cursor=next_cursor)
+
+    def _ensure_default_work_pool(self) -> None:
+        now = self._now()
+        with self._lock:
+            self._sqlite_conn.execute(
+                """
+                INSERT OR IGNORE INTO work_pools(id,name,type,paused,created_at,updated_at)
+                VALUES(?,?,?,?,?,?)
+                """,
+                [DEFAULT_WORK_POOL_ID, "default-process-pool", "process", 0, now, now],
+            )
+            self._sqlite_conn.execute(
+                f"UPDATE deployments SET work_pool_id = ? WHERE work_pool_id IS NULL",
+                [DEFAULT_WORK_POOL_ID],
+            )
+
+    def claim_next_deployment_run(
+        self, worker_name: str, lease_seconds: int = 30, work_pool_id: str | None = None
+    ) -> dict[str, Any] | None:
+        pool_id = work_pool_id or os.getenv("IRONFLOW_WORK_POOL", DEFAULT_WORK_POOL_ID)
         rust = self._rust_deployment_dispatch(
             "deployment_claim_next",
-            {"worker_name": worker_name, "lease_seconds": lease_seconds},
+            {"worker_name": worker_name, "lease_seconds": lease_seconds, "work_pool_id": pool_id},
         )
         if rust is not None:
             if rust.get("ok"):
@@ -1716,20 +1898,22 @@ class InMemoryControlPlane:
             lease_until = (now_dt + timedelta(seconds=max(1, lease_seconds))).isoformat()
             self._sqlite_conn.execute(
                 """
-                INSERT INTO workers(name,last_heartbeat,status,updated_at)
-                VALUES(?,?,?,?)
+                INSERT INTO workers(name,last_heartbeat,status,updated_at,work_pool_id)
+                VALUES(?,?,?,?,?)
                 ON CONFLICT(name) DO UPDATE SET
                     last_heartbeat=excluded.last_heartbeat,
                     status=excluded.status,
-                    updated_at=excluded.updated_at
+                    updated_at=excluded.updated_at,
+                    work_pool_id=excluded.work_pool_id
                 """,
-                [worker_name, now, "ONLINE", now],
+                [worker_name, now, "ONLINE", now, pool_id],
             )
             candidates = self._query_rows(
                 """
                 SELECT dr.id FROM deployment_runs dr
                 INNER JOIN deployments d ON d.id = dr.deployment_id
                 WHERE dr.status = 'SCHEDULED'
+                AND COALESCE(d.work_pool_id, ?) = ?
                 AND (
                   d.concurrency_limit IS NULL
                   OR (
@@ -1741,7 +1925,7 @@ class InMemoryControlPlane:
                 ORDER BY dr.created_at ASC
                 LIMIT 1
                 """,
-                [],
+                [DEFAULT_WORK_POOL_ID, pool_id],
             )
             if not candidates:
                 return None
@@ -1769,11 +1953,17 @@ class InMemoryControlPlane:
             return self._deployment_run_row_to_dict(row[0])
 
     def claim_next_deployment_run_wait(
-        self, worker_name: str, lease_seconds: int = 30, wait_ms: int = 500
+        self, worker_name: str, lease_seconds: int = 30, wait_ms: int = 500, work_pool_id: str | None = None
     ) -> dict[str, Any] | None:
+        pool_id = work_pool_id or os.getenv("IRONFLOW_WORK_POOL", DEFAULT_WORK_POOL_ID)
         rust = self._rust_deployment_dispatch(
             "deployment_claim_next_wait",
-            {"worker_name": worker_name, "lease_seconds": lease_seconds, "wait_ms": wait_ms},
+            {
+                "worker_name": worker_name,
+                "lease_seconds": lease_seconds,
+                "wait_ms": wait_ms,
+                "work_pool_id": pool_id,
+            },
         )
         if rust is not None:
             if rust.get("ok"):
@@ -1784,7 +1974,7 @@ class InMemoryControlPlane:
 
         deadline = time.monotonic() + max(wait_ms, 1) / 1000.0
         while time.monotonic() < deadline:
-            c = self.claim_next_deployment_run(worker_name, lease_seconds)
+            c = self.claim_next_deployment_run(worker_name, lease_seconds, work_pool_id=pool_id)
             if c is not None:
                 return c
             time.sleep(0.05)
@@ -2167,6 +2357,15 @@ class InMemoryControlPlane:
                 name TEXT PRIMARY KEY,
                 last_heartbeat TEXT NOT NULL,
                 status TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                work_pool_id TEXT
+            );
+            CREATE TABLE IF NOT EXISTS work_pools (
+                id TEXT PRIMARY KEY,
+                name TEXT UNIQUE NOT NULL,
+                type TEXT NOT NULL DEFAULT 'process',
+                paused INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_flow_runs_state_created
@@ -2213,6 +2412,16 @@ class InMemoryControlPlane:
             conn.execute("ALTER TABLE deployments ADD COLUMN schedule_next_run_at TEXT")
         if "schedule_enabled" not in dep_cols:
             conn.execute("ALTER TABLE deployments ADD COLUMN schedule_enabled INTEGER NOT NULL DEFAULT 0")
+        if "work_pool_id" not in dep_cols:
+            conn.execute(
+                f"ALTER TABLE deployments ADD COLUMN work_pool_id TEXT DEFAULT '{DEFAULT_WORK_POOL_ID}'"
+            )
+        worker_cols = {c["name"] for c in conn.execute("PRAGMA table_info(workers)").fetchall()}
+        if "work_pool_id" not in worker_cols:
+            conn.execute("ALTER TABLE workers ADD COLUMN work_pool_id TEXT")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_deployments_work_pool ON deployments(work_pool_id)"
+        )
 
     def _query_rows(self, query: str, params: list[Any]) -> list[sqlite3.Row]:
         with self._lock:
@@ -2484,8 +2693,29 @@ class InMemoryControlPlane:
             "schedule_rrule": col("schedule_rrule"),
             "schedule_next_run_at": col("schedule_next_run_at"),
             "schedule_enabled": bool(col("schedule_enabled", 0)),
+            "work_pool_id": col("work_pool_id") or DEFAULT_WORK_POOL_ID,
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
+        }
+
+    def _work_pool_row_to_dict(self, row: sqlite3.Row) -> dict[str, Any]:
+        return {
+            "id": row["id"],
+            "name": row["name"],
+            "type": row["type"],
+            "paused": bool(row["paused"]),
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+        }
+
+    def _worker_row_to_dict(self, row: sqlite3.Row) -> dict[str, Any]:
+        keys = row.keys()
+        return {
+            "name": row["name"],
+            "status": row["status"],
+            "last_heartbeat": row["last_heartbeat"],
+            "updated_at": row["updated_at"],
+            "work_pool_id": row["work_pool_id"] if "work_pool_id" in keys else None,
         }
 
     def _deployment_run_row_to_dict(self, row: sqlite3.Row) -> dict[str, Any]:

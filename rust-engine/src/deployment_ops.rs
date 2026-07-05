@@ -100,13 +100,14 @@ fn count_exec_runs(conn: &Connection, deployment_id: &str) -> Result<i64, String
 }
 
 /// Upsert worker heartbeat (ONLINE).
-pub fn worker_heartbeat(conn: &Connection, worker_name: &str) -> Result<(), String> {
+pub fn worker_heartbeat(conn: &Connection, worker_name: &str, work_pool_id: Option<&str>) -> Result<(), String> {
     let now = now_iso();
     conn.execute(
-        "INSERT INTO workers(name,last_heartbeat,status,updated_at) VALUES(?1,?2,'ONLINE',?3) \
+        "INSERT INTO workers(name,last_heartbeat,status,updated_at,work_pool_id) VALUES(?1,?2,'ONLINE',?3,?4) \
          ON CONFLICT(name) DO UPDATE SET last_heartbeat = excluded.last_heartbeat, \
-         status = excluded.status, updated_at = excluded.updated_at",
-        params![worker_name, now, now],
+         status = excluded.status, updated_at = excluded.updated_at, \
+         work_pool_id = COALESCE(excluded.work_pool_id, workers.work_pool_id)",
+        params![worker_name, now, now, work_pool_id],
     )
     .map_err(|e| e.to_string())?;
     Ok(())
@@ -132,20 +133,23 @@ pub fn claim_next_deployment_run(
     conn: &Connection,
     worker_name: &str,
     lease_seconds: i64,
+    work_pool_id: Option<&str>,
 ) -> Result<Option<Value>, String> {
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
-    worker_heartbeat(&tx, worker_name)?;
+    worker_heartbeat(&tx, worker_name, work_pool_id)?;
     reclaim_expired_claims(&tx)?;
 
     let now_dt = Utc::now();
     let now = now_dt.to_rfc3339();
     let lease_until = (now_dt + Duration::seconds(lease_seconds.max(1))).to_rfc3339();
 
+    let pool_filter = work_pool_id.unwrap_or("default-process-pool");
     let candidate_id: Option<String> = tx
         .query_row(
             "SELECT dr.id FROM deployment_runs dr \
              INNER JOIN deployments d ON d.id = dr.deployment_id \
              WHERE dr.status = 'SCHEDULED' \
+             AND COALESCE(d.work_pool_id, 'default-process-pool') = ?1 \
              AND ( \
                d.concurrency_limit IS NULL \
                OR ( \
@@ -156,7 +160,7 @@ pub fn claim_next_deployment_run(
              ) \
              ORDER BY dr.created_at ASC \
              LIMIT 1",
-            [],
+            params![pool_filter],
             |row| row.get(0),
         )
         .optional()

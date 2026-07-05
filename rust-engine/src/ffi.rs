@@ -555,7 +555,8 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| "missing string field worker_name".to_string())?;
             let lease_seconds = body.get("lease_seconds").and_then(|v| v.as_i64()).unwrap_or(30).max(1);
-            match deployment_ops::claim_next_deployment_run(conn, worker_name, lease_seconds) {
+            let work_pool_id = body.get("work_pool_id").and_then(|v| v.as_str());
+            match deployment_ops::claim_next_deployment_run(conn, worker_name, lease_seconds, work_pool_id) {
                 Ok(Some(run)) => Ok(json!({"ok": true, "run": run})),
                 Ok(None) => Ok(json!({"ok": true, "run": Value::Null})),
                 Err(e) => Ok(json!({"ok": false, "error": {"code": "deployment", "message": e}})),
@@ -573,7 +574,8 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| "missing string field worker_name".to_string())?;
             let lease_seconds = body.get("lease_seconds").and_then(|v| v.as_i64()).unwrap_or(30).max(1);
-            match deployment_ops::claim_next_deployment_run(conn, worker_name, lease_seconds) {
+            let work_pool_id = body.get("work_pool_id").and_then(|v| v.as_str());
+            match deployment_ops::claim_next_deployment_run(conn, worker_name, lease_seconds, work_pool_id) {
                 Ok(Some(run)) => Ok(json!({"ok": true, "run": run})),
                 Ok(None) => Ok(json!({"ok": true, "run": Value::Null})),
                 Err(e) => Ok(json!({"ok": false, "error": {"code": "deployment", "message": e}})),
@@ -621,7 +623,8 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                 .get("worker_name")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| "missing string field worker_name".to_string())?;
-            deployment_ops::worker_heartbeat(conn, worker_name).map_err(|e| e.to_string())?;
+            let work_pool_id = body.get("work_pool_id").and_then(|v| v.as_str());
+            deployment_ops::worker_heartbeat(conn, worker_name, work_pool_id).map_err(|e| e.to_string())?;
             Ok(json!({"ok": true}))
         }
         "deployment_tick_schedules" => {

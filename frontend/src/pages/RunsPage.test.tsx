@@ -42,6 +42,6 @@ describe("RunsPage", () => {
   it("renders flow runs from API", async () => {
     renderPage();
     expect(await screen.findByText("mapped_flow")).toBeInTheDocument();
-    expect(screen.getByText("COMPLETED")).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "COMPLETED" })).toBeInTheDocument();
   });
 });

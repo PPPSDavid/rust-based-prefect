@@ -66,8 +66,8 @@ function renderPage() {
 describe("RunDetailPage", () => {
   it("renders DAG tab and DAG content", async () => {
     renderPage();
-    expect(await screen.findByText("mapped_flow")).toBeInTheDocument();
-    const dagButton = screen.getByRole("button", { name: "DAG" });
+    expect(await screen.findByRole("heading", { name: "mapped_flow" })).toBeInTheDocument();
+    const dagButton = screen.getByRole("tab", { name: "DAG" });
     dagButton.click();
     expect(await screen.findByText(/source:/i)).toBeInTheDocument();
     expect(await screen.findByText("inc")).toBeInTheDocument();
