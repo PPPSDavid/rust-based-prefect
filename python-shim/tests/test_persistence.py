@@ -23,6 +23,14 @@ def test_history_persists_across_restart(tmp_path: Path):
     assert reloaded.summary()["events"] >= 3
 
 
+def test_close_io_handles_releases_history_file(tmp_path: Path) -> None:
+    history = tmp_path / "history.jsonl"
+    plane = InMemoryControlPlane(history_path=str(history))
+    plane.create_flow_run("release-test")
+    plane.close_io_handles()
+    history.unlink()
+
+
 def test_sqlite_read_model_is_rebuilt_from_history_if_missing(tmp_path: Path):
     history = tmp_path / "history.jsonl"
     plane = InMemoryControlPlane(history_path=str(history))

@@ -163,7 +163,7 @@ Agents and contributors must preserve this contract when touching `runtime.py` o
 
 - List/detail query methods (`list_flow_runs`, `list_task_runs`, `list_events`, etc.) call `_query_rust()` **without** acquiring `_lock`.
 - `ironflow_query` uses a **thread-local SQLite connection pool** (one reused connection per thread per database path) under WAL mode.
-- Mixed `perf_matrix` recipes spawn one writer thread plus `mixed_reader_count` reader threads to regression-test this path.
+- Mixed `perf_matrix` recipes spawn one writer thread plus `mixed_reader_count` reader threads to regression-test this path. The `concurrency` preset includes 2- and 4-reader mixed workloads.
 
 ### Task runners vs control plane
 
