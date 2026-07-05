@@ -42,9 +42,26 @@ This file is a compact context handoff for future sessions.
 - Compare performance: `python benchmarks/compare_prefect_vs_ironflow.py`
 - Generate forecast sample: `python scripts/run_forecast.py`
 
+## Run lifecycle: cancel / retry (current vs desired)
+
+**Current behavior (MVP — do not change without explicit task):**
+
+- **Cancel** (`POST /api/flow-runs/{id}/cancel`): sets flow run state to `CANCELLED` and marks in-flight task runs `CANCELLED` in the control plane / SQLite read model. Long-running task bodies are not cooperatively interrupted unless they poll cancellation themselves (no default hook yet).
+- **Retry** (`POST /api/flow-runs/{id}/retry`): for deployment-backed runs, calls `trigger_deployment_run` with the same deployment and parameters → **new deployment run → new flow run → full flow re-execution from scratch**. This is **not** Prefect task-resume parity.
+
+**Known gap (documented, future work):**
+
+- For multi-task flows where some tasks **completed** before cancel, **retry currently recomputes those completed tasks**. Desired Prefect-like semantics: on retry, **already-completed tasks should not be recomputed** (task-level resume / result cache keyed by flow run lineage or equivalent).
+- Implementing this requires architectural work: task result persistence across retry, idempotent resume graph, and UI/API surfacing of which tasks were skipped vs re-run. Track in compatibility matrix before claiming parity.
+
+**Useful test scenario (manual / E2E):**
+
+- Flow: fast task → `sleep` ~10s task → downstream task. Trigger → cancel while sleeping → retry → wait for completion. Today, expect all tasks to run again on retry; use this to validate when resume lands.
+
 ## Next High-Value Work
 
 1. Move projection write hot paths from Python into Rust-backed implementation.
 2. Expand Prefect API compatibility matrix with concrete parity tests.
 3. Add migration/versioning path toward PostgreSQL for larger-scale persistence.
 4. Add CI gates and benchmark regression thresholds.
+5. **Task-level resume on flow-run retry** (skip recomputation of tasks that completed before cancel) — see section above.
