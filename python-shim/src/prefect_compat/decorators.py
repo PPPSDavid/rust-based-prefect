@@ -28,6 +28,12 @@ _CONTROL_PLANE = InMemoryControlPlane()
 _ACTIVE_TASK_RUNNER: contextvars.ContextVar[MapTaskRunner | ProcessPoolTaskRunner | None] = contextvars.ContextVar(
     "ironflow_active_task_runner", default=None
 )
+_ACTIVE_FLOW_RUN: contextvars.ContextVar[UUID | None] = contextvars.ContextVar(
+    "ironflow_active_flow_run", default=None
+)
+_ACTIVE_DEPLOYMENT_RUN: contextvars.ContextVar[UUID | None] = contextvars.ContextVar(
+    "ironflow_active_deployment_run", default=None
+)
 
 
 @dataclass
@@ -112,6 +118,10 @@ class TaskWrapper:
                 planned_node_id=task_run.planned_node_id if task_run is not None else None,
             )
         except Exception as exc:
+            from .cancellation import FlowRunCancelled
+
+            if isinstance(exc, FlowRunCancelled):
+                raise
             if task_run is not None:
                 # If ``task_completed`` progressed the FSM but persistence raised, do not emit FAILED.
                 try:
@@ -247,10 +257,17 @@ def flow(
 
         @wraps(f)
         def wrapped(*args: Any, **kwargs: Any) -> T:
+            from .cancellation import FlowRunCancelled
+
             token = _ACTIVE_TASK_RUNNER.set(resolved_runner)
+            flow_token = _ACTIVE_FLOW_RUN.set(None)
             fh = compiled_flow_hooks
             try:
                 record = _CONTROL_PLANE.create_flow_run(flow_name)
+                _ACTIVE_FLOW_RUN.set(record.run_id)
+                dep_run_id = _ACTIVE_DEPLOYMENT_RUN.get()
+                if dep_run_id is not None:
+                    _CONTROL_PLANE.attach_flow_run_to_deployment_run(dep_run_id, record.run_id)
                 manifest_info = _compile_forecast_for_flow(f, flow_name)
                 _CONTROL_PLANE.save_flow_manifest(
                     run_id=record.run_id,
@@ -282,7 +299,11 @@ def flow(
                     if fh and done.status == "applied":
                         _emit_flow_transition(fh, record.run_id, prev, RunState.COMPLETED, "complete")
                     return result
+                except FlowRunCancelled:
+                    raise
                 except Exception:
+                    if _CONTROL_PLANE.get_flow(record.run_id).state == RunState.CANCELLED:
+                        raise
                     prev = _CONTROL_PLANE.get_flow(record.run_id).state
                     failed = _CONTROL_PLANE.set_flow_state(
                         record.run_id, RunState.FAILED, uuid4(), "fail", expected_version=2
@@ -291,6 +312,7 @@ def flow(
                         _emit_flow_transition(fh, record.run_id, prev, RunState.FAILED, "fail")
                     raise
             finally:
+                _ACTIVE_FLOW_RUN.reset(flow_token)
                 _ACTIVE_TASK_RUNNER.reset(token)
 
         return wrapped

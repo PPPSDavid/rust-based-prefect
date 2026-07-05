@@ -21,5 +21,5 @@ test("opens run detail tabs", async ({ page }) => {
   await page.goto("/runs");
   await page.getByRole("link").filter({ hasText: /mapped_flow|chained_flow|simple_flow/ }).first().click();
   await page.getByRole("tab", { name: "DAG" }).click();
-  await expect(page.getByText(/logical|expanded/i)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Logical" })).toBeVisible();
 });
