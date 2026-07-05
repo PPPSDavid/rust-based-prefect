@@ -53,7 +53,7 @@ fn query_flow_runs(conn: &Connection, params_json: &str) -> Result<String, Strin
     }
     sql.push_str(" ORDER BY seq DESC LIMIT ?3");
 
-    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare_cached(&sql).map_err(|e| e.to_string())?;
     let items = stmt
         .query_map(
             params![
@@ -84,7 +84,7 @@ fn query_flow_run_detail(conn: &Connection, params_json: &str) -> Result<String,
     let flow_run_id = parse_opt_string(params_json, "flow_run_id")
         .ok_or_else(|| "flow_run_id required".to_string())?;
     let mut stmt = conn
-        .prepare("SELECT id,name,state,version,created_at,updated_at FROM flow_runs WHERE id = ?1 LIMIT 1")
+        .prepare_cached("SELECT id,name,state,version,created_at,updated_at FROM flow_runs WHERE id = ?1 LIMIT 1")
         .map_err(|e| e.to_string())?;
     let mut rows = stmt.query(params![flow_run_id]).map_err(|e| e.to_string())?;
     if let Some(row) = rows.next().map_err(|e| e.to_string())? {
@@ -112,7 +112,7 @@ fn query_task_runs(conn: &Connection, params_json: &str) -> Result<String, Strin
         sql.push_str(" AND seq < ?2");
     }
     sql.push_str(" ORDER BY seq DESC LIMIT ?3");
-    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare_cached(&sql).map_err(|e| e.to_string())?;
     let items = stmt
         .query_map(params![flow_run_id, cursor, limit], |row| {
             Ok(json!({
@@ -149,7 +149,7 @@ fn query_logs(conn: &Connection, params_json: &str) -> Result<String, String> {
     }
     sql.push_str(" ORDER BY seq DESC LIMIT ?5");
 
-    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare_cached(&sql).map_err(|e| e.to_string())?;
     let items = stmt
         .query_map(params![flow_run_id, task_run_id, level, cursor, limit], |row| {
             Ok(json!({
@@ -171,7 +171,7 @@ fn query_logs(conn: &Connection, params_json: &str) -> Result<String, String> {
 fn query_flows(conn: &Connection, params_json: &str) -> Result<String, String> {
     let limit = parse_limit(params_json, 200);
     let mut stmt = conn
-        .prepare(
+        .prepare_cached(
             "SELECT name,MAX(updated_at) AS updated_at,COUNT(*) AS run_count FROM flow_runs GROUP BY name ORDER BY updated_at DESC LIMIT ?1",
         )
         .map_err(|e| e.to_string())?;
@@ -199,7 +199,7 @@ fn query_tasks(conn: &Connection, params_json: &str) -> Result<String, String> {
                GROUP BY tr.task_name
                ORDER BY updated_at DESC
                LIMIT ?2";
-    let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare_cached(sql).map_err(|e| e.to_string())?;
     let items = stmt
         .query_map(params![flow_name, limit], |row| {
             Ok(json!({
@@ -224,7 +224,7 @@ fn query_events(conn: &Connection, params_json: &str) -> Result<String, String> 
         sql.push_str(" AND seq < ?2");
     }
     sql.push_str(" ORDER BY seq DESC LIMIT ?3");
-    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare_cached(&sql).map_err(|e| e.to_string())?;
     let items = stmt
         .query_map(params![flow_run_id, cursor, limit], |row| {
             let data_raw: Option<String> = row.get(8)?;
@@ -259,7 +259,7 @@ fn query_artifacts(conn: &Connection, params_json: &str, key: &str) -> Result<St
     let value = parse_opt_string(params_json, key).ok_or_else(|| format!("{key} required"))?;
     let limit = parse_limit(params_json, 200);
     let sql = format!("SELECT id,flow_run_id,task_run_id,artifact_type,key,summary,created_at FROM artifacts WHERE {key} = ?1 ORDER BY created_at DESC LIMIT ?2");
-    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare_cached(&sql).map_err(|e| e.to_string())?;
     let items = stmt
         .query_map(params![value, limit], |row| {
             Ok(json!({
@@ -282,7 +282,7 @@ fn query_artifact(conn: &Connection, params_json: &str) -> Result<String, String
     let artifact_id =
         parse_opt_string(params_json, "artifact_id").ok_or_else(|| "artifact_id required".to_string())?;
     let mut stmt = conn
-        .prepare(
+        .prepare_cached(
             "SELECT id,flow_run_id,task_run_id,artifact_type,key,summary,created_at FROM artifacts WHERE id = ?1 LIMIT 1",
         )
         .map_err(|e| e.to_string())?;
