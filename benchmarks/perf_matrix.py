@@ -43,6 +43,8 @@ class WorkloadRecipe:
     # (including transition hooks) instead of raw control-plane calls. ``flow_count`` is
     # timed iterations per sample; ``tasks_per_flow`` is warmup iterations before the timer.
     decorator_hook_profile: str | None = None
+    # When set, run ``@flow`` with ``ThreadPoolTaskRunner`` map workloads (``tasks_per_flow`` = map width).
+    decorator_map_width: int | None = None
     # Concurrent reader threads in mixed recipes (writers always use one thread).
     mixed_reader_count: int = 1
     # Exercise FSM batch APIs (task_pending/running/completed) instead of heartbeat events.
@@ -272,6 +274,28 @@ def _recipe_catalog() -> dict[str, WorkloadRecipe]:
             sqlite_enabled=True,
             decorator_hook_profile="both",
         ),
+        "micro_map_threadpool_narrow": WorkloadRecipe(
+            name="micro_map_threadpool_narrow",
+            flow_count=20,
+            tasks_per_flow=2,
+            task_events_per_task=0,
+            read_ratio=0.0,
+            mixed=False,
+            cold_start=True,
+            sqlite_enabled=True,
+            decorator_map_width=10,
+        ),
+        "micro_map_threadpool_wide": WorkloadRecipe(
+            name="micro_map_threadpool_wide",
+            flow_count=10,
+            tasks_per_flow=1,
+            task_events_per_task=0,
+            read_ratio=0.0,
+            mixed=False,
+            cold_start=True,
+            sqlite_enabled=True,
+            decorator_map_width=100,
+        ),
     }
 
 
@@ -292,11 +316,19 @@ def _presets() -> dict[str, list[str]]:
             "micro_decorator_hooks_task_noop",
             "micro_decorator_hooks_both_noop",
         ],
+        "flow_map": [
+            "micro_map_threadpool_narrow",
+            "micro_map_threadpool_wide",
+        ],
         "concurrency": [
             "medium_narrow_fsm_batch_warm",
             "medium_narrow_heavy_mixed_2readers_warm",
         ],
-        "full": [k for k in _recipe_catalog().keys() if not k.startswith("micro_decorator_hooks_")],
+        "full": [
+            k
+            for k in _recipe_catalog().keys()
+            if not k.startswith("micro_decorator_hooks_") and not k.startswith("micro_map_")
+        ],
     }
 
 
@@ -560,6 +592,123 @@ def _run_decorator_hook_micro_iteration(
     )
 
 
+def _run_decorator_map_micro_iteration(
+    recipe: WorkloadRecipe,
+    seed: int,
+    warmup: bool,
+) -> RecipeRunSample:
+    """Benchmark ``@flow`` with ``ThreadPoolTaskRunner`` map (flow plane hot path)."""
+    rng = random.Random(seed)
+    _ = rng
+    iterations = max(1, int(recipe.flow_count))
+    warmup_iters = max(0, int(recipe.tasks_per_flow))
+    map_width = max(1, int(recipe.decorator_map_width or 1))
+    if warmup:
+        iterations = max(2, iterations // 4)
+        warmup_iters = max(1, warmup_iters // 2)
+
+    latencies: dict[str, list[float]] = {}
+    notes: list[str] = [f"decorator_map_micro width={map_width}"]
+
+    with tempfile.TemporaryDirectory(prefix="perf-matrix-map-") as td:
+        history_path = Path(td) / "history.jsonl"
+        db_path = history_path.with_suffix(".db")
+        if not recipe.sqlite_enabled:
+            history_path = None
+            db_path = Path(td) / "unused.db"
+
+        plane = InMemoryControlPlane(history_path=str(history_path) if history_path else None)
+        sqlite_before = float(db_path.stat().st_size) if db_path.exists() else 0.0
+        wal_path = db_path.with_suffix(".db-wal")
+        wal_before = float(wal_path.stat().st_size) if wal_path.exists() else 0.0
+        before_proc = _process_snapshot()
+
+        from prefect_compat import flow, set_control_plane, task, wait
+        from prefect_compat.task_runners import ThreadPoolTaskRunner
+
+        set_control_plane(plane)
+
+        @task
+        def inc(x: int) -> int:
+            return x + 1
+
+        @task
+        def dbl(x: int) -> int:
+            return x * 2
+
+        @flow(task_runner=ThreadPoolTaskRunner())
+        def sample() -> int:
+            first = inc.submit(map_width)
+            mapped_futs = dbl.map(range(map_width), wait_for=[first])
+            wait(mapped_futs)
+            return sum(f.result() for f in mapped_futs)
+
+        for _ in range(warmup_iters):
+            _timed_call(latencies, "decorator_map_micro.warmup_invocation", sample)
+
+        wall_start = time.perf_counter()
+        per_ms: list[float] = []
+        for _ in range(iterations):
+            t0 = time.perf_counter()
+            sample()
+            per_ms.append((time.perf_counter() - t0) * 1000.0)
+        wall_seconds = time.perf_counter() - wall_start
+
+        after_proc = _process_snapshot()
+        sqlite_after = float(db_path.stat().st_size) if db_path.exists() else sqlite_before
+        wal_after = float(wal_path.stat().st_size) if wal_path.exists() else wal_before
+
+        tasks_per_flow = map_width + 1
+        counts = {
+            "flows_created": iterations,
+            "tasks_created": iterations * tasks_per_flow,
+            "flow_transitions": 0,
+            "task_events_recorded": 0,
+            "read_queries": 0,
+        }
+        throughput = {
+            "flows_per_sec": iterations / wall_seconds if wall_seconds else 0.0,
+            "tasks_per_sec": (iterations * tasks_per_flow) / wall_seconds if wall_seconds else 0.0,
+            "transitions_per_sec": 0.0,
+            "task_events_per_sec": 0.0,
+        }
+        latency_ms = {"decorator_map_micro.invocation_ms": _latency_stats_ms(per_ms)}
+        process = {
+            "cpu_seconds_used": max(0.0, after_proc.cpu_seconds - before_proc.cpu_seconds),
+            "rss_bytes_start": float(before_proc.rss_bytes),
+            "rss_bytes_end": float(after_proc.rss_bytes),
+            "rss_bytes_delta": float(after_proc.rss_bytes - before_proc.rss_bytes),
+        }
+        sqlite: dict[str, float] = {
+            "db_bytes_before": sqlite_before,
+            "db_bytes_after": sqlite_after,
+            "db_bytes_growth": max(0.0, sqlite_after - sqlite_before),
+            "wal_bytes_before": wal_before,
+            "wal_bytes_after": wal_after,
+            "wal_bytes_growth": max(0.0, wal_after - wal_before),
+            "bytes_per_write_op": 0.0,
+        }
+        if notes:
+            sqlite["notes"] = float(len(notes))
+
+        events = len(plane.events())
+        _ = events
+        _close_plane_footprint(plane)
+
+    return RecipeRunSample(
+        recipe=recipe.name,
+        iteration=0,
+        warmup=warmup,
+        seed=seed,
+        wall_clock_seconds=wall_seconds,
+        counts=counts,
+        throughput=throughput,
+        latency_ms=latency_ms,
+        process=process,
+        sqlite=sqlite,
+    )
+
+
 def _measure_read_queries(
     plane: InMemoryControlPlane,
     flow_ids: list[Any],
@@ -700,6 +849,8 @@ def _run_recipe_iteration(
 ) -> RecipeRunSample:
     if recipe.decorator_hook_profile is not None:
         return _run_decorator_hook_micro_iteration(recipe, seed, warmup)
+    if recipe.decorator_map_width is not None:
+        return _run_decorator_map_micro_iteration(recipe, seed, warmup)
 
     rng = random.Random(seed)
     latencies: dict[str, list[float]] = {}

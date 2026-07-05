@@ -23,6 +23,7 @@ Fast local loop:
 Transition-hook microbench (same `perf_matrix` harness; exercises real `@flow` / `@task` shim path with optional no-op hooks on flow, task, or both):
 
 - `python benchmarks/perf_matrix.py run --preset hook_micro --repetitions 3 --warmups 1 --jobs 1`
+- `python benchmarks/perf_matrix.py run --preset flow_map --repetitions 3 --warmups 1 --jobs 1`
 
 Concurrency / FSM batch regression gate (FSM batch transitions + multi-reader mixed workload):
 
@@ -67,6 +68,7 @@ For each recipe/iteration, the runner records:
     - `query.list_events`
     - `query.get_flow_run_detail`
   - for `micro_decorator_hooks_*` recipes: `decorator_hook_micro.invocation_ms` (per `@flow` invocation, including `@task.submit` work)
+  - for `micro_map_*` recipes: `decorator_map_micro.invocation_ms` (per `@flow` with `ThreadPoolTaskRunner` map)
 - process-level CPU and RSS memory
   - `process.cpu_seconds_used`
   - `process.rss_bytes_start/end/delta`
@@ -166,7 +168,8 @@ Agents and contributors must preserve this contract when touching `runtime.py` o
 ### Task runners vs control plane
 
 - `ThreadPoolTaskRunner` / `ProcessPoolTaskRunner` parallelize **user task bodies** in `map()` / `submit()`.
-- Every `submit()` still records transitions through the serialized control plane. Do not expect task-runner threads to speed up transition-heavy benchmarks.
+- `map()` registers task runs on the caller thread, runs bodies in the runner pool, then records completions — control-plane mutations are not contended across worker threads.
+- Every `submit()` still records transitions through the serialized control plane. Do not expect task-runner threads to speed up transition-heavy benchmarks unless the workload is dominated by user Python in `map()`.
 
 ### Batch APIs
 
