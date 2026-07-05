@@ -77,7 +77,6 @@ class DeploymentRecord:
 class InMemoryControlPlane:
     _FLOW_BATCH_MIN_SIZE = 2
     _TASK_BATCH_MIN_SIZE = 2
-
     """
     Python MVP control plane with the same transition semantics as the Rust engine.
     This is used by the shim and can be swapped for an HTTP Rust facade.
@@ -108,6 +107,7 @@ class InMemoryControlPlane:
         self._rust_fsm_handle = 0
         self._rust_native_persistence = True
         self._rust_db_bound = False
+        self._history_file: Any = None
         if RustQueryBridge is not None:
             try:
                 self._rust_bridge = RustQueryBridge()
@@ -158,6 +158,10 @@ class InMemoryControlPlane:
             return conn
 
     def __del__(self) -> None:
+        try:
+            self._flush_jsonl_buffer()
+        except Exception:
+            pass
         bridge = getattr(self, "_rust_fsm_bridge", None)
         handle = getattr(self, "_rust_fsm_handle", 0)
         if bridge is not None and handle:
@@ -2098,9 +2102,21 @@ class InMemoryControlPlane:
     def _persist_record(self, record: dict[str, Any]) -> None:
         if self._history_path is None:
             return
-        with self._history_path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(record))
-            f.write("\n")
+        if self._history_file is None:
+            self._history_path.parent.mkdir(parents=True, exist_ok=True)
+            self._history_file = self._history_path.open("a", encoding="utf-8")
+        self._history_file.write(json.dumps(record))
+        self._history_file.write("\n")
+        self._history_file.flush()
+
+    def _flush_jsonl_buffer(self) -> None:
+        if self._history_file is None:
+            return
+        try:
+            self._history_file.flush()
+            self._history_file.close()
+        finally:
+            self._history_file = None
 
     def _load_from_history(self) -> None:
         if self._history_path is None or not self._history_path.exists():
