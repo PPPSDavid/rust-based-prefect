@@ -225,9 +225,6 @@ jobs:
   frontend-e2e:
     name: Frontend Playwright E2E
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -243,8 +240,10 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-ci.txt
       - name: Install frontend and Playwright
+        working-directory: frontend
         run: |
           npm ci
           npx playwright install --with-deps chromium
       - name: Run Playwright E2E
+        working-directory: frontend
         run: npm run test:e2e
