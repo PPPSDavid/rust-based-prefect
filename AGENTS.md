@@ -221,3 +221,35 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 2. Use `detect_changes` for code review.
 3. Use `get_affected_flows` to understand impact.
 4. Use `query_graph` pattern="tests_for" to check coverage.
+
+## Cursor Cloud specific instructions
+
+The startup update script already refreshes all dependencies: it installs Python deps
+(`python3 -m pip install --break-system-packages -r requirements-ci.txt`, into the user
+site), runs `npm --prefix frontend ci`, and runs `cargo build --manifest-path rust-engine/Cargo.toml`
+so the native `libironflow_engine.so` is present. You should not need to reinstall anything
+to run tests or the app. Standard commands live in `README.md` (Quickstart) and **Expected Validation** above.
+
+Non-obvious caveats for this environment:
+
+- **`python` maps to `python3`** via a `/usr/local/bin/python` symlink, and there is no conda.
+  Docs use `python`; either works. `pip` targets the system interpreter with `--break-system-packages`
+  (PEP 668), and console scripts land in `~/.local/bin` (not on `PATH`) — invoke tools as modules,
+  e.g. `python -m pytest`, `python -m uvicorn`, `python -m ruff`.
+- **Vite dev server binds to IPv6 `localhost` (`::1`) only.** Open the UI at `http://localhost:4173`,
+  **not** `http://127.0.0.1:4173` (the latter refuses the connection). The backend API is at
+  `http://127.0.0.1:8000` and the frontend hardcodes that origin (`frontend/src/api.ts`); backend CORS
+  only allows the `4173` origins, so run both together.
+- **Running the stack:** start the backend with
+  `python -m uvicorn python-shim.src.prefect_compat.server:app --host 127.0.0.1 --port 8000`
+  and the UI with `npm --prefix frontend run dev` (or both via `python scripts/ironflow_server.py start`).
+  Seed demo runs for the UI with `python scripts/ui_e2e_seed.py` (needs the backend up). The local
+  worker + scheduler run as daemon threads inside the API process (toggle via `IRONFLOW_ENABLE_LOCAL_WORKER`
+  / `IRONFLOW_ENABLE_SCHEDULER`).
+- **Lint is not a CI gate:** `ruff` is installed but the repo has no ruff config and CI never runs it, so
+  `python -m ruff check .` reports pre-existing default-rule style findings — do not treat those as failures
+  or "fix" them as part of unrelated work.
+- **Persistence is local files** under `data/` (JSONL history + a stdlib-SQLite read model); there is no
+  external database/broker to start. `data/` is git-ignored, but `benchmarks/perf_matrix.py run` overwrites
+  tracked `docs/perf_matrix_results.json` / `docs/perf_matrix_summary.md` — revert those unless a benchmark
+  change is intended.
