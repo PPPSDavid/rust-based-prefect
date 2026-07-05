@@ -1,18 +1,35 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
-import { useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api";
+import { ActionButton } from "../components/ActionButton";
+import { PageHeader } from "../components/PageHeader";
 import { RunDagPanel } from "../components/RunDagPanel";
+import { StateBadge } from "../components/StateBadge";
+import { TabBar } from "../components/TabBar";
 import { useSsePulse } from "../hooks/useSsePulse";
 import type { FlowRunDag } from "../types";
 
 type Tab = "tasks" | "logs" | "events" | "artifacts" | "dag";
 
+const TABS = [
+  { id: "tasks" as const, label: "Task Runs" },
+  { id: "logs" as const, label: "Logs" },
+  { id: "events" as const, label: "Events" },
+  { id: "artifacts" as const, label: "Artifacts" },
+  { id: "dag" as const, label: "DAG" }
+];
+
+const CANCELLABLE = new Set(["SCHEDULED", "PENDING", "RUNNING"]);
+const RETRYABLE = new Set(["FAILED", "CANCELLED"]);
+
 export function RunDetailPage() {
   const { id = "" } = useParams();
-  const [tab, setTab] = useState<Tab>("tasks");
+  const [searchParams] = useSearchParams();
+  const initialTab = (searchParams.get("tab") as Tab | null) ?? "tasks";
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [dagMode, setDagMode] = useState<"logical" | "expanded">("logical");
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const pulse = useSsePulse(useMemo(() => () => api.streamFlowRun(id), [id]));
 
@@ -20,26 +37,60 @@ export function RunDetailPage() {
     if (pulse > 0) {
       void queryClient.invalidateQueries({ queryKey: ["flow-run", id] });
       void queryClient.invalidateQueries({ queryKey: ["task-runs", id] });
-      void queryClient.invalidateQueries({ queryKey: ["logs", id] });
-      void queryClient.invalidateQueries({ queryKey: ["events", id] });
-      void queryClient.invalidateQueries({ queryKey: ["artifacts", id] });
-      void queryClient.invalidateQueries({ queryKey: ["dag", id, dagMode] });
+      if (tab === "logs") void queryClient.invalidateQueries({ queryKey: ["logs", id] });
+      if (tab === "events") void queryClient.invalidateQueries({ queryKey: ["events", id] });
+      if (tab === "artifacts") void queryClient.invalidateQueries({ queryKey: ["artifacts", id] });
+      if (tab === "dag") void queryClient.invalidateQueries({ queryKey: ["dag", id, dagMode] });
     }
-  }, [pulse, id, dagMode, queryClient]);
+  }, [pulse, id, dagMode, queryClient, tab]);
 
   const run = useQuery({ queryKey: ["flow-run", id], queryFn: () => api.getFlowRun(id), staleTime: 5_000 });
-  const tasks = useQuery({ queryKey: ["task-runs", id], queryFn: () => api.listTaskRuns(id), staleTime: 5_000 });
-  const logs = useQuery({ queryKey: ["logs", id], queryFn: () => api.listLogs(id), staleTime: 5_000 });
-  const events = useQuery({ queryKey: ["events", id], queryFn: () => api.listEvents(id), staleTime: 5_000 });
+  const tasks = useQuery({
+    queryKey: ["task-runs", id],
+    queryFn: () => api.listTaskRuns(id),
+    staleTime: 5_000,
+    enabled: tab === "tasks" || tab === "dag"
+  });
+  const logs = useQuery({
+    queryKey: ["logs", id],
+    queryFn: () => api.listLogs(id),
+    staleTime: 5_000,
+    enabled: tab === "logs"
+  });
+  const events = useQuery({
+    queryKey: ["events", id],
+    queryFn: () => api.listEvents(id),
+    staleTime: 5_000,
+    enabled: tab === "events"
+  });
   const artifacts = useQuery({
     queryKey: ["artifacts", id],
     queryFn: () => api.listFlowArtifacts(id),
-    staleTime: 5_000
+    staleTime: 5_000,
+    enabled: tab === "artifacts"
   });
   const dag = useQuery({
     queryKey: ["dag", id, dagMode],
     queryFn: () => api.getFlowRunDag(id, dagMode),
-    staleTime: 5_000
+    staleTime: 5_000,
+    enabled: tab === "dag"
+  });
+
+  const cancelRun = useMutation({
+    mutationFn: () => api.cancelFlowRun(id),
+    onSuccess: () => {
+      setActionMessage("Run cancelled.");
+      void queryClient.invalidateQueries({ queryKey: ["flow-run", id] });
+    },
+    onError: () => setActionMessage("Failed to cancel run.")
+  });
+  const retryRun = useMutation({
+    mutationFn: () => api.retryFlowRun(id),
+    onSuccess: () => {
+      setActionMessage("Retry scheduled from deployment.");
+      void queryClient.invalidateQueries({ queryKey: ["flow-runs"] });
+    },
+    onError: () => setActionMessage("Retry is only available for deployment-backed runs.")
   });
 
   useEffect(() => {
@@ -64,17 +115,39 @@ export function RunDetailPage() {
 
   return (
     <section>
-      <h2>{run.data.name}</h2>
+      <PageHeader
+        title={run.data.name}
+        subtitle={`Run ${run.data.id}`}
+        breadcrumbs={[
+          { label: "Flow Runs", to: "/runs" },
+          { label: run.data.name }
+        ]}
+        actions={
+          <>
+            {CANCELLABLE.has(run.data.state) ? (
+              <ActionButton variant="danger" disabled={cancelRun.isPending} onClick={() => cancelRun.mutate()}>
+                Cancel
+              </ActionButton>
+            ) : null}
+            {RETRYABLE.has(run.data.state) ? (
+              <ActionButton variant="primary" disabled={retryRun.isPending} onClick={() => retryRun.mutate()}>
+                Retry
+              </ActionButton>
+            ) : null}
+          </>
+        }
+      />
       <p>
-        <b>{run.data.state}</b> · version {run.data.version}
+        <StateBadge state={run.data.state} /> · version {run.data.version} · updated{" "}
+        {new Date(run.data.updated_at).toLocaleString()}
       </p>
-      <div className="tabs">
-        <button onClick={() => setTab("tasks")}>Task Runs</button>
-        <button onClick={() => setTab("logs")}>Logs</button>
-        <button onClick={() => setTab("events")}>Events</button>
-        <button onClick={() => setTab("artifacts")}>Artifacts</button>
-        <button onClick={() => setTab("dag")}>DAG</button>
-      </div>
+      {run.data.deployment_id ? (
+        <p>
+          Deployment: <Link to={`/deployments/${run.data.deployment_id}`}>{run.data.deployment_id.slice(0, 8)}</Link>
+        </p>
+      ) : null}
+      {actionMessage ? <p className="action-message">{actionMessage}</p> : null}
+      <TabBar tabs={TABS} activeTab={tab} onChange={setTab} />
       {tab === "tasks" && (
         <ul>
           {tasks.data?.items.map((task) => (
@@ -97,8 +170,7 @@ export function RunDetailPage() {
         <ul className="mono-list">
           {events.data?.items.map((event) => (
             <li key={event.event_id}>
-              {event.timestamp} {event.event_type ?? event.kind} {event.from_state ?? ""}{" "}
-              {event.to_state ?? ""}
+              {event.timestamp} {event.event_type ?? event.kind} {event.from_state ?? ""} {event.to_state ?? ""}
             </li>
           ))}
         </ul>
@@ -112,9 +184,7 @@ export function RunDetailPage() {
           ))}
         </ul>
       )}
-      {tab === "dag" && dag.data && (
-        <RunDagPanel dag={dag.data} mode={dagMode} onModeChange={setDagMode} />
-      )}
+      {tab === "dag" && dag.data && <RunDagPanel dag={dag.data} mode={dagMode} onModeChange={setDagMode} />}
       {tab === "dag" && dag.isLoading && <p>Loading DAG...</p>}
     </section>
   );

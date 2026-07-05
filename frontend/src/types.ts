@@ -10,6 +10,7 @@ export type FlowRun = {
   version: number;
   created_at: string;
   updated_at: string;
+  deployment_id?: string | null;
 };
 
 export type TaskRun = {
@@ -94,6 +95,7 @@ export type Deployment = {
   schedule_rrule?: string | null;
   schedule_next_run_at?: string | null;
   schedule_enabled?: boolean;
+  work_pool_id?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -113,4 +115,26 @@ export type DeploymentRun = {
   updated_at: string;
   started_at?: string | null;
   finished_at?: string | null;
+};
+
+export type FlowDetail = {
+  name: string;
+  tasks: Array<{ task_name: string; run_count: number; updated_at: string }>;
+};
+
+export type WorkPool = {
+  id: string;
+  name: string;
+  type: string;
+  paused: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Worker = {
+  name: string;
+  status: string;
+  last_heartbeat: string;
+  updated_at: string;
+  work_pool_id?: string | null;
 };

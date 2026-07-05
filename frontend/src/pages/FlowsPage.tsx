@@ -1,77 +1,34 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { api } from "../api";
+import { DataTable } from "../components/DataTable";
+import { PageHeader } from "../components/PageHeader";
 
 export function FlowsPage() {
-  const queryClient = useQueryClient();
   const flows = useQuery({ queryKey: ["flows"], queryFn: () => api.listFlows() });
-  const tasks = useQuery({ queryKey: ["tasks"], queryFn: () => api.listTasks() });
-  const deployments = useQuery({ queryKey: ["deployments"], queryFn: () => api.listDeployments() });
-  const trigger = useMutation({
-    mutationFn: (deploymentId: string) => api.triggerDeploymentRun(deploymentId),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["flow-runs"] });
-      void queryClient.invalidateQueries({ queryKey: ["deployments"] });
-    }
-  });
+
+  if (flows.isLoading) return <p>Loading flows...</p>;
 
   return (
     <section>
-      <h2>Flows</h2>
-      <div className="split">
-        <div>
-          <h3>Flow Catalog</h3>
-          <ul>
-            {flows.data?.items.map((flow) => (
-              <li key={flow.name}>
-                {flow.name} ({flow.run_count})
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div>
-          <h3>Task Catalog</h3>
-          <ul>
-            {tasks.data?.map((task) => (
-              <li key={task.task_name}>
-                {task.task_name} ({task.run_count})
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div>
-          <h3>Deployments</h3>
-          <ul>
-            {deployments.data?.items.map((deployment) => (
-              <li key={deployment.id}>
-                {deployment.name} [{deployment.flow_name}]
-                {deployment.schedule_enabled ? (
-                  <span style={{ opacity: 0.85 }}>
-                    {" "}
-                    — schedule:{" "}
-                    {deployment.schedule_cron && deployment.schedule_cron.trim() !== ""
-                      ? `cron ${deployment.schedule_cron}`
-                      : deployment.schedule_rrule && deployment.schedule_rrule.trim() !== ""
-                        ? `rrule ${deployment.schedule_rrule}`
-                      : deployment.schedule_interval_seconds != null
-                        ? `every ${deployment.schedule_interval_seconds}s`
-                        : "on"}
-                    {deployment.schedule_next_run_at != null && deployment.schedule_next_run_at !== ""
-                      ? `, next ${deployment.schedule_next_run_at}`
-                      : ""}
-                  </span>
-                ) : null}
-                {" "}
-                <button
-                  onClick={() => trigger.mutate(deployment.id)}
-                  disabled={deployment.paused || trigger.isPending}
-                >
-                  Run now
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
+      <PageHeader title="Flows" subtitle="Registered flow definitions." />
+      <DataTable
+        columns={[
+          {
+            key: "name",
+            header: "Flow",
+            render: (flow) => <Link to={`/flows/${encodeURIComponent(flow.name)}`}>{flow.name}</Link>
+          },
+          { key: "runs", header: "Runs", render: (flow) => flow.run_count },
+          {
+            key: "updated",
+            header: "Last activity",
+            render: (flow) => new Date(flow.updated_at).toLocaleString()
+          }
+        ]}
+        rows={flows.data?.items ?? []}
+        rowKey={(flow) => flow.name}
+      />
     </section>
   );
 }

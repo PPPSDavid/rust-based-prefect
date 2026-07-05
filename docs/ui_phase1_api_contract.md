@@ -103,6 +103,14 @@ List logs for a flow run (optionally scoped to a task run).
 - `GET /api/stream/flow-runs`
 - `GET /api/stream/flow-runs/{flow_run_id}`
 
+## Phase 5 mutation endpoints (UI actions)
+
+- `POST /api/flow-runs/{flow_run_id}/cancel` — user-initiated cancel (idempotent for terminal states)
+- `POST /api/flow-runs/{flow_run_id}/retry` — re-trigger deployment run when flow run is deployment-backed (`409` otherwise)
+- `GET /api/deployments/{deployment_id}`
+- `GET /api/work-pools`, `POST /api/work-pools`, `PATCH /api/work-pools/{id}`
+- `GET /api/workers`, `POST /api/workers/heartbeat`
+
 ## Performance Targets (Balanced Profile)
 
 - `GET /api/flow-runs` p95 <= `120ms`

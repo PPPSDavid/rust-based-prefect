@@ -56,6 +56,21 @@ class DeploymentPatchRequest(BaseModel):
     schedule_rrule: str | None = None
     schedule_next_run_at: str | None = None
     schedule_enabled: bool | None = None
+    work_pool_id: str | None = None
+
+
+class WorkPoolCreateRequest(BaseModel):
+    name: str
+    type: str = "process"
+
+
+class WorkPoolPatchRequest(BaseModel):
+    paused: bool | None = None
+
+
+class WorkerHeartbeatRequest(BaseModel):
+    name: str
+    work_pool_id: str | None = None
 
 
 class DeploymentRunTriggerRequest(BaseModel):
@@ -76,6 +91,7 @@ _scheduler_stop_event = threading.Event()
 _scheduler_thread: threading.Thread | None = None
 _rust_scheduler_started = False
 LOCAL_WORKER_NAME = os.getenv("IRONFLOW_LOCAL_WORKER_NAME", "local-worker-1")
+LOCAL_WORK_POOL = os.getenv("IRONFLOW_WORK_POOL", "default-process-pool")
 
 app = FastAPI(title="IronFlow Compat Server")
 app.add_middleware(
@@ -226,7 +242,9 @@ def _execute_claimed_deployment_run(claimed: dict) -> None:
 
 def _run_local_deployment_once(worker_name: str | None = None) -> bool:
     wn = worker_name or LOCAL_WORKER_NAME
-    claimed = control_plane.claim_next_deployment_run(worker_name=wn, lease_seconds=30)
+    claimed = control_plane.claim_next_deployment_run(
+        worker_name=wn, lease_seconds=30, work_pool_id=LOCAL_WORK_POOL
+    )
     if not claimed:
         return False
     _execute_claimed_deployment_run(claimed)
@@ -260,7 +278,7 @@ def _local_worker_loop_rust_wait() -> None:
                 pass
             _worker_last_heartbeat = now_m
         claimed = control_plane.claim_next_deployment_run_wait(
-            worker_name=LOCAL_WORKER_NAME, lease_seconds=30, wait_ms=500
+            worker_name=LOCAL_WORKER_NAME, lease_seconds=30, wait_ms=500, work_pool_id=LOCAL_WORK_POOL
         )
         if not claimed:
             continue
@@ -468,6 +486,97 @@ def list_deployment_runs(
 ) -> CursorPage:
     page = control_plane.list_deployment_runs(deployment_id=deployment_id, limit=limit, cursor=cursor)
     return CursorPage(items=page.items, next_cursor=page.next_cursor)
+
+
+@app.get("/api/deployments/{deployment_id}")
+def get_deployment(deployment_id: UUID) -> dict:
+    deployment = control_plane.get_deployment(deployment_id)
+    if deployment is None:
+        raise HTTPException(status_code=404, detail="Deployment not found")
+    return deployment
+
+
+@app.post("/api/flow-runs/{flow_run_id}/cancel")
+def cancel_flow_run(flow_run_id: UUID) -> dict:
+    try:
+        return control_plane.cancel_flow_run(flow_run_id)
+    except ValueError as exc:
+        detail = str(exc)
+        status_code = 404 if "not found" in detail else 400
+        raise HTTPException(status_code=status_code, detail=detail) from exc
+
+
+@app.post("/api/flow-runs/{flow_run_id}/retry")
+def retry_flow_run(flow_run_id: UUID) -> dict:
+    try:
+        return control_plane.retry_flow_run(flow_run_id)
+    except ValueError as exc:
+        detail = str(exc)
+        if "not deployment-backed" in detail:
+            raise HTTPException(status_code=409, detail=detail) from exc
+        status_code = 404 if "not found" in detail else 400
+        raise HTTPException(status_code=status_code, detail=detail) from exc
+
+
+@app.get("/api/work-pools", response_model=CursorPage)
+def list_work_pools(
+    limit: int = Query(default=50, ge=1, le=500),
+    cursor: str | None = Query(default=None),
+) -> CursorPage:
+    page = control_plane.list_work_pools(limit=limit, cursor=cursor)
+    return CursorPage(items=page.items, next_cursor=page.next_cursor)
+
+
+@app.post("/api/work-pools")
+def create_work_pool(req: WorkPoolCreateRequest) -> dict:
+    try:
+        return control_plane.create_work_pool(name=req.name, pool_type=req.type)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/work-pools/{work_pool_id}")
+def get_work_pool(work_pool_id: str) -> dict:
+    pool = control_plane.get_work_pool(work_pool_id)
+    if pool is None:
+        raise HTTPException(status_code=404, detail="Work pool not found")
+    return pool
+
+
+@app.patch("/api/work-pools/{work_pool_id}")
+def patch_work_pool(work_pool_id: str, req: WorkPoolPatchRequest) -> dict:
+    try:
+        return control_plane.patch_work_pool(work_pool_id, req.model_dump(exclude_unset=True))
+    except ValueError as exc:
+        detail = str(exc)
+        status_code = 404 if "not found" in detail else 400
+        raise HTTPException(status_code=status_code, detail=detail) from exc
+
+
+@app.get("/api/workers", response_model=CursorPage)
+def list_workers(
+    work_pool_id: str | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
+    cursor: str | None = Query(default=None),
+) -> CursorPage:
+    page = control_plane.list_workers(work_pool_id=work_pool_id, limit=limit, cursor=cursor)
+    return CursorPage(items=page.items, next_cursor=page.next_cursor)
+
+
+@app.post("/api/workers/heartbeat")
+def worker_heartbeat(req: WorkerHeartbeatRequest) -> dict:
+    control_plane.worker_heartbeat(req.name, work_pool_id=req.work_pool_id)
+    page = control_plane.list_workers(limit=500)
+    for item in page.items:
+        if item["name"] == req.name:
+            return item
+    rows = control_plane._query_rows(
+        "SELECT name, last_heartbeat, status, updated_at, work_pool_id FROM workers WHERE name = ? LIMIT 1",
+        [req.name],
+    )
+    if not rows:
+        raise HTTPException(status_code=500, detail="worker heartbeat failed")
+    return control_plane._worker_row_to_dict(rows[0])
 
 
 @app.post("/api/deployments/{deployment_id}/run")

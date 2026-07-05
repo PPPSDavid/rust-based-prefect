@@ -23,9 +23,20 @@ Optional custom seed volume:
 
 Open `http://localhost:4173/runs` and verify:
 
-- Runs table shows recent runs
+- Top navigation shows **Flow Runs**, **Flows**, **Deployments**, and **Work Pools**
+- Runs table shows recent runs with state filter chips
 - State badges are visible (`COMPLETED` expected for benchmark runs)
-- Clicking a run opens run detail page
+- Clicking a run opens run detail page with Cancel/Retry actions when applicable
+
+### Deployments
+
+- `/deployments` lists deployments with Quick Run
+- Deployment detail shows schedule, parameters, and recent deployment runs
+
+### Work Pools
+
+- `/work-pools` shows `default-process-pool`
+- Pool detail lists workers (local worker should appear as `ONLINE` when server worker is enabled)
 
 Inside run detail verify tabs:
 
