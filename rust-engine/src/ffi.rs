@@ -62,9 +62,21 @@ struct EngineContext {
     db_conn: Option<Connection>,
 }
 
-fn engines() -> &'static Mutex<HashMap<u64, EngineContext>> {
-    static CELL: OnceLock<Mutex<HashMap<u64, EngineContext>>> = OnceLock::new();
+fn engines() -> &'static Mutex<HashMap<u64, Arc<Mutex<EngineContext>>>> {
+    static CELL: OnceLock<Mutex<HashMap<u64, Arc<Mutex<EngineContext>>>>> = OnceLock::new();
     CELL.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn engine_context(handle: u64) -> Result<Arc<Mutex<EngineContext>>, String> {
+    if handle == 0 {
+        return Err("invalid engine handle 0".to_string());
+    }
+    let map = engines()
+        .lock()
+        .map_err(|_| "engine map poisoned".to_string())?;
+    map.get(&handle)
+        .cloned()
+        .ok_or_else(|| format!("unknown engine handle {handle}"))
 }
 
 struct DeploymentSchedulerHandle {
@@ -719,14 +731,15 @@ fn opt_str_from_field(body: &Value, key: &str) -> Option<String> {
 #[no_mangle]
 pub extern "C" fn ironflow_engine_new() -> u64 {
     let h = NEXT_ENGINE_HANDLE.fetch_add(1, Ordering::Relaxed);
-    engines().lock().expect("engine map poisoned").insert(
-        h,
-        EngineContext {
-            engine: Engine::new(),
-            db_path: None,
-            db_conn: None,
-        },
-    );
+    let ctx = Arc::new(Mutex::new(EngineContext {
+        engine: Engine::new(),
+        db_path: None,
+        db_conn: None,
+    }));
+    engines()
+        .lock()
+        .expect("engine map poisoned")
+        .insert(h, ctx);
     h
 }
 
@@ -760,11 +773,10 @@ pub extern "C" fn ironflow_deployment_scheduler_start(
             if stop_t.load(Ordering::SeqCst) {
                 break;
             }
-            let mut map = match engines().lock() {
-                Ok(m) => m,
-                Err(_) => break,
+            let Ok(ctx_arc) = engine_context(handle) else {
+                break;
             };
-            let Some(ctx) = map.get_mut(&handle) else {
+            let Ok(ctx) = ctx_arc.lock() else {
                 break;
             };
             let Some(conn) = ctx.db_conn.as_ref() else {
@@ -799,9 +811,6 @@ pub extern "C" fn ironflow_control(
     json_in: *const c_char,
 ) -> *mut c_char {
     let result = (|| -> Result<String, String> {
-        if handle == 0 {
-            return Err("invalid engine handle 0".to_string());
-        }
         let op = cstr_to_string(op)?;
         let json_in = cstr_to_string(json_in)?;
         let body: Value = if json_in.trim().is_empty() {
@@ -809,11 +818,11 @@ pub extern "C" fn ironflow_control(
         } else {
             serde_json::from_str(&json_in).map_err(|e| e.to_string())?
         };
-        let mut map = engines().lock().map_err(|_| "engine map poisoned".to_string())?;
-        let engine = map
-            .get_mut(&handle)
-            .ok_or_else(|| format!("unknown engine handle {handle}"))?;
-        match dispatch_control(engine, &op, &body) {
+        let ctx_arc = engine_context(handle)?;
+        let mut ctx = ctx_arc
+            .lock()
+            .map_err(|_| "engine context poisoned".to_string())?;
+        match dispatch_control(&mut ctx, &op, &body) {
             Ok(v) => Ok(v.to_string()),
             Err(e) => Ok(json!({"ok": false, "error": {"code": "dispatch", "message": e}}).to_string()),
         }

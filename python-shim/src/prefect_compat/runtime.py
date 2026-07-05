@@ -75,12 +75,15 @@ class DeploymentRecord:
 
 
 class InMemoryControlPlane:
-    _FLOW_BATCH_MIN_SIZE = 3
-    _TASK_BATCH_MIN_SIZE = 3
+    _FLOW_BATCH_MIN_SIZE = 2
+    _TASK_BATCH_MIN_SIZE = 2
 
     """
     Python MVP control plane with the same transition semantics as the Rust engine.
     This is used by the shim and can be swapped for an HTTP Rust facade.
+
+    Concurrency: writes are serialized under ``_lock``; Rust-backed list/detail queries
+    bypass the lock and use WAL SQLite readers (see ``docs/perf_methodology.md``).
     """
 
     def __init__(self, history_path: str | None = None) -> None:
