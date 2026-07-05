@@ -13,8 +13,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from starlette.responses import StreamingResponse
 
-from .decorators import flow, set_control_plane, task, wait
-from .runtime import InMemoryControlPlane
+from .cancellation import FlowRunCancelled
+from .decorators import _ACTIVE_DEPLOYMENT_RUN, flow, set_control_plane, task, wait
+from .runtime import InMemoryControlPlane, RunState
 from .task_runners import ThreadPoolTaskRunner
 
 
@@ -173,6 +174,22 @@ def long_chain_flow(n: int) -> int:
     return f.result()
 
 
+@task
+def sleep_seconds(seconds: float) -> None:
+    from .cancellation import sleep_cancelable
+
+    sleep_cancelable(seconds)
+
+
+@flow
+def cancelable_flow(n: int, sleep_duration: float = 10.0) -> int:
+    """Multi-task flow for cancel/retry UI tests: fast task, long sleep, downstream task."""
+    first = inc.submit(n)
+    slept = sleep_seconds.submit(sleep_duration, wait_for=[first])
+    second = dbl.submit(first, wait_for=[slept])
+    return second.result()
+
+
 @flow
 def failing_flow(n: int) -> int:
     first = inc.submit(n)
@@ -189,6 +206,7 @@ FLOW_REGISTRY = {
     "mapped_flow": mapped_flow,
     "chained_flow": chained_flow,
     "failing_flow": failing_flow,
+    "cancelable_flow": cancelable_flow,
 }
 
 
@@ -219,6 +237,7 @@ def _execute_claimed_deployment_run(claimed: dict) -> None:
 
     control_plane.mark_deployment_run_started(UUID(claimed["id"]))
     flow_run_id: UUID | None = None
+    dep_token = _ACTIVE_DEPLOYMENT_RUN.set(UUID(claimed["id"]))
     try:
         flow_fn = _resolve_flow_callable(deployment["flow_name"], deployment.get("entrypoint"))
         params = claimed.get("resolved_parameters", {}) or {}
@@ -226,9 +245,25 @@ def _execute_claimed_deployment_run(claimed: dict) -> None:
         latest = control_plane.latest_flow()
         if latest is not None:
             flow_run_id = latest.run_id
+            if control_plane.get_flow(flow_run_id).state == RunState.CANCELLED:
+                control_plane.mark_deployment_run_finished(
+                    deployment_run_id=UUID(claimed["id"]),
+                    status="CANCELLED",
+                    flow_run_id=flow_run_id,
+                )
+                return
         control_plane.mark_deployment_run_finished(
             deployment_run_id=UUID(claimed["id"]),
             status="COMPLETED",
+            flow_run_id=flow_run_id,
+        )
+    except FlowRunCancelled:
+        latest = control_plane.latest_flow()
+        if latest is not None:
+            flow_run_id = latest.run_id
+        control_plane.mark_deployment_run_finished(
+            deployment_run_id=UUID(claimed["id"]),
+            status="CANCELLED",
             flow_run_id=flow_run_id,
         )
     except Exception as exc:
@@ -238,6 +273,8 @@ def _execute_claimed_deployment_run(claimed: dict) -> None:
             flow_run_id=flow_run_id,
             error=str(exc),
         )
+    finally:
+        _ACTIVE_DEPLOYMENT_RUN.reset(dep_token)
 
 
 def _run_local_deployment_once(worker_name: str | None = None) -> bool:

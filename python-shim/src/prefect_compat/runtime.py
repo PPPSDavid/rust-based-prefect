@@ -1997,6 +1997,18 @@ class InMemoryControlPlane:
                 [now, now, str(deployment_run_id)],
             )
 
+    def attach_flow_run_to_deployment_run(self, deployment_run_id: UUID, flow_run_id: UUID) -> None:
+        now = self._now()
+        with self._lock:
+            self._sqlite_conn.execute(
+                """
+                UPDATE deployment_runs
+                SET flow_run_id = ?, updated_at = ?
+                WHERE id = ? AND (flow_run_id IS NULL OR flow_run_id = ?)
+                """,
+                [str(flow_run_id), now, str(deployment_run_id), str(flow_run_id)],
+            )
+
     def mark_deployment_run_finished(
         self, deployment_run_id: UUID, status: str, flow_run_id: UUID | None = None, error: str | None = None
     ) -> None:
