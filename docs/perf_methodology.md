@@ -24,6 +24,10 @@ Transition-hook microbench (same `perf_matrix` harness; exercises real `@flow` /
 
 - `python benchmarks/perf_matrix.py run --preset hook_micro --repetitions 3 --warmups 1 --jobs 1`
 
+Concurrency / FSM batch regression gate (FSM batch transitions + multi-reader mixed workload):
+
+- `python benchmarks/perf_matrix.py run --preset concurrency --repetitions 2 --warmups 1 --jobs 1`
+
 ## Workload Dimensions
 
 The recipe catalog spans:
@@ -32,11 +36,12 @@ The recipe catalog spans:
 - `tasks_per_flow` (narrow/wide)
 - transition density (`task_events_per_task`: few/heavy)
 - read-heavy vs write-heavy (`read_ratio`)
-- mixed workload (`mixed=True`: concurrent read + write)
+- mixed workload (`mixed=True`: concurrent read + write; optional `mixed_reader_count` for N reader threads)
+- FSM batch path (`fsm_task_lifecycle=True`: `record_task_events_batch` with pending/running/completed instead of heartbeat events)
 - cold start vs warm run (`cold_start`)
 - optional **decorator transition-hook microbench** (`decorator_hook_profile` on select recipes): `flow_count` is timed shim iterations; `tasks_per_flow` is warmup iterations before the timer; profiles `none` / `flow` / `task` / `both` compare baseline vs no-op hooks.
 
-Use defaults for consistency (`--preset lite`, `--preset pr`, `--preset hook_micro`, or `--preset full`) or override with:
+Use defaults for consistency (`--preset lite`, `--preset pr`, `--preset hook_micro`, `--preset concurrency`, or `--preset full`) or override with:
 
 - `--recipes small_narrow_few_write_cold,medium_wide_heavy_write_warm`
 - `--repetitions 5 --warmups 2 --seed 20260416`
@@ -140,6 +145,38 @@ When reviewing changes:
 - separate warmups from measured iterations
 - medians and tail percentiles over repeated runs
 - no unbounded background services in the core harness path
+
+## Concurrency and Locking (Read/Write Contract)
+
+IronFlow optimizes **read throughput** without sacrificing **single-writer determinism** on the FSM.
+Agents and contributors must preserve this contract when touching `runtime.py` or the Rust FFI.
+
+### Write path (must stay serialized per control plane)
+
+- `InMemoryControlPlane` holds an `RLock` (`_lock`) around all mutations: flow/task creation, state transitions, event append, and Python SQLite writes.
+- Rust FSM calls (`ironflow_control`) take a **per-handle** mutex. Different engine handles can dispatch in parallel; a single handle is still single-writer.
+- **Do not** remove the Python write lock or shard it by flow without an explicit determinism design — optimistic concurrency and transition tokens assume ordered application per plane.
+
+### Read path (intentionally concurrent)
+
+- List/detail query methods (`list_flow_runs`, `list_task_runs`, `list_events`, etc.) call `_query_rust()` **without** acquiring `_lock`.
+- `ironflow_query` uses a **thread-local SQLite connection pool** (one reused connection per thread per database path) under WAL mode.
+- Mixed `perf_matrix` recipes spawn one writer thread plus `mixed_reader_count` reader threads to regression-test this path.
+
+### Task runners vs control plane
+
+- `ThreadPoolTaskRunner` / `ProcessPoolTaskRunner` parallelize **user task bodies** in `map()` / `submit()`.
+- Every `submit()` still records transitions through the serialized control plane. Do not expect task-runner threads to speed up transition-heavy benchmarks.
+
+### Batch APIs
+
+- `set_flow_states_batch` and `record_task_events_batch` collapse multiple FSM transitions into one SQLite transaction (threshold: 2+ items).
+- `@flow` / `@task` decorators and the `concurrency` perf preset exercise these paths; heartbeat-only workloads do not.
+
+### Benchmark interpretation
+
+- `--jobs N` parallelizes **recipes across processes**, not operations inside a recipe.
+- Compare runs only when `metadata.matrix_compare_key` matches (e.g. `preset:concurrency` vs `preset:concurrency`).
 
 See example regression artifacts:
 

@@ -1,6 +1,8 @@
 use rusqlite::{params, Connection};
 use serde_json::{json, Value};
 
+use crate::ui_read_pool;
+
 fn parse_limit(params_json: &str, default_limit: i64) -> i64 {
     let parsed: Value = serde_json::from_str(params_json).unwrap_or_else(|_| json!({}));
     parsed
@@ -20,20 +22,19 @@ fn parse_opt_string(params_json: &str, key: &str) -> Option<String> {
 }
 
 pub fn query(db_path: &str, kind: &str, params_json: &str) -> Result<String, String> {
-    let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
-    match kind {
-        "flow_runs" => query_flow_runs(&conn, params_json),
-        "flow_run_detail" => query_flow_run_detail(&conn, params_json),
-        "task_runs" => query_task_runs(&conn, params_json),
-        "logs" => query_logs(&conn, params_json),
-        "flows" => query_flows(&conn, params_json),
-        "tasks" => query_tasks(&conn, params_json),
-        "events" => query_events(&conn, params_json),
-        "artifacts_flow" => query_artifacts_flow(&conn, params_json),
-        "artifacts_task" => query_artifacts_task(&conn, params_json),
-        "artifact" => query_artifact(&conn, params_json),
+    ui_read_pool::with_read_connection(db_path, |conn| match kind {
+        "flow_runs" => query_flow_runs(conn, params_json),
+        "flow_run_detail" => query_flow_run_detail(conn, params_json),
+        "task_runs" => query_task_runs(conn, params_json),
+        "logs" => query_logs(conn, params_json),
+        "flows" => query_flows(conn, params_json),
+        "tasks" => query_tasks(conn, params_json),
+        "events" => query_events(conn, params_json),
+        "artifacts_flow" => query_artifacts_flow(conn, params_json),
+        "artifacts_task" => query_artifacts_task(conn, params_json),
+        "artifact" => query_artifact(conn, params_json),
         _ => Err(format!("unknown query kind: {kind}")),
-    }
+    })
 }
 
 fn query_flow_runs(conn: &Connection, params_json: &str) -> Result<String, String> {

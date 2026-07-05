@@ -43,6 +43,10 @@ class WorkloadRecipe:
     # (including transition hooks) instead of raw control-plane calls. ``flow_count`` is
     # timed iterations per sample; ``tasks_per_flow`` is warmup iterations before the timer.
     decorator_hook_profile: str | None = None
+    # Concurrent reader threads in mixed recipes (writers always use one thread).
+    mixed_reader_count: int = 1
+    # Exercise FSM batch APIs (task_pending/running/completed) instead of heartbeat events.
+    fsm_task_lifecycle: bool = False
 
 
 @dataclass
@@ -191,6 +195,28 @@ def _recipe_catalog() -> dict[str, WorkloadRecipe]:
             cold_start=False,
             sqlite_enabled=True,
         ),
+        "medium_narrow_heavy_mixed_2readers_warm": WorkloadRecipe(
+            name="medium_narrow_heavy_mixed_2readers_warm",
+            flow_count=40,
+            tasks_per_flow=8,
+            task_events_per_task=5,
+            read_ratio=0.50,
+            mixed=True,
+            cold_start=False,
+            sqlite_enabled=True,
+            mixed_reader_count=2,
+        ),
+        "medium_narrow_fsm_batch_warm": WorkloadRecipe(
+            name="medium_narrow_fsm_batch_warm",
+            flow_count=40,
+            tasks_per_flow=8,
+            task_events_per_task=3,
+            read_ratio=0.20,
+            mixed=False,
+            cold_start=False,
+            sqlite_enabled=True,
+            fsm_task_lifecycle=True,
+        ),
         "small_wide_few_mixed_cold": WorkloadRecipe(
             name="small_wide_few_mixed_cold",
             flow_count=15,
@@ -265,6 +291,10 @@ def _presets() -> dict[str, list[str]]:
             "micro_decorator_hooks_flow_noop",
             "micro_decorator_hooks_task_noop",
             "micro_decorator_hooks_both_noop",
+        ],
+        "concurrency": [
+            "medium_narrow_fsm_batch_warm",
+            "medium_narrow_heavy_mixed_2readers_warm",
         ],
         "full": [k for k in _recipe_catalog().keys() if not k.startswith("micro_decorator_hooks_")],
     }
@@ -555,6 +585,114 @@ def _measure_read_queries(
             _timed_call(latencies, "query.get_flow_run_detail", plane.get_flow_run_detail, rid)
 
 
+_FSM_TASK_LIFECYCLE = (
+    ("task_pending", None),
+    ("task_running", None),
+    ("task_completed", None),
+)
+
+
+def _record_task_events_for_recipe(
+    plane: InMemoryControlPlane,
+    latencies: dict[str, list[float]],
+    task_run_id: Any,
+    recipe: WorkloadRecipe,
+    evt_idx: int,
+) -> int:
+    """Record task events; returns number of events recorded (for throughput counts)."""
+    if recipe.fsm_task_lifecycle:
+        _timed_call(
+            latencies,
+            "record_task_event",
+            plane.record_task_events_batch,
+            task_run_id,
+            list(_FSM_TASK_LIFECYCLE),
+        )
+        return 3
+    _timed_call(
+        latencies,
+        "record_task_event",
+        plane.record_task_event,
+        task_run_id,
+        "heartbeat",
+        {"ordinal": evt_idx},
+    )
+    return 1
+
+
+def _apply_flow_start_transitions(
+    plane: InMemoryControlPlane,
+    latencies: dict[str, list[float]],
+    flow_run_id: Any,
+) -> int:
+    """Apply pending → running → completed; returns transition count (3)."""
+    transitions = [
+        (RunState.PENDING, uuid4(), "bench", 0),
+        (RunState.RUNNING, uuid4(), "bench", 1),
+        (RunState.COMPLETED, uuid4(), "bench", 2),
+    ]
+    _timed_call(latencies, "set_flow_state", plane.set_flow_states_batch, flow_run_id, transitions)
+    return 3
+
+
+def _run_mixed_concurrent(
+    plane: InMemoryControlPlane,
+    flow_ids: list[Any],
+    rng: random.Random,
+    latencies: dict[str, list[float]],
+    counts: dict[str, int],
+    recipe: WorkloadRecipe,
+    write_iterations: int,
+    read_iterations: int,
+) -> None:
+    lock = threading.Lock()
+    shared_flow_id = flow_ids[0] if flow_ids else None
+    reader_count = max(1, recipe.mixed_reader_count)
+    reads_per_reader = max(1, read_iterations // reader_count)
+    extra_reads = max(0, read_iterations - reads_per_reader * reader_count)
+    stop = threading.Event()
+
+    def writer() -> None:
+        for i in range(write_iterations):
+            if stop.is_set() or shared_flow_id is None:
+                break
+            task = _timed_call(
+                latencies, "create_task", plane.create_task_run, shared_flow_id, f"mixed-task-{i}"
+            )
+            if recipe.fsm_task_lifecycle:
+                n_events = _record_task_events_for_recipe(plane, latencies, task.task_run_id, recipe, i)
+            else:
+                _timed_call(
+                    latencies,
+                    "record_task_event",
+                    plane.record_task_event,
+                    task.task_run_id,
+                    "mixed",
+                )
+                n_events = 1
+            with lock:
+                counts["tasks_created"] += 1
+                counts["task_events_recorded"] += n_events
+
+    def reader(reader_idx: int) -> None:
+        local_reads = reads_per_reader + (1 if reader_idx < extra_reads else 0)
+        _measure_read_queries(plane, flow_ids, random.Random(rng.randint(0, 2**31)), latencies, local_reads)
+        with lock:
+            counts["read_queries"] += local_reads
+
+    wt = threading.Thread(target=writer, name="perf-writer")
+    reader_threads = [
+        threading.Thread(target=reader, args=(idx,), name=f"perf-reader-{idx}")
+        for idx in range(reader_count)
+    ]
+    wt.start()
+    for rt in reader_threads:
+        rt.start()
+    wt.join()
+    for rt in reader_threads:
+        rt.join()
+
+
 def _run_recipe_iteration(
     recipe: WorkloadRecipe,
     seed: int,
@@ -602,59 +740,50 @@ def _run_recipe_iteration(
                 flow_ids.append(flow.run_id)
                 counts["flows_created"] += 1
 
-                _timed_call(latencies, "set_flow_state", plane.set_flow_state, flow.run_id, RunState.PENDING, uuid4(), "bench")
-                _timed_call(latencies, "set_flow_state", plane.set_flow_state, flow.run_id, RunState.RUNNING, uuid4(), "bench")
-                _timed_call(latencies, "set_flow_state", plane.set_flow_state, flow.run_id, RunState.COMPLETED, uuid4(), "bench")
-                counts["flow_transitions"] += 3
+                counts["flow_transitions"] += _apply_flow_start_transitions(plane, latencies, flow.run_id)
 
                 for task_idx in range(recipe.tasks_per_flow):
-                    task = _timed_call(
-                        latencies,
-                        "create_task",
-                        plane.create_task_run,
-                        flow.run_id,
-                        f"task-{task_idx}",
-                    )
-                    counts["tasks_created"] += 1
-                    for evt in range(recipe.task_events_per_task):
-                        _timed_call(
+                    if recipe.fsm_task_lifecycle:
+                        for evt in range(recipe.task_events_per_task):
+                            task = _timed_call(
+                                latencies,
+                                "create_task",
+                                plane.create_task_run,
+                                flow.run_id,
+                                f"task-{task_idx}-{evt}",
+                            )
+                            counts["tasks_created"] += 1
+                            counts["task_events_recorded"] += _record_task_events_for_recipe(
+                                plane, latencies, task.task_run_id, recipe, evt
+                            )
+                    else:
+                        task = _timed_call(
                             latencies,
-                            "record_task_event",
-                            plane.record_task_event,
-                            task.task_run_id,
-                            "heartbeat",
-                            {"ordinal": evt},
+                            "create_task",
+                            plane.create_task_run,
+                            flow.run_id,
+                            f"task-{task_idx}",
                         )
-                        counts["task_events_recorded"] += 1
+                        counts["tasks_created"] += 1
+                        for evt in range(recipe.task_events_per_task):
+                            counts["task_events_recorded"] += _record_task_events_for_recipe(
+                                plane, latencies, task.task_run_id, recipe, evt
+                            )
 
             read_count = int((counts["tasks_created"] + counts["flows_created"]) * recipe.read_ratio)
             if recipe.mixed:
                 write_iterations = max(10, recipe.flow_count // 2)
                 read_iterations = max(10, read_count)
-                lock = threading.Lock()
-                shared_flow_id = flow_ids[0] if flow_ids else None
-
-                def writer() -> None:
-                    for i in range(write_iterations):
-                        if shared_flow_id is None:
-                            break
-                        task = _timed_call(latencies, "create_task", plane.create_task_run, shared_flow_id, f"mixed-task-{i}")
-                        _timed_call(latencies, "record_task_event", plane.record_task_event, task.task_run_id, "mixed")
-                        with lock:
-                            counts["tasks_created"] += 1
-                            counts["task_events_recorded"] += 1
-
-                def reader() -> None:
-                    _measure_read_queries(plane, flow_ids, rng, latencies, read_iterations)
-                    with lock:
-                        counts["read_queries"] += read_iterations
-
-                wt = threading.Thread(target=writer, name="perf-writer")
-                rt = threading.Thread(target=reader, name="perf-reader")
-                wt.start()
-                rt.start()
-                wt.join()
-                rt.join()
+                _run_mixed_concurrent(
+                    plane,
+                    flow_ids,
+                    rng,
+                    latencies,
+                    counts,
+                    recipe,
+                    write_iterations,
+                    read_iterations,
+                )
             else:
                 _measure_read_queries(plane, flow_ids, rng, latencies, read_count)
                 counts["read_queries"] += read_count

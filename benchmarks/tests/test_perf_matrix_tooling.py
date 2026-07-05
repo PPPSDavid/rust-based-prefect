@@ -93,6 +93,23 @@ def test_canonical_key_matches_preset_when_recipes_align() -> None:
     ) == "preset:lite"
 
 
+def test_concurrency_preset_recipes_exist() -> None:
+    from benchmarks.perf_matrix import _presets, _recipe_catalog
+
+    catalog = _recipe_catalog()
+    for name in _presets()["concurrency"]:
+        assert name in catalog
+        recipe = catalog[name]
+        assert recipe.fsm_task_lifecycle or recipe.mixed_reader_count > 1
+
+
+def test_canonical_key_matches_concurrency_preset() -> None:
+    from benchmarks.perf_matrix import _presets
+
+    recipes = _presets()["concurrency"]
+    assert canonical_matrix_compare_key(recipes) == "preset:concurrency"
+
+
 def test_load_matrix_run_json_rejects_array(tmp_path: Path) -> None:
     bad = tmp_path / "bad.json"
     bad.write_text(json.dumps([{"engine": "x"}]), encoding="utf-8")
