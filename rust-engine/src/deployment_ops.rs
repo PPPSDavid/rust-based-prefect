@@ -153,6 +153,7 @@ pub fn claim_next_deployment_run(
         .query_row(
             "SELECT dr.id FROM deployment_runs dr \
              INNER JOIN deployments d ON d.id = dr.deployment_id \
+             INNER JOIN work_pools wp ON wp.id = COALESCE(d.work_pool_id, 'default-process-pool') AND wp.paused = 0 \
              WHERE dr.status = 'SCHEDULED' \
              AND COALESCE(d.work_pool_id, ?2) = ?1 \
              AND ( \
