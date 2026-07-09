@@ -1,3 +1,4 @@
+from .client import DeployClient
 from .spec import (
     DeploymentSpec,
     IronflowManifest,
@@ -8,6 +9,7 @@ from .spec import (
 from .yaml_loader import load_manifest
 
 __all__ = [
+    "DeployClient",
     "DeploymentSpec",
     "IronflowManifest",
     "ScheduleSpec",

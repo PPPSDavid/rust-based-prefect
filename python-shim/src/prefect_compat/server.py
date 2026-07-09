@@ -42,6 +42,7 @@ class DeploymentCreateRequest(BaseModel):
     schedule_rrule: str | None = None
     schedule_next_run_at: str | None = None
     schedule_enabled: bool = False
+    work_pool_id: str | None = None
 
 
 class DeploymentPatchRequest(BaseModel):
@@ -416,7 +417,16 @@ def create_deployment(req: DeploymentCreateRequest) -> dict:
         schedule_rrule=req.schedule_rrule,
         schedule_next_run_at=req.schedule_next_run_at,
         schedule_enabled=req.schedule_enabled,
+        work_pool_id=req.work_pool_id,
     )
+
+
+@app.get("/api/deployments/by-name/{name}")
+def get_deployment_by_name(name: str) -> dict:
+    deployment = control_plane.get_deployment_by_name(name)
+    if deployment is None:
+        raise HTTPException(status_code=404, detail="Deployment not found")
+    return deployment
 
 
 @app.patch("/api/deployments/{deployment_id}")

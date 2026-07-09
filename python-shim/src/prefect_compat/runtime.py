@@ -1602,6 +1602,22 @@ class InMemoryControlPlane:
             return None
         return self._deployment_row_to_dict(rows[0])
 
+    def get_deployment_by_name(self, name: str) -> dict[str, Any] | None:
+        rows = self._query_rows(
+            """
+            SELECT id,name,flow_name,entrypoint,path,default_parameters,paused,
+                   concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,
+                   schedule_next_run_at,schedule_enabled,work_pool_id,created_at,updated_at
+            FROM deployments
+            WHERE name = ?
+            LIMIT 1
+            """,
+            [name],
+        )
+        if not rows:
+            return None
+        return self._deployment_row_to_dict(rows[0])
+
     def trigger_deployment_run(
         self,
         deployment_id: UUID,
