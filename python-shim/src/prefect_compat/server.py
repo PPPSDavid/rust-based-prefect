@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 import threading
 import time
-from importlib import import_module
 from collections.abc import AsyncIterator
 from pathlib import Path
 from uuid import UUID
@@ -13,9 +12,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from starlette.responses import StreamingResponse
 
-from .cancellation import FlowRunCancelled
-from .decorators import _ACTIVE_DEPLOYMENT_RUN, flow, set_control_plane, task, wait
-from .runtime import InMemoryControlPlane, RunState
+from .decorators import flow, set_control_plane, task, wait
+from .runtime import InMemoryControlPlane
+from .worker import run_local_deployment_once, run_worker_loop
 from .task_runners import ThreadPoolTaskRunner
 
 
@@ -43,6 +42,7 @@ class DeploymentCreateRequest(BaseModel):
     schedule_rrule: str | None = None
     schedule_next_run_at: str | None = None
     schedule_enabled: bool = False
+    work_pool_id: str | None = None
 
 
 class DeploymentPatchRequest(BaseModel):
@@ -87,7 +87,6 @@ control_plane = InMemoryControlPlane(history_path=history_path)
 set_control_plane(control_plane)
 _worker_stop_event = threading.Event()
 _worker_thread: threading.Thread | None = None
-_worker_last_heartbeat = 0.0
 _scheduler_stop_event = threading.Event()
 _scheduler_thread: threading.Thread | None = None
 _rust_scheduler_started = False
@@ -210,116 +209,33 @@ FLOW_REGISTRY = {
 }
 
 
-def _resolve_flow_callable(flow_name: str, entrypoint: str | None = None):
-    if flow_name in FLOW_REGISTRY:
-        return FLOW_REGISTRY[flow_name]
-    if entrypoint:
-        module_name, sep, func_name = entrypoint.partition(":")
-        if not sep:
-            raise ValueError("entrypoint must look like module.submodule:function_name")
-        mod = import_module(module_name)
-        fn = getattr(mod, func_name, None)
-        if fn is None:
-            raise ValueError(f"entrypoint function not found: {entrypoint}")
-        return fn
-    raise ValueError(f"unknown local flow: {flow_name}")
-
-
-def _execute_claimed_deployment_run(claimed: dict) -> None:
-    deployment = control_plane.get_deployment(UUID(claimed["deployment_id"]))
-    if deployment is None:
-        control_plane.mark_deployment_run_finished(
-            deployment_run_id=UUID(claimed["id"]),
-            status="FAILED",
-            error="Deployment not found",
-        )
-        return
-
-    control_plane.mark_deployment_run_started(UUID(claimed["id"]))
-    flow_run_id: UUID | None = None
-    dep_token = _ACTIVE_DEPLOYMENT_RUN.set(UUID(claimed["id"]))
-    try:
-        flow_fn = _resolve_flow_callable(deployment["flow_name"], deployment.get("entrypoint"))
-        params = claimed.get("resolved_parameters", {}) or {}
-        flow_fn(**params)
-        latest = control_plane.latest_flow()
-        if latest is not None:
-            flow_run_id = latest.run_id
-            if control_plane.get_flow(flow_run_id).state == RunState.CANCELLED:
-                control_plane.mark_deployment_run_finished(
-                    deployment_run_id=UUID(claimed["id"]),
-                    status="CANCELLED",
-                    flow_run_id=flow_run_id,
-                )
-                return
-        control_plane.mark_deployment_run_finished(
-            deployment_run_id=UUID(claimed["id"]),
-            status="COMPLETED",
-            flow_run_id=flow_run_id,
-        )
-    except FlowRunCancelled:
-        latest = control_plane.latest_flow()
-        if latest is not None:
-            flow_run_id = latest.run_id
-        control_plane.mark_deployment_run_finished(
-            deployment_run_id=UUID(claimed["id"]),
-            status="CANCELLED",
-            flow_run_id=flow_run_id,
-        )
-    except Exception as exc:
-        control_plane.mark_deployment_run_finished(
-            deployment_run_id=UUID(claimed["id"]),
-            status="FAILED",
-            flow_run_id=flow_run_id,
-            error=str(exc),
-        )
-    finally:
-        _ACTIVE_DEPLOYMENT_RUN.reset(dep_token)
-
-
 def _run_local_deployment_once(worker_name: str | None = None) -> bool:
-    wn = worker_name or LOCAL_WORKER_NAME
-    claimed = control_plane.claim_next_deployment_run(
-        worker_name=wn, lease_seconds=30, work_pool_id=LOCAL_WORK_POOL
+    return run_local_deployment_once(
+        control_plane,
+        worker_name or LOCAL_WORKER_NAME,
+        LOCAL_WORK_POOL,
+        FLOW_REGISTRY,
     )
-    if not claimed:
-        return False
-    _execute_claimed_deployment_run(claimed)
-    return True
 
 
 def _local_worker_loop() -> None:
-    global _worker_last_heartbeat
-    while not _worker_stop_event.is_set():
-        now_m = time.monotonic()
-        if now_m - _worker_last_heartbeat > 15.0:
-            try:
-                control_plane.worker_heartbeat(LOCAL_WORKER_NAME)
-            except Exception:
-                pass
-            _worker_last_heartbeat = now_m
-        handled = _run_local_deployment_once(worker_name=LOCAL_WORKER_NAME)
-        if not handled:
-            time.sleep(0.5)
+    run_worker_loop(
+        control_plane,
+        worker_name=LOCAL_WORKER_NAME,
+        work_pool_id=LOCAL_WORK_POOL,
+        flow_registry=FLOW_REGISTRY,
+        stop_event=_worker_stop_event,
+    )
 
 
 def _local_worker_loop_rust_wait() -> None:
-    """Worker loop using Rust-backed blocking claim when available."""
-    global _worker_last_heartbeat
-    while not _worker_stop_event.is_set():
-        now_m = time.monotonic()
-        if now_m - _worker_last_heartbeat > 15.0:
-            try:
-                control_plane.worker_heartbeat(LOCAL_WORKER_NAME)
-            except Exception:
-                pass
-            _worker_last_heartbeat = now_m
-        claimed = control_plane.claim_next_deployment_run_wait(
-            worker_name=LOCAL_WORKER_NAME, lease_seconds=30, wait_ms=500, work_pool_id=LOCAL_WORK_POOL
-        )
-        if not claimed:
-            continue
-        _execute_claimed_deployment_run(claimed)
+    run_worker_loop(
+        control_plane,
+        worker_name=LOCAL_WORKER_NAME,
+        work_pool_id=LOCAL_WORK_POOL,
+        flow_registry=FLOW_REGISTRY,
+        stop_event=_worker_stop_event,
+    )
 
 
 def _scheduler_maintenance_loop() -> None:
@@ -501,7 +417,16 @@ def create_deployment(req: DeploymentCreateRequest) -> dict:
         schedule_rrule=req.schedule_rrule,
         schedule_next_run_at=req.schedule_next_run_at,
         schedule_enabled=req.schedule_enabled,
+        work_pool_id=req.work_pool_id,
     )
+
+
+@app.get("/api/deployments/by-name/{name}")
+def get_deployment_by_name(name: str) -> dict:
+    deployment = control_plane.get_deployment_by_name(name)
+    if deployment is None:
+        raise HTTPException(status_code=404, detail="Deployment not found")
+    return deployment
 
 
 @app.patch("/api/deployments/{deployment_id}")

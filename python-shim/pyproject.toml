@@ -32,7 +32,11 @@ classifiers = [
 ]
 dependencies = [
   "pydantic>=2,<3",
+  "pyyaml>=6,<7",
 ]
+
+[project.scripts]
+ironflow = "prefect_compat.cli.main:main"
 
 [project.urls]
 Homepage = "https://github.com/PPPSDavid/rust-based-prefect"
@@ -50,6 +54,7 @@ prefect_compat = [
   "native/*.dll",
   "native/*.dylib",
 ]
+"prefect_compat.cli.templates" = ["*.yaml"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

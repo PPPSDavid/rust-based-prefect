@@ -1365,7 +1365,7 @@ class InMemoryControlPlane:
                 """
                 SELECT id,name,flow_name,entrypoint,path,default_parameters,paused,
                        concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,
-                       schedule_next_run_at,schedule_enabled,created_at,updated_at
+                       schedule_next_run_at,schedule_enabled,work_pool_id,created_at,updated_at
                 FROM deployments
                 WHERE name = ?
                 LIMIT 1
@@ -1433,7 +1433,7 @@ class InMemoryControlPlane:
                 """
                 SELECT id,name,flow_name,entrypoint,path,default_parameters,paused,
                        concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,
-                       schedule_next_run_at,schedule_enabled,created_at,updated_at
+                       schedule_next_run_at,schedule_enabled,work_pool_id,created_at,updated_at
                 FROM deployments
                 WHERE id = ?
                 LIMIT 1
@@ -1597,6 +1597,22 @@ class InMemoryControlPlane:
             LIMIT 1
             """,
             [str(deployment_id)],
+        )
+        if not rows:
+            return None
+        return self._deployment_row_to_dict(rows[0])
+
+    def get_deployment_by_name(self, name: str) -> dict[str, Any] | None:
+        rows = self._query_rows(
+            """
+            SELECT id,name,flow_name,entrypoint,path,default_parameters,paused,
+                   concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,
+                   schedule_next_run_at,schedule_enabled,work_pool_id,created_at,updated_at
+            FROM deployments
+            WHERE name = ?
+            LIMIT 1
+            """,
+            [name],
         )
         if not rows:
             return None
@@ -1915,6 +1931,7 @@ class InMemoryControlPlane:
                 """
                 SELECT dr.id FROM deployment_runs dr
                 INNER JOIN deployments d ON d.id = dr.deployment_id
+                INNER JOIN work_pools wp ON wp.id = COALESCE(d.work_pool_id, 'default-process-pool') AND wp.paused = 0
                 WHERE dr.status = 'SCHEDULED'
                 AND COALESCE(d.work_pool_id, ?) = ?
                 AND (

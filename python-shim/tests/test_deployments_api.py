@@ -31,6 +31,33 @@ def _swap_plane(tmp_path: Path) -> None:
     set_control_plane(control_plane)
 
 
+def test_create_deployment_with_work_pool_id(tmp_path: Path) -> None:
+    _swap_plane(tmp_path)
+    client = TestClient(app)
+
+    create = client.post(
+        "/api/deployments",
+        json={
+            "name": "pool-bound",
+            "flow_name": "simple_flow",
+            "work_pool_id": "custom-process-pool",
+        },
+    )
+    assert create.status_code == 200
+    body = create.json()
+    assert body["work_pool_id"] == "custom-process-pool"
+
+    default_create = client.post(
+        "/api/deployments",
+        json={
+            "name": "default-pool",
+            "flow_name": "simple_flow",
+        },
+    )
+    assert default_create.status_code == 200
+    assert default_create.json()["work_pool_id"] == "default-process-pool"
+
+
 def test_deployment_trigger_and_local_worker(tmp_path: Path) -> None:
     _swap_plane(tmp_path)
     client = TestClient(app)

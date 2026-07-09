@@ -1,0 +1,18 @@
+# IronFlow deployment manifest (Tier 1)
+# See: https://github.com/PPPSDavid/rust-based-prefect
+ironflow-version: "1"
+
+# Optional pull steps run before the worker imports flow code (serve / worker --file).
+# pull:
+#   - step: ironflow.deployments.steps.set_working_directory
+#     inputs:
+#       directory: .
+
+deployments:
+  - name: my-deployment
+    entrypoint: flows/example.py:my_flow
+    parameters: {}
+    work_pool:
+      name: default-process-pool
+    # schedule:
+    #   cron: "0 * * * *"

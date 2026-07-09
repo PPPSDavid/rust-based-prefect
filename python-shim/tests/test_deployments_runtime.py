@@ -46,6 +46,29 @@ def _set_dep_policy(
     )
 
 
+def test_claim_skips_paused_work_pool(tmp_path: Path) -> None:
+    _swap_plane(tmp_path)
+    pool = control_plane.create_work_pool(name="paused-pool")
+    pool_id = pool["id"]
+    control_plane.patch_work_pool(pool_id, {"paused": True})
+
+    dep = control_plane.create_deployment(
+        name="paused-pool-flow",
+        flow_name="simple_flow",
+        default_parameters={"n": 1},
+        paused=False,
+        work_pool_id=pool_id,
+    )
+    d_id = UUID(dep["id"])
+    run = control_plane.trigger_deployment_run(d_id, parameters={})
+    assert run["status"] == "SCHEDULED"
+
+    claimed = control_plane.claim_next_deployment_run(
+        worker_name="w1", lease_seconds=30, work_pool_id=pool_id
+    )
+    assert claimed is None
+
+
 def test_cancel_new_when_at_exec_capacity(tmp_path: Path) -> None:
     _swap_plane(tmp_path)
     dep = control_plane.create_deployment(

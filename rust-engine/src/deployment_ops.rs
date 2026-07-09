@@ -9,6 +9,8 @@ use rusqlite::{params, Connection, OptionalExtension, Result as SqlResult};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
+const DEFAULT_WORK_POOL_ID: &str = "default-process-pool";
+
 fn now_iso() -> String {
     Utc::now().to_rfc3339()
 }
@@ -44,6 +46,9 @@ fn deployment_row_to_json(row: &rusqlite::Row) -> SqlResult<Value> {
         "schedule_rrule": row.get::<_, Option<String>>("schedule_rrule")?,
         "schedule_next_run_at": row.get::<_, Option<String>>("schedule_next_run_at")?,
         "schedule_enabled": row.get::<_, i64>("schedule_enabled")? != 0,
+        "work_pool_id": row
+            .get::<_, Option<String>>("work_pool_id")?
+            .unwrap_or_else(|| DEFAULT_WORK_POOL_ID.to_string()),
         "created_at": row.get::<_, String>("created_at")?,
         "updated_at": row.get::<_, String>("updated_at")?,
     }))
@@ -143,13 +148,14 @@ pub fn claim_next_deployment_run(
     let now = now_dt.to_rfc3339();
     let lease_until = (now_dt + Duration::seconds(lease_seconds.max(1))).to_rfc3339();
 
-    let pool_filter = work_pool_id.unwrap_or("default-process-pool");
+    let pool_filter = work_pool_id.unwrap_or(DEFAULT_WORK_POOL_ID);
     let candidate_id: Option<String> = tx
         .query_row(
             "SELECT dr.id FROM deployment_runs dr \
              INNER JOIN deployments d ON d.id = dr.deployment_id \
+             INNER JOIN work_pools wp ON wp.id = COALESCE(d.work_pool_id, 'default-process-pool') AND wp.paused = 0 \
              WHERE dr.status = 'SCHEDULED' \
-             AND COALESCE(d.work_pool_id, 'default-process-pool') = ?1 \
+             AND COALESCE(d.work_pool_id, ?2) = ?1 \
              AND ( \
                d.concurrency_limit IS NULL \
                OR ( \
@@ -160,7 +166,7 @@ pub fn claim_next_deployment_run(
              ) \
              ORDER BY dr.created_at ASC \
              LIMIT 1",
-            params![pool_filter],
+            params![pool_filter, DEFAULT_WORK_POOL_ID],
             |row| row.get(0),
         )
         .optional()
@@ -328,7 +334,7 @@ pub fn create_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
         .query_row(
             "SELECT id,name,flow_name,entrypoint,path,default_parameters,paused,\
              concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,\
-             schedule_next_run_at,schedule_enabled,created_at,updated_at \
+             schedule_next_run_at,schedule_enabled,work_pool_id,created_at,updated_at \
              FROM deployments WHERE name = ?1 LIMIT 1",
             params![name],
             |row| deployment_row_to_json(row),
@@ -338,6 +344,11 @@ pub fn create_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
     if let Some(row) = existing {
         return Ok(row);
     }
+
+    let work_pool_id = body
+        .get("work_pool_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or(DEFAULT_WORK_POOL_ID);
 
     let entrypoint = body.get("entrypoint").and_then(|v| v.as_str());
     let path = body.get("path").and_then(|v| v.as_str());
@@ -432,8 +443,8 @@ pub fn create_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
         "INSERT INTO deployments \
          (id,name,flow_name,entrypoint,path,default_parameters,paused,\
           concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,\
-          schedule_next_run_at,schedule_enabled,created_at,updated_at) \
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16)",
+          schedule_next_run_at,schedule_enabled,work_pool_id,created_at,updated_at) \
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)",
         params![
             deployment_id,
             name,
@@ -449,6 +460,7 @@ pub fn create_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
             schedule_rrule,
             schedule_next_run_at,
             if schedule_enabled { 1 } else { 0 },
+            work_pool_id,
             now,
             now,
         ],
@@ -458,7 +470,7 @@ pub fn create_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
     conn.query_row(
         "SELECT id,name,flow_name,entrypoint,path,default_parameters,paused,\
          concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,\
-         schedule_next_run_at,schedule_enabled,created_at,updated_at \
+         schedule_next_run_at,schedule_enabled,work_pool_id,created_at,updated_at \
          FROM deployments WHERE id = ?1",
         params![deployment_id],
         |row| deployment_row_to_json(row),
@@ -580,7 +592,7 @@ pub fn update_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
         .query_row(
             "SELECT id,name,flow_name,entrypoint,path,default_parameters,paused,\
              concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,\
-             schedule_next_run_at,schedule_enabled,created_at,updated_at \
+             schedule_next_run_at,schedule_enabled,work_pool_id,created_at,updated_at \
              FROM deployments WHERE id = ?1 LIMIT 1",
             params![deployment_id],
             |row| deployment_row_to_json(row),
@@ -789,7 +801,7 @@ pub fn update_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
     conn.query_row(
         "SELECT id,name,flow_name,entrypoint,path,default_parameters,paused,\
          concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,\
-         schedule_next_run_at,schedule_enabled,created_at,updated_at \
+         schedule_next_run_at,schedule_enabled,work_pool_id,created_at,updated_at \
          FROM deployments WHERE id = ?1",
         params![deployment_id],
         |row| deployment_row_to_json(row),
@@ -982,6 +994,54 @@ pub fn deployment_maintenance(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn create_deployment_sets_work_pool_id() {
+        let conn = Connection::open_in_memory().expect("open db");
+        conn.execute_batch(
+            "CREATE TABLE deployments (
+                id TEXT UNIQUE NOT NULL,
+                name TEXT UNIQUE NOT NULL,
+                flow_name TEXT NOT NULL,
+                entrypoint TEXT,
+                path TEXT,
+                default_parameters TEXT NOT NULL,
+                paused INTEGER NOT NULL,
+                concurrency_limit INTEGER,
+                collision_strategy TEXT NOT NULL DEFAULT 'ENQUEUE',
+                schedule_interval_seconds INTEGER,
+                schedule_cron TEXT,
+                schedule_rrule TEXT,
+                schedule_next_run_at TEXT,
+                schedule_enabled INTEGER NOT NULL DEFAULT 0,
+                work_pool_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );",
+        )
+        .expect("schema");
+
+        let custom = create_deployment(
+            &conn,
+            &json!({
+                "name": "pool-bound",
+                "flow_name": "simple_flow",
+                "work_pool_id": "custom-process-pool",
+            }),
+        )
+        .expect("create with pool");
+        assert_eq!(custom["work_pool_id"], "custom-process-pool");
+
+        let default_pool = create_deployment(
+            &conn,
+            &json!({
+                "name": "default-pool",
+                "flow_name": "simple_flow",
+            }),
+        )
+        .expect("create default pool");
+        assert_eq!(default_pool["work_pool_id"], DEFAULT_WORK_POOL_ID);
+    }
 
     #[test]
     fn next_cron_occurrence_advances() {
