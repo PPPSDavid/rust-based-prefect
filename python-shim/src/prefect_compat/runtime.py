@@ -98,6 +98,7 @@ class InMemoryControlPlane:
     def __init__(self, history_path: str | None = None) -> None:
         self._flows: dict[UUID, FlowRunRecord] = {}
         self._tasks: dict[UUID, TaskRunRecord] = {}
+        self._flow_results: dict[UUID, Any] = {}
         self._events: list[dict[str, Any]] = []
         self._tokens: set[UUID] = set()
         self._lock = RLock()
@@ -956,6 +957,7 @@ class InMemoryControlPlane:
             "task_running": RunState.RUNNING,
             "task_completed": RunState.COMPLETED,
             "task_failed": RunState.FAILED,
+            "task_cancelled": RunState.CANCELLED,
         }
         with self._lock:
             task = self._tasks[task_run_id]
@@ -1072,6 +1074,7 @@ class InMemoryControlPlane:
             "task_running": RunState.RUNNING,
             "task_completed": RunState.COMPLETED,
             "task_failed": RunState.FAILED,
+            "task_cancelled": RunState.CANCELLED,
         }
         with self._lock:
             task = self._tasks[task_run_id]
@@ -1682,6 +1685,119 @@ class InMemoryControlPlane:
         if not rows:
             return None
         return self._deployment_row_to_dict(rows[0])
+
+    def set_flow_result(self, run_id: UUID, result: Any) -> None:
+        with self._lock:
+            self._flow_results[run_id] = result
+
+    def get_flow_result(self, run_id: UUID) -> Any:
+        with self._lock:
+            return self._flow_results.get(run_id)
+
+    def get_deployment_run(self, deployment_run_id: UUID) -> dict[str, Any] | None:
+        rust = self._rust_deployment_dispatch(
+            "deployment_get_run", {"deployment_run_id": str(deployment_run_id)}
+        )
+        if rust is not None:
+            if rust.get("ok"):
+                run = rust.get("run")
+                if run is not None:
+                    return run
+            else:
+                err = rust.get("error") or {}
+                raise RuntimeError(str(err.get("message", "deployment get run failed")))
+        rows = self._query_rows(
+            """
+            SELECT seq,id,deployment_id,status,requested_parameters,resolved_parameters,idempotency_key,
+                   worker_name,lease_until,flow_run_id,error,parent_flow_run_id,parent_task_run_id,parent_deployment_run_id,
+                   created_at,updated_at,started_at,finished_at
+            FROM deployment_runs
+            WHERE id = ?
+            LIMIT 1
+            """,
+            [str(deployment_run_id)],
+        )
+        if not rows:
+            return None
+        return self._deployment_run_row_to_dict(rows[0])
+
+    _DEPLOYMENT_TERMINAL = frozenset({"COMPLETED", "FAILED", "CANCELLED"})
+    _DEPLOYMENT_ACTIVE = frozenset({"SCHEDULED", "CLAIMED", "RUNNING"})
+
+    def update_subflow_task_child_flow_run(self, task_run_id: UUID, child_flow_run_id: UUID) -> None:
+        with self._lock:
+            task = self._tasks.get(task_run_id)
+            if task is None:
+                return
+            task.child_flow_run_id = child_flow_run_id
+            self._sqlite_conn.execute(
+                "UPDATE task_runs SET child_flow_run_id = ? WHERE id = ?",
+                [str(child_flow_run_id), str(task_run_id)],
+            )
+
+    def mirror_subflow_task_from_deployment(self, task_run_id: UUID, deployment_run: dict[str, Any]) -> None:
+        status = str(deployment_run.get("status", ""))
+        child_flow_run_id = deployment_run.get("flow_run_id")
+        if child_flow_run_id:
+            self.update_subflow_task_child_flow_run(task_run_id, UUID(str(child_flow_run_id)))
+
+        task = self.get_task_run(task_run_id)
+        if status in {"SCHEDULED", "CLAIMED"} and task.state == RunState.SCHEDULED:
+            self.record_task_event(task_run_id, "task_pending", {"subflow": True})
+        elif status == "RUNNING" and task.state in {RunState.SCHEDULED, RunState.PENDING}:
+            if task.state == RunState.SCHEDULED:
+                self.record_task_event(task_run_id, "task_pending", {"subflow": True})
+            self.record_task_event(task_run_id, "task_running", {"subflow": True})
+        elif status == "COMPLETED" and task.state not in {RunState.COMPLETED, RunState.FAILED, RunState.CANCELLED}:
+            if task.state == RunState.SCHEDULED:
+                self.record_task_event(task_run_id, "task_pending", {"subflow": True})
+            if task.state in {RunState.SCHEDULED, RunState.PENDING}:
+                self.record_task_event(task_run_id, "task_running", {"subflow": True})
+            self.record_task_event(task_run_id, "task_completed", {"subflow": True})
+        elif status == "FAILED" and task.state not in {RunState.FAILED, RunState.CANCELLED}:
+            if task.state == RunState.SCHEDULED:
+                self.record_task_event(task_run_id, "task_pending", {"subflow": True})
+            if task.state in {RunState.SCHEDULED, RunState.PENDING}:
+                self.record_task_event(task_run_id, "task_running", {"subflow": True})
+            err = deployment_run.get("error") or "subflow deployment failed"
+            self.record_task_event(task_run_id, "task_failed", {"subflow": True, "error": str(err)})
+        elif status == "CANCELLED" and task.state not in {RunState.CANCELLED, RunState.FAILED, RunState.COMPLETED}:
+            if task.state == RunState.SCHEDULED:
+                self.record_task_event(task_run_id, "task_pending", {"subflow": True})
+            if task.state in {RunState.SCHEDULED, RunState.PENDING}:
+                self.record_task_event(task_run_id, "task_running", {"subflow": True})
+            self.record_task_event(
+                task_run_id,
+                "task_cancelled",
+                {"subflow": True, "error": deployment_run.get("error") or "cancelled"},
+            )
+
+    def wait_for_deployment_run_terminal(
+        self,
+        deployment_run_id: UUID,
+        *,
+        parent_task_run_id: UUID | None = None,
+        timeout_seconds: float = 3600.0,
+        poll_seconds: float = 0.05,
+    ) -> dict[str, Any]:
+        deadline = time.monotonic() + max(0.0, timeout_seconds)
+        last: dict[str, Any] | None = None
+        while time.monotonic() < deadline:
+            last = self.get_deployment_run(deployment_run_id)
+            if last is None:
+                if time.monotonic() + poll_seconds < deadline:
+                    time.sleep(poll_seconds)
+                    continue
+                raise ValueError(f"deployment run not found: {deployment_run_id}")
+            if parent_task_run_id is not None:
+                self.mirror_subflow_task_from_deployment(parent_task_run_id, last)
+            status = str(last.get("status", ""))
+            if status in self._DEPLOYMENT_TERMINAL:
+                if parent_task_run_id is not None:
+                    self.mirror_subflow_task_from_deployment(parent_task_run_id, last)
+                return last
+            time.sleep(min(poll_seconds, max(0.0, deadline - time.monotonic())))
+        raise TimeoutError(f"timed out waiting for deployment run {deployment_run_id}")
 
     def trigger_deployment_run(
         self,

@@ -663,6 +663,21 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                 }
             }
         }
+        "deployment_get_run" => {
+            let conn = ctx
+                .db_conn
+                .as_ref()
+                .ok_or_else(|| "deployment_get_run requires bind_db".to_string())?;
+            let deployment_run_id = body
+                .get("deployment_run_id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| "missing string field deployment_run_id".to_string())?;
+            match deployment_ops::get_deployment_run(conn, deployment_run_id) {
+                Ok(Some(run)) => Ok(json!({"ok": true, "run": run})),
+                Ok(None) => Ok(json!({"ok": true, "run": Value::Null})),
+                Err(e) => Ok(json!({"ok": false, "error": {"code": "deployment", "message": e}})),
+            }
+        }
         "deployment_reclaim_expired" => {
             let conn = ctx
                 .db_conn

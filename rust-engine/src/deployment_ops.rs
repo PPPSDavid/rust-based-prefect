@@ -999,6 +999,20 @@ pub fn mark_deployment_run_finished(
     Ok(())
 }
 
+/// Read a single deployment run row (hot path for subflow wait polling).
+pub fn get_deployment_run(conn: &Connection, deployment_run_id: &str) -> Result<Option<Value>, String> {
+    conn.query_row(
+        "SELECT id,deployment_id,status,requested_parameters,resolved_parameters,idempotency_key,\
+         worker_name,lease_until,flow_run_id,error,parent_flow_run_id,parent_task_run_id,parent_deployment_run_id,\
+         created_at,updated_at,started_at,finished_at \
+         FROM deployment_runs WHERE id = ?1 LIMIT 1",
+        params![deployment_run_id],
+        |row| deployment_run_row_to_json(row),
+    )
+    .optional()
+    .map_err(|e| e.to_string())
+}
+
 /// One FFI round-trip: reclaim leases, fire due schedules, mark stale workers offline.
 pub fn deployment_maintenance(
     conn: &Connection,
