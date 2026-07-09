@@ -30,6 +30,13 @@ class WorkPoolRef(BaseModel):
     name: str
 
 
+class PullStepSpec(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    step: str
+    inputs: dict[str, Any] = Field(default_factory=dict)
+
+
 class DeploymentSpec(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
