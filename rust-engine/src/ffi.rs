@@ -201,13 +201,30 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                 serde_json::from_value(body.get("task").cloned().unwrap_or_else(|| body.clone()))
                     .map_err(|e| e.to_string())?;
             let planned_node_id = opt_str_from_field(body, "planned_node_id");
+            let kind = opt_str_from_field(body, "kind");
+            let child_flow_run_id = opt_str_from_field(body, "child_flow_run_id");
+            let child_deployment_run_id = opt_str_from_field(body, "child_deployment_run_id");
             ctx.engine.register_task_run(task.clone());
             if let Some(conn) = ctx.db_conn.as_ref() {
-                ui_write::persist_task_create_with_conn(conn, &task, planned_node_id.as_deref())
-                    .map_err(|e| format!("persist task create failed: {e}"))?;
+                ui_write::persist_task_create_with_conn(
+                    conn,
+                    &task,
+                    planned_node_id.as_deref(),
+                    kind.as_deref(),
+                    child_flow_run_id.as_deref(),
+                    child_deployment_run_id.as_deref(),
+                )
+                .map_err(|e| format!("persist task create failed: {e}"))?;
             } else {
-                ui_write::persist_task_create(&db_path, &task, planned_node_id.as_deref())
-                    .map_err(|e| format!("persist task create failed: {e}"))?;
+                ui_write::persist_task_create(
+                    &db_path,
+                    &task,
+                    planned_node_id.as_deref(),
+                    kind.as_deref(),
+                    child_flow_run_id.as_deref(),
+                    child_deployment_run_id.as_deref(),
+                )
+                .map_err(|e| format!("persist task create failed: {e}"))?;
             }
             Ok(json!({"ok": true}))
         }
@@ -604,7 +621,35 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                 .ok_or_else(|| "missing string field deployment_id".to_string())?;
             let requested = body.get("parameters");
             let idempotency_key = body.get("idempotency_key").and_then(|v| v.as_str());
-            match deployment_ops::trigger_deployment_run(conn, deployment_id, requested, idempotency_key) {
+            let parent_link = deployment_ops::DeploymentParentLink {
+                parent_flow_run_id: body
+                    .get("parent_flow_run_id")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string),
+                parent_task_run_id: body
+                    .get("parent_task_run_id")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string),
+                parent_deployment_run_id: body
+                    .get("parent_deployment_run_id")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string),
+            };
+            let parent_ref = if parent_link.parent_flow_run_id.is_some()
+                || parent_link.parent_task_run_id.is_some()
+                || parent_link.parent_deployment_run_id.is_some()
+            {
+                Some(parent_link)
+            } else {
+                None
+            };
+            match deployment_ops::trigger_deployment_run(
+                conn,
+                deployment_id,
+                requested,
+                idempotency_key,
+                parent_ref.as_ref(),
+            ) {
                 Ok(run) => Ok(json!({"ok": true, "run": run})),
                 Err(e) => {
                     let code = if e == "deployment not found" {

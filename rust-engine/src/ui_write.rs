@@ -20,14 +20,21 @@ pub fn persist_flow_create_with_conn(
 ) -> Result<(), String> {
     let ts = now_iso();
     conn.execute(
-        "INSERT OR IGNORE INTO flow_runs(id,name,state,version,created_at,updated_at) VALUES(?,?,?,?,?,?)",
+        "INSERT OR IGNORE INTO flow_runs(id,name,state,version,created_at,updated_at,\
+         parent_flow_run_id,parent_task_run_id,root_flow_run_id,execution_mode,depth) \
+         VALUES(?,?,?,?,?,?,?,?,?,?,?)",
         params![
             run.id.to_string(),
             run.name.as_str(),
             format!("{:?}", run.state).to_uppercase(),
             run.version as i64,
             ts,
-            now_iso()
+            now_iso(),
+            run.parent_flow_run_id.map(|u| u.to_string()),
+            run.parent_task_run_id.map(|u| u.to_string()),
+            run.root_flow_run_id.map(|u| u.to_string()),
+            run.execution_mode.as_deref(),
+            run.depth as i64,
         ],
     )
     .map_err(|e| e.to_string())?;
@@ -38,19 +45,33 @@ pub fn persist_task_create(
     db_path: &str,
     task: &crate::engine::TaskRun,
     planned_node_id: Option<&str>,
+    kind: Option<&str>,
+    child_flow_run_id: Option<&str>,
+    child_deployment_run_id: Option<&str>,
 ) -> Result<(), String> {
     let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
-    persist_task_create_with_conn(&conn, task, planned_node_id)
+    persist_task_create_with_conn(
+        &conn,
+        task,
+        planned_node_id,
+        kind,
+        child_flow_run_id,
+        child_deployment_run_id,
+    )
 }
 
 pub fn persist_task_create_with_conn(
     conn: &Connection,
     task: &crate::engine::TaskRun,
     planned_node_id: Option<&str>,
+    kind: Option<&str>,
+    child_flow_run_id: Option<&str>,
+    child_deployment_run_id: Option<&str>,
 ) -> Result<(), String> {
     let ts = now_iso();
     conn.execute(
-        "INSERT OR IGNORE INTO task_runs(id,flow_run_id,task_name,planned_node_id,state,version,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
+        "INSERT OR IGNORE INTO task_runs(id,flow_run_id,task_name,planned_node_id,state,version,created_at,updated_at,\
+         kind,child_flow_run_id,child_deployment_run_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
         params![
             task.id.to_string(),
             task.flow_run_id.to_string(),
@@ -59,7 +80,10 @@ pub fn persist_task_create_with_conn(
             format!("{:?}", task.state).to_uppercase(),
             task.version as i64,
             ts,
-            now_iso()
+            now_iso(),
+            kind.unwrap_or("task"),
+            child_flow_run_id,
+            child_deployment_run_id,
         ],
     )
     .map_err(|e| e.to_string())?;

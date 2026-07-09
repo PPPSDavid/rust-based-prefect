@@ -21,6 +21,7 @@ except Exception:  # pragma: no cover - best-effort optional accelerator
 
 
 DEFAULT_WORK_POOL_ID = "default-process-pool"
+SUBFLOW_MAX_DEPTH = 32
 
 
 class RunState(str, Enum):
@@ -38,6 +39,11 @@ class FlowRunRecord:
     name: str
     state: RunState
     version: int
+    parent_flow_run_id: UUID | None = None
+    parent_task_run_id: UUID | None = None
+    root_flow_run_id: UUID | None = None
+    execution_mode: str | None = None
+    depth: int = 0
 
 
 @dataclass
@@ -55,6 +61,9 @@ class TaskRunRecord:
     planned_node_id: str | None
     state: RunState
     version: int
+    kind: str = "task"
+    child_flow_run_id: UUID | None = None
+    child_deployment_run_id: UUID | None = None
 
 
 @dataclass
@@ -451,8 +460,34 @@ class InMemoryControlPlane:
             },
         )
 
-    def create_flow_run(self, name: str) -> FlowRunRecord:
-        record = FlowRunRecord(run_id=uuid4(), name=name, state=RunState.SCHEDULED, version=0)
+    def create_flow_run(
+        self,
+        name: str,
+        *,
+        parent_flow_run_id: UUID | None = None,
+        parent_task_run_id: UUID | None = None,
+        execution_mode: str | None = None,
+    ) -> FlowRunRecord:
+        run_id = uuid4()
+        root_flow_run_id: UUID | None = run_id
+        depth = 0
+        if parent_flow_run_id is not None:
+            parent = self.get_flow(parent_flow_run_id)
+            root_flow_run_id = parent.root_flow_run_id or parent_flow_run_id
+            depth = parent.depth + 1
+            if depth > SUBFLOW_MAX_DEPTH:
+                raise ValueError(f"subflow depth exceeds maximum ({SUBFLOW_MAX_DEPTH})")
+        record = FlowRunRecord(
+            run_id=run_id,
+            name=name,
+            state=RunState.SCHEDULED,
+            version=0,
+            parent_flow_run_id=parent_flow_run_id,
+            parent_task_run_id=parent_task_run_id,
+            root_flow_run_id=root_flow_run_id,
+            execution_mode=execution_mode,
+            depth=depth,
+        )
         with self._lock:
             persisted_by_rust = False
             if self._rust_fsm_active() and self._rust_native_persistence:
@@ -465,6 +500,11 @@ class InMemoryControlPlane:
                             "name": record.name,
                             "state": record.state.value,
                             "version": int(record.version),
+                            "parent_flow_run_id": str(parent_flow_run_id) if parent_flow_run_id else None,
+                            "parent_task_run_id": str(parent_task_run_id) if parent_task_run_id else None,
+                            "root_flow_run_id": str(root_flow_run_id) if root_flow_run_id else None,
+                            "execution_mode": execution_mode,
+                            "depth": depth,
                         },
                     },
                 )
@@ -487,6 +527,11 @@ class InMemoryControlPlane:
                     "name": record.name,
                     "state": record.state.value,
                     "version": record.version,
+                    "parent_flow_run_id": str(parent_flow_run_id) if parent_flow_run_id else None,
+                    "parent_task_run_id": str(parent_task_run_id) if parent_task_run_id else None,
+                    "root_flow_run_id": str(root_flow_run_id) if root_flow_run_id else None,
+                    "execution_mode": execution_mode,
+                    "depth": depth,
                 }
             )
             if (not self._rust_native_persistence) and self._rust_fsm_active():
@@ -494,7 +539,14 @@ class InMemoryControlPlane:
         return record
 
     def create_task_run(
-        self, flow_run_id: UUID, task_name: str, planned_node_id: str | None = None
+        self,
+        flow_run_id: UUID,
+        task_name: str,
+        planned_node_id: str | None = None,
+        *,
+        kind: str = "task",
+        child_flow_run_id: UUID | None = None,
+        child_deployment_run_id: UUID | None = None,
     ) -> TaskRunRecord:
         task = TaskRunRecord(
             task_run_id=uuid4(),
@@ -503,6 +555,9 @@ class InMemoryControlPlane:
             planned_node_id=planned_node_id,
             state=RunState.SCHEDULED,
             version=0,
+            kind=kind,
+            child_flow_run_id=child_flow_run_id,
+            child_deployment_run_id=child_deployment_run_id,
         )
         with self._lock:
             self._tasks[task.task_run_id] = task
@@ -513,6 +568,11 @@ class InMemoryControlPlane:
                     {
                         **({} if self._rust_db_bound else {"db_path": str(self._sqlite_path)}),
                         "planned_node_id": task.planned_node_id,
+                        "kind": task.kind,
+                        "child_flow_run_id": str(child_flow_run_id) if child_flow_run_id else None,
+                        "child_deployment_run_id": str(child_deployment_run_id)
+                        if child_deployment_run_id
+                        else None,
                         "task": {
                             "id": str(task.task_run_id),
                             "flow_run_id": str(task.flow_run_id),
@@ -1112,7 +1172,10 @@ class InMemoryControlPlane:
         rust_result = self._query_rust("flow_runs", {"state": state, "limit": limit, "cursor": cursor})
         if rust_result is not None:
             return PageResult(items=rust_result["items"], next_cursor=rust_result["next_cursor"])
-        query = "SELECT seq,id,name,state,version,created_at,updated_at FROM flow_runs"
+        query = (
+            "SELECT seq,id,name,state,version,created_at,updated_at,parent_flow_run_id,parent_task_run_id,"
+            "root_flow_run_id,execution_mode,depth FROM flow_runs"
+        )
         conditions: list[str] = []
         params: list[Any] = []
         if state:
@@ -1136,7 +1199,8 @@ class InMemoryControlPlane:
             result = rust_result
         else:
             rows = self._query_rows(
-                "SELECT seq,id,name,state,version,created_at,updated_at FROM flow_runs WHERE id = ? LIMIT 1",
+                "SELECT seq,id,name,state,version,created_at,updated_at,parent_flow_run_id,parent_task_run_id,"
+                "root_flow_run_id,execution_mode,depth FROM flow_runs WHERE id = ? LIMIT 1",
                 [str(flow_run_id)],
             )
             if not rows:
@@ -1160,7 +1224,8 @@ class InMemoryControlPlane:
         if rust_result is not None:
             return PageResult(items=rust_result["items"], next_cursor=rust_result["next_cursor"])
         query = (
-            "SELECT seq,id,flow_run_id,task_name,planned_node_id,state,version,created_at,updated_at "
+            "SELECT seq,id,flow_run_id,task_name,planned_node_id,state,version,created_at,updated_at,"
+            "kind,child_flow_run_id,child_deployment_run_id "
             "FROM task_runs WHERE flow_run_id = ?"
         )
         params: list[Any] = [str(flow_run_id)]
@@ -1623,15 +1688,23 @@ class InMemoryControlPlane:
         deployment_id: UUID,
         parameters: dict[str, Any] | None = None,
         idempotency_key: str | None = None,
+        *,
+        parent_flow_run_id: UUID | None = None,
+        parent_task_run_id: UUID | None = None,
+        parent_deployment_run_id: UUID | None = None,
     ) -> dict[str, Any]:
-        rust = self._rust_deployment_dispatch(
-            "deployment_trigger_run",
-            {
-                "deployment_id": str(deployment_id),
-                "parameters": parameters,
-                "idempotency_key": idempotency_key,
-            },
-        )
+        rust_body: dict[str, Any] = {
+            "deployment_id": str(deployment_id),
+            "parameters": parameters,
+            "idempotency_key": idempotency_key,
+        }
+        if parent_flow_run_id is not None:
+            rust_body["parent_flow_run_id"] = str(parent_flow_run_id)
+        if parent_task_run_id is not None:
+            rust_body["parent_task_run_id"] = str(parent_task_run_id)
+        if parent_deployment_run_id is not None:
+            rust_body["parent_deployment_run_id"] = str(parent_deployment_run_id)
+        rust = self._rust_deployment_dispatch("deployment_trigger_run", rust_body)
         if rust is not None:
             if rust.get("ok"):
                 return rust["run"]
@@ -1655,7 +1728,8 @@ class InMemoryControlPlane:
                 existing = self._query_rows(
                     """
                     SELECT seq,id,deployment_id,status,requested_parameters,resolved_parameters,idempotency_key,
-                           worker_name,lease_until,flow_run_id,error,created_at,updated_at,started_at,finished_at
+                           worker_name,lease_until,flow_run_id,error,parent_flow_run_id,parent_task_run_id,parent_deployment_run_id,
+                           created_at,updated_at,started_at,finished_at
                     FROM deployment_runs
                     WHERE deployment_id = ? AND idempotency_key = ?
                     LIMIT 1
@@ -1683,8 +1757,9 @@ class InMemoryControlPlane:
                 """
                 INSERT INTO deployment_runs
                 (id,deployment_id,status,requested_parameters,resolved_parameters,idempotency_key,
-                 worker_name,lease_until,flow_run_id,error,created_at,updated_at,started_at,finished_at)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                 worker_name,lease_until,flow_run_id,error,parent_flow_run_id,parent_task_run_id,parent_deployment_run_id,
+                 created_at,updated_at,started_at,finished_at)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 [
                     run_id,
@@ -1697,6 +1772,9 @@ class InMemoryControlPlane:
                     None,
                     None,
                     err_msg,
+                    str(parent_flow_run_id) if parent_flow_run_id else None,
+                    str(parent_task_run_id) if parent_task_run_id else None,
+                    str(parent_deployment_run_id) if parent_deployment_run_id else None,
                     now,
                     now,
                     None,
@@ -1706,7 +1784,8 @@ class InMemoryControlPlane:
             row = self._query_rows(
                 """
                 SELECT seq,id,deployment_id,status,requested_parameters,resolved_parameters,idempotency_key,
-                       worker_name,lease_until,flow_run_id,error,created_at,updated_at,started_at,finished_at
+                       worker_name,lease_until,flow_run_id,error,parent_flow_run_id,parent_task_run_id,parent_deployment_run_id,
+                       created_at,updated_at,started_at,finished_at
                 FROM deployment_runs
                 WHERE id = ?
                 LIMIT 1
@@ -1720,7 +1799,8 @@ class InMemoryControlPlane:
     ) -> PageResult:
         query = (
             "SELECT seq,id,deployment_id,status,requested_parameters,resolved_parameters,idempotency_key,"
-            " worker_name,lease_until,flow_run_id,error,created_at,updated_at,started_at,finished_at "
+            " worker_name,lease_until,flow_run_id,error,parent_flow_run_id,parent_task_run_id,parent_deployment_run_id,"
+            " created_at,updated_at,started_at,finished_at "
             "FROM deployment_runs"
         )
         conditions: list[str] = []
@@ -1961,7 +2041,8 @@ class InMemoryControlPlane:
             row = self._query_rows(
                 """
                 SELECT seq,id,deployment_id,status,requested_parameters,resolved_parameters,idempotency_key,
-                       worker_name,lease_until,flow_run_id,error,created_at,updated_at,started_at,finished_at
+                       worker_name,lease_until,flow_run_id,error,parent_flow_run_id,parent_task_run_id,parent_deployment_run_id,
+                       created_at,updated_at,started_at,finished_at
                 FROM deployment_runs
                 WHERE id = ? AND status = 'CLAIMED'
                 LIMIT 1
@@ -2138,6 +2219,15 @@ class InMemoryControlPlane:
                 name=rec["name"],
                 state=RunState(rec["state"]),
                 version=int(rec["version"]),
+                parent_flow_run_id=UUID(rec["parent_flow_run_id"])
+                if rec.get("parent_flow_run_id")
+                else None,
+                parent_task_run_id=UUID(rec["parent_task_run_id"])
+                if rec.get("parent_task_run_id")
+                else None,
+                root_flow_run_id=UUID(rec["root_flow_run_id"]) if rec.get("root_flow_run_id") else run_id,
+                execution_mode=rec.get("execution_mode"),
+                depth=int(rec.get("depth", 0)),
             )
             self._flows[run_id] = flow
             self._latest_flow_run_id = run_id
@@ -2153,6 +2243,11 @@ class InMemoryControlPlane:
                 planned_node_id=rec.get("planned_node_id"),
                 state=RunState(rec["state"]),
                 version=int(rec["version"]),
+                kind=rec.get("kind", "task"),
+                child_flow_run_id=UUID(rec["child_flow_run_id"]) if rec.get("child_flow_run_id") else None,
+                child_deployment_run_id=UUID(rec["child_deployment_run_id"])
+                if rec.get("child_deployment_run_id")
+                else None,
             )
             self._tasks[task_id] = task
             if self._replay_to_sqlite:
@@ -2292,7 +2387,12 @@ class InMemoryControlPlane:
                 state TEXT NOT NULL,
                 version INTEGER NOT NULL,
                 created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                parent_flow_run_id TEXT,
+                parent_task_run_id TEXT,
+                root_flow_run_id TEXT,
+                execution_mode TEXT,
+                depth INTEGER NOT NULL DEFAULT 0
             );
             CREATE TABLE IF NOT EXISTS task_runs (
                 seq INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2303,7 +2403,10 @@ class InMemoryControlPlane:
                 state TEXT NOT NULL,
                 version INTEGER NOT NULL,
                 created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                kind TEXT NOT NULL DEFAULT 'task',
+                child_flow_run_id TEXT,
+                child_deployment_run_id TEXT
             );
             CREATE TABLE IF NOT EXISTS dag_manifests (
                 seq INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2377,6 +2480,9 @@ class InMemoryControlPlane:
                 lease_until TEXT,
                 flow_run_id TEXT,
                 error TEXT,
+                parent_flow_run_id TEXT,
+                parent_task_run_id TEXT,
+                parent_deployment_run_id TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
                 started_at TEXT,
@@ -2451,6 +2557,30 @@ class InMemoryControlPlane:
         worker_cols = {c["name"] for c in conn.execute("PRAGMA table_info(workers)").fetchall()}
         if "work_pool_id" not in worker_cols:
             conn.execute("ALTER TABLE workers ADD COLUMN work_pool_id TEXT")
+        flow_cols = {c["name"] for c in conn.execute("PRAGMA table_info(flow_runs)").fetchall()}
+        if "parent_flow_run_id" not in flow_cols:
+            conn.execute("ALTER TABLE flow_runs ADD COLUMN parent_flow_run_id TEXT")
+        if "parent_task_run_id" not in flow_cols:
+            conn.execute("ALTER TABLE flow_runs ADD COLUMN parent_task_run_id TEXT")
+        if "root_flow_run_id" not in flow_cols:
+            conn.execute("ALTER TABLE flow_runs ADD COLUMN root_flow_run_id TEXT")
+        if "execution_mode" not in flow_cols:
+            conn.execute("ALTER TABLE flow_runs ADD COLUMN execution_mode TEXT")
+        if "depth" not in flow_cols:
+            conn.execute("ALTER TABLE flow_runs ADD COLUMN depth INTEGER NOT NULL DEFAULT 0")
+        if "kind" not in col_names:
+            conn.execute("ALTER TABLE task_runs ADD COLUMN kind TEXT NOT NULL DEFAULT 'task'")
+        if "child_flow_run_id" not in col_names:
+            conn.execute("ALTER TABLE task_runs ADD COLUMN child_flow_run_id TEXT")
+        if "child_deployment_run_id" not in col_names:
+            conn.execute("ALTER TABLE task_runs ADD COLUMN child_deployment_run_id TEXT")
+        dep_run_cols = {c["name"] for c in conn.execute("PRAGMA table_info(deployment_runs)").fetchall()}
+        if "parent_flow_run_id" not in dep_run_cols:
+            conn.execute("ALTER TABLE deployment_runs ADD COLUMN parent_flow_run_id TEXT")
+        if "parent_task_run_id" not in dep_run_cols:
+            conn.execute("ALTER TABLE deployment_runs ADD COLUMN parent_task_run_id TEXT")
+        if "parent_deployment_run_id" not in dep_run_cols:
+            conn.execute("ALTER TABLE deployment_runs ADD COLUMN parent_deployment_run_id TEXT")
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_deployments_work_pool ON deployments(work_pool_id)"
         )
@@ -2466,8 +2596,22 @@ class InMemoryControlPlane:
     def _insert_flow_row(self, record: FlowRunRecord) -> None:
         now = self._now()
         self._sqlite_conn.execute(
-            "INSERT OR IGNORE INTO flow_runs(id,name,state,version,created_at,updated_at) VALUES(?,?,?,?,?,?)",
-            [str(record.run_id), record.name, record.state.value, record.version, now, now],
+            "INSERT OR IGNORE INTO flow_runs(id,name,state,version,created_at,updated_at,"
+            "parent_flow_run_id,parent_task_run_id,root_flow_run_id,execution_mode,depth) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+            [
+                str(record.run_id),
+                record.name,
+                record.state.value,
+                record.version,
+                now,
+                now,
+                str(record.parent_flow_run_id) if record.parent_flow_run_id else None,
+                str(record.parent_task_run_id) if record.parent_task_run_id else None,
+                str(record.root_flow_run_id) if record.root_flow_run_id else None,
+                record.execution_mode,
+                record.depth,
+            ],
         )
 
     def _update_flow_row(self, record: FlowRunRecord) -> None:
@@ -2479,8 +2623,9 @@ class InMemoryControlPlane:
     def _insert_task_row(self, task: TaskRunRecord) -> None:
         now = self._now()
         self._sqlite_conn.execute(
-            "INSERT OR IGNORE INTO task_runs(id,flow_run_id,task_name,planned_node_id,state,version,created_at,updated_at) "
-            "VALUES(?,?,?,?,?,?,?,?)",
+            "INSERT OR IGNORE INTO task_runs(id,flow_run_id,task_name,planned_node_id,state,version,created_at,updated_at,"
+            "kind,child_flow_run_id,child_deployment_run_id) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
             [
                 str(task.task_run_id),
                 str(task.flow_run_id),
@@ -2490,6 +2635,9 @@ class InMemoryControlPlane:
                 task.version,
                 now,
                 now,
+                task.kind,
+                str(task.child_flow_run_id) if task.child_flow_run_id else None,
+                str(task.child_deployment_run_id) if task.child_deployment_run_id else None,
             ],
         )
 
@@ -2650,6 +2798,7 @@ class InMemoryControlPlane:
         return states[-1]
 
     def _flow_row_to_dict(self, row: sqlite3.Row) -> dict[str, Any]:
+        keys = row.keys()
         return {
             "id": row["id"],
             "name": row["name"],
@@ -2657,9 +2806,15 @@ class InMemoryControlPlane:
             "version": row["version"],
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
+            "parent_flow_run_id": row["parent_flow_run_id"] if "parent_flow_run_id" in keys else None,
+            "parent_task_run_id": row["parent_task_run_id"] if "parent_task_run_id" in keys else None,
+            "root_flow_run_id": row["root_flow_run_id"] if "root_flow_run_id" in keys else None,
+            "execution_mode": row["execution_mode"] if "execution_mode" in keys else None,
+            "depth": row["depth"] if "depth" in keys else 0,
         }
 
     def _task_row_to_dict(self, row: sqlite3.Row) -> dict[str, Any]:
+        keys = row.keys()
         return {
             "id": row["id"],
             "flow_run_id": row["flow_run_id"],
@@ -2669,6 +2824,11 @@ class InMemoryControlPlane:
             "version": row["version"],
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
+            "kind": row["kind"] if "kind" in keys else "task",
+            "child_flow_run_id": row["child_flow_run_id"] if "child_flow_run_id" in keys else None,
+            "child_deployment_run_id": row["child_deployment_run_id"]
+            if "child_deployment_run_id" in keys
+            else None,
         }
 
     def _log_row_to_dict(self, row: sqlite3.Row) -> dict[str, Any]:
@@ -2751,6 +2911,7 @@ class InMemoryControlPlane:
         }
 
     def _deployment_run_row_to_dict(self, row: sqlite3.Row) -> dict[str, Any]:
+        keys = row.keys()
         return {
             "id": row["id"],
             "deployment_id": row["deployment_id"],
@@ -2762,6 +2923,11 @@ class InMemoryControlPlane:
             "lease_until": row["lease_until"],
             "flow_run_id": row["flow_run_id"],
             "error": row["error"],
+            "parent_flow_run_id": row["parent_flow_run_id"] if "parent_flow_run_id" in keys else None,
+            "parent_task_run_id": row["parent_task_run_id"] if "parent_task_run_id" in keys else None,
+            "parent_deployment_run_id": row["parent_deployment_run_id"]
+            if "parent_deployment_run_id" in keys
+            else None,
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
             "started_at": row["started_at"],

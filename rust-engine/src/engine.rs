@@ -21,6 +21,17 @@ pub struct FlowRun {
     pub name: String,
     pub state: RunState,
     pub version: u64,
+    #[serde(default)]
+    pub parent_flow_run_id: Option<Uuid>,
+    #[serde(default)]
+    pub parent_task_run_id: Option<Uuid>,
+    #[serde(default)]
+    pub root_flow_run_id: Option<Uuid>,
+    /// `inline` or `deployment` when this run is a subflow child.
+    #[serde(default)]
+    pub execution_mode: Option<String>,
+    #[serde(default)]
+    pub depth: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -103,11 +114,17 @@ impl Engine {
     }
 
     pub fn create_flow_run(&mut self, name: impl Into<String>) -> FlowRun {
+        let id = Uuid::new_v4();
         let run = FlowRun {
-            id: Uuid::new_v4(),
+            id,
             name: name.into(),
             state: RunState::Scheduled,
             version: 0,
+            parent_flow_run_id: None,
+            parent_task_run_id: None,
+            root_flow_run_id: Some(id),
+            execution_mode: None,
+            depth: 0,
         };
         self.flow_runs.insert(run.id, run.clone());
         run
