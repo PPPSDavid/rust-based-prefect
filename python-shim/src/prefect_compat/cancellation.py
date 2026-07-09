@@ -29,8 +29,14 @@ def assert_flow_not_cancelled(flow_run_id: UUID | None = None) -> None:
     rid = flow_run_id or active_flow_run_id()
     if rid is None:
         return
-    if plane.get_flow(rid).state == RunState.CANCELLED:
+    flow = plane.get_flow(rid)
+    if flow.state == RunState.CANCELLED:
         raise FlowRunCancelled(f"flow run {rid} was cancelled")
+    parent_id = flow.parent_flow_run_id
+    if parent_id is not None and flow.execution_mode == "inline":
+        parent = plane.get_flow(parent_id)
+        if parent.state == RunState.CANCELLED:
+            raise FlowRunCancelled(f"parent flow run {parent_id} was cancelled")
 
 
 def sleep_cancelable(seconds: float, *, poll_seconds: float = 0.25) -> None:

@@ -1936,6 +1936,35 @@ class InMemoryControlPlane:
         next_cursor = str(rows[-1]["seq"]) if len(rows) == limit else None
         return PageResult(items=items, next_cursor=next_cursor)
 
+    def _cancel_inline_child_flow_runs(self, parent_flow_run_id: UUID) -> None:
+        """Cancel active inline subflow children when a parent flow is cancelled."""
+        for flow in list(self._flows.values()):
+            if flow.parent_flow_run_id != parent_flow_run_id:
+                continue
+            if flow.execution_mode != "inline":
+                continue
+            if flow.state not in {RunState.SCHEDULED, RunState.PENDING, RunState.RUNNING}:
+                continue
+            try:
+                self.set_flow_state(flow.run_id, RunState.CANCELLED, uuid4(), "parent_cancel")
+            except ValueError:
+                continue
+            self._sqlite_conn.execute(
+                """
+                UPDATE task_runs
+                SET state = 'CANCELLED', updated_at = ?
+                WHERE flow_run_id = ? AND state IN ('SCHEDULED','PENDING','RUNNING')
+                """,
+                [self._now(), str(flow.run_id)],
+            )
+            for task in self._tasks.values():
+                if task.flow_run_id == flow.run_id and task.state in {
+                    RunState.SCHEDULED,
+                    RunState.PENDING,
+                    RunState.RUNNING,
+                }:
+                    task.state = RunState.CANCELLED
+
     def cancel_flow_run(self, flow_run_id: UUID) -> dict[str, Any]:
         detail = self.get_flow_run_detail(flow_run_id)
         if detail is None:
@@ -1957,6 +1986,7 @@ class InMemoryControlPlane:
 
         now = self._now()
         with self._lock:
+            self._cancel_inline_child_flow_runs(flow_run_id)
             self._sqlite_conn.execute(
                 """
                 UPDATE task_runs

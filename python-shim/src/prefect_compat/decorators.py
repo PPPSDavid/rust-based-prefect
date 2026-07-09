@@ -333,6 +333,7 @@ def flow(
             from .cancellation import FlowRunCancelled
 
             token = _ACTIVE_TASK_RUNNER.set(resolved_runner)
+            parent_active_flow_run = _ACTIVE_FLOW_RUN.get()
             flow_token = _ACTIVE_FLOW_RUN.set(None)
             fh = compiled_flow_hooks
             try:
@@ -348,6 +349,9 @@ def flow(
                         if dep_run.get("parent_task_run_id"):
                             parent_task_run_id = UUID(str(dep_run["parent_task_run_id"]))
                         execution_mode = "deployment"
+                elif parent_active_flow_run is not None:
+                    parent_flow_run_id = parent_active_flow_run
+                    execution_mode = "inline"
                 record = _CONTROL_PLANE.create_flow_run(
                     flow_name,
                     parent_flow_run_id=parent_flow_run_id,
@@ -390,6 +394,13 @@ def flow(
                     _CONTROL_PLANE.set_flow_result(record.run_id, result)
                     return result
                 except FlowRunCancelled:
+                    if _CONTROL_PLANE.get_flow(record.run_id).state != RunState.CANCELLED:
+                        prev = _CONTROL_PLANE.get_flow(record.run_id).state
+                        cancelled = _CONTROL_PLANE.set_flow_state(
+                            record.run_id, RunState.CANCELLED, uuid4(), "cancel", expected_version=2
+                        )
+                        if fh and cancelled.status == "applied":
+                            _emit_flow_transition(fh, record.run_id, prev, RunState.CANCELLED, "cancel")
                     raise
                 except Exception:
                     if _CONTROL_PLANE.get_flow(record.run_id).state == RunState.CANCELLED:
