@@ -80,6 +80,27 @@ def long_chain_flow(n: int) -> int:
     assert manifest["nodes"][0]["task_name"] == "passthrough"
 
 
+def test_compile_repeated_task_name_gets_distinct_nodes():
+    source = """
+def status_flow() -> None:
+    started = status.submit("start")
+    done = work.submit(1, wait_for=[started])
+    status.submit("end", wait_for=[done])
+"""
+    graph, diagnostics = compile_flow_source(source, flow_name="status_flow")
+    manifest = graph.as_manifest()
+
+    assert diagnostics.fallback_required is False
+    assert len(manifest["nodes"]) == 3
+    status_nodes = [n for n in manifest["nodes"] if n["task_name"] == "status"]
+    assert len(status_nodes) == 2
+    assert status_nodes[0]["label"] == "status-0"
+    assert status_nodes[1]["label"] == "status-1"
+    assert status_nodes[0]["deps"] == []
+    work_node = next(n for n in manifest["nodes"] if n["task_name"] == "work")
+    assert status_nodes[1]["deps"] == [work_node["node_id"]]
+
+
 def test_conditional_falls_back():
     source = """
 if flag:

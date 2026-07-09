@@ -32,20 +32,28 @@ def compile_flow_source(source: str, flow_name: str = "flow") -> tuple[GraphIR, 
     warnings: list[str] = []
     fallback_required = False
     counter = 0
+    task_instance_counts: dict[str, int] = {}
+
+    def _make_node(task_name: str, op_type: str, deps: list[str]) -> TaskNode:
+        nonlocal counter
+        counter += 1
+        instance = task_instance_counts.get(task_name, 0)
+        task_instance_counts[task_name] = instance + 1
+        return TaskNode(
+            node_id=f"n{counter}",
+            task_name=task_name,
+            op_type=op_type,
+            deps=deps,
+            label=f"{task_name}-{instance}",
+        )
 
     def visit_stmt(stmt: ast.stmt) -> None:
-        nonlocal counter, fallback_required
+        nonlocal fallback_required
         if isinstance(stmt, ast.Assign) and isinstance(stmt.value, ast.Call):
             maybe = _extract_task_call(stmt.value, bound_nodes)
             if maybe is not None and len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name):
-                counter += 1
                 var_name = stmt.targets[0].id
-                node = TaskNode(
-                    node_id=f"n{counter}",
-                    task_name=maybe["task_name"],
-                    op_type=maybe["op_type"],
-                    deps=maybe["deps"],
-                )
+                node = _make_node(maybe["task_name"], maybe["op_type"], maybe["deps"])
                 nodes.append(node)
                 bound_nodes[var_name] = node.node_id
                 return
@@ -69,15 +77,7 @@ def compile_flow_source(source: str, flow_name: str = "flow") -> tuple[GraphIR, 
         if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call):
             maybe = _extract_task_call(stmt.value, bound_nodes)
             if maybe is not None:
-                counter += 1
-                nodes.append(
-                    TaskNode(
-                        node_id=f"n{counter}",
-                        task_name=maybe["task_name"],
-                        op_type=maybe["op_type"],
-                        deps=maybe["deps"],
-                    )
-                )
+                nodes.append(_make_node(maybe["task_name"], maybe["op_type"], maybe["deps"]))
                 return
 
     for stmt in _flow_statements(tree, flow_name):

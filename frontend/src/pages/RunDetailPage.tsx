@@ -98,9 +98,7 @@ export function RunDetailPage() {
     queryClient.setQueryData<FlowRunDag | undefined>(["dag", id, dagMode], (current) => {
       if (!current) return current;
       const nextNodes = current.nodes.map((node) => {
-        const related = tasks.data.items.filter(
-          (task) => task.planned_node_id === node.id || task.task_name === node.task_name
-        );
+        const related = tasks.data.items.filter((task) => task.planned_node_id === node.id);
         if (related.length === 0) return node;
         const states = related.map((t) => t.state);
         const nextState = aggregateState(states);

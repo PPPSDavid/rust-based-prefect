@@ -172,10 +172,12 @@ class TaskWrapper:
     def _prepare_map_task_runs(self, vals: list[Any]) -> list[tuple[TaskRunRecord | None, Any]]:
         flow_run_id = _ACTIVE_FLOW_RUN.get()
         metas: list[tuple[TaskRunRecord | None, Any]] = []
+        planned_node_id: str | None = None
         for v in vals:
             task_run = None
             if flow_run_id is not None:
-                planned_node_id = _CONTROL_PLANE.next_planned_node_id(flow_run_id, self.name)
+                if planned_node_id is None:
+                    planned_node_id = _CONTROL_PLANE.next_planned_node_id(flow_run_id, self.name)
                 task_run = _CONTROL_PLANE.create_task_run(
                     flow_run_id, self.name, planned_node_id=planned_node_id
                 )

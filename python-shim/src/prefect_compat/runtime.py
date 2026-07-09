@@ -98,6 +98,7 @@ class InMemoryControlPlane:
         sqlite_path.parent.mkdir(parents=True, exist_ok=True)
         self._sqlite_path = sqlite_path
         self._manifest_by_task: dict[UUID, dict[str, list[str]]] = {}
+        self._reserved_planned_ids: dict[UUID, set[str]] = {}
         self._sqlite_conn = self._open_sqlite_connection(sqlite_path)
         self._init_sqlite_schema(self._sqlite_conn)
         self._ensure_schema_upgrades(self._sqlite_conn)
@@ -611,18 +612,33 @@ class InMemoryControlPlane:
 
     def next_planned_node_id(self, flow_run_id: UUID, task_name: str) -> str | None:
         with self._lock:
+            reserved = self._reserved_planned_ids.setdefault(flow_run_id, set())
+            task_run_used = {
+                str(task.planned_node_id)
+                for task in self._tasks.values()
+                if task.flow_run_id == flow_run_id and task.planned_node_id
+            }
+            taken = reserved | task_run_used
+
             by_task = self._manifest_by_task.get(flow_run_id)
             if by_task is not None:
-                used = {
-                    str(t.planned_node_id)
-                    for t in self._tasks.values()
-                    if t.flow_run_id == flow_run_id and t.task_name == task_name and t.planned_node_id
-                }
-                for nid in by_task.get(task_name, []):
-                    if nid not in used:
-                        return nid
-                return None
-            return self._next_planned_from_sql_unlocked(flow_run_id, task_name)
+                for node_id in by_task.get(task_name, []):
+                    if node_id not in taken:
+                        reserved.add(node_id)
+                        return node_id
+            else:
+                manifest_id = self._next_planned_from_sql_unlocked(flow_run_id, task_name)
+                if manifest_id is not None and manifest_id not in taken:
+                    reserved.add(manifest_id)
+                    return manifest_id
+
+            index = 0
+            while True:
+                candidate = f"dyn_{task_name}_{index}"
+                if candidate not in taken:
+                    reserved.add(candidate)
+                    return candidate
+                index += 1
 
     def _next_planned_from_sql_unlocked(self, flow_run_id: UUID, task_name: str) -> str | None:
         cur = self._sqlite_conn.execute(
@@ -2546,19 +2562,35 @@ class InMemoryControlPlane:
     def _infer_runtime_manifest(self, task_rows: list[sqlite3.Row]) -> dict[str, Any]:
         nodes: list[dict[str, Any]] = []
         edges: list[dict[str, str]] = []
-        seen: dict[str, str] = {}
+        instance_counts: dict[str, int] = {}
+        node_by_planned: dict[str, str] = {}
         previous: str | None = None
         counter = 0
+
         for row in task_rows:
             task_name = row["task_name"]
-            if task_name not in seen:
+            planned = row["planned_node_id"]
+            node_id = str(planned) if planned else None
+
+            if node_id is None or node_id not in node_by_planned:
                 counter += 1
-                node_id = f"rt_{counter}"
-                seen[task_name] = node_id
-                nodes.append({"node_id": node_id, "task_name": task_name, "op_type": "runtime", "deps": []})
+                node_id = node_id or f"rt_{counter}"
+                instance = instance_counts.get(task_name, 0)
+                instance_counts[task_name] = instance + 1
+                node_by_planned[node_id] = node_id
+                nodes.append(
+                    {
+                        "node_id": node_id,
+                        "task_name": task_name,
+                        "label": f"{task_name}-{instance}",
+                        "op_type": "runtime",
+                        "deps": [],
+                    }
+                )
                 if previous is not None:
                     edges.append({"from": previous, "to": node_id})
                 previous = node_id
+
         return {"nodes": nodes, "edges": edges}
 
     def _logical_dag(
@@ -2567,26 +2599,24 @@ class InMemoryControlPlane:
         nodes = manifest.get("nodes", [])
         edges = manifest.get("edges", [])
         by_planned: dict[str, list[str]] = {}
-        by_task_name: dict[str, list[str]] = {}
         for row in task_rows:
             state = row["state"]
             planned = row["planned_node_id"]
-            task_name = row["task_name"]
             if planned:
-                by_planned.setdefault(planned, []).append(state)
-            by_task_name.setdefault(task_name, []).append(state)
+                by_planned.setdefault(str(planned), []).append(state)
 
         out_nodes: list[dict[str, Any]] = []
         node_state: dict[str, str] = {}
         for node in nodes:
             node_id = str(node["node_id"])
-            states = by_planned.get(node_id) or by_task_name.get(str(node.get("task_name")), [])
+            states = by_planned.get(node_id, [])
             state = self._aggregate_state(states)
             node_state[node_id] = state
+            label = node.get("label") or node.get("task_name", node_id)
             out_nodes.append(
                 {
                     "id": node_id,
-                    "label": node.get("task_name", node_id),
+                    "label": label,
                     "task_name": node.get("task_name"),
                     "op_type": node.get("op_type"),
                     "state": state,
