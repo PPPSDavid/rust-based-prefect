@@ -143,11 +143,44 @@ RRule schedule ticks run in Rust when the native engine is bound, with a Python 
 
 For production-style **external** orchestration (Kubernetes CronJob, systemd timer, CI), the supported pattern is often: call **`POST /api/deployments/{id}/run`** on a timer rather than relying on embedded schedules.
 
-## 5. Workers in production (expectations)
+## 5. Standalone worker and CLI (Tier 1)
 
-- **Today:** the reference path is the **embedded** worker thread in `prefect_compat.server`, plus **heartbeats** under `IRONFLOW_LOCAL_WORKER_NAME`.
-- **Scaling out:** multiple **separate processes** each calling `claim_next_deployment_run` with **distinct worker names** is the intended direction for horizontal scale; there is **no** separate `ironflow worker` CLI packaged like Prefect’s worker yet.
-- **Parity:** IronFlow does **not** offer Prefect work pools, agents, or Cloud-grade worker isolation — see **[Compatibility](compatibility.md)**.
+IronFlow ships a **Tier 1** deployment CLI and manifest format (not full Prefect parity). After installing the shim, the **`ironflow`** entry point provides:
+
+| Command | Purpose |
+| --- | --- |
+| `ironflow init` | Write a starter **`ironflow.yaml`** if missing. |
+| `ironflow deploy` | Create or update deployment(s) from the manifest via the API. |
+| `ironflow serve` | Deploy one entry, run pull steps, then execute a local worker loop for that flow. |
+| `ironflow worker start` | Poll shared local history for queued deployment runs (standalone process). |
+
+Full examples, manifest schema, and Python **`deploy()`** / **`serve()`** helpers: **[How to deploy with the CLI and `ironflow.yaml`](how-to/deploy-with-cli.md)**.
+
+### Split API and worker (two terminals)
+
+For production-style separation, disable the embedded worker on the server and run a dedicated worker that shares the same **`IRONFLOW_HISTORY_PATH`**:
+
+**Terminal 1 — API + scheduler only:**
+
+```bash
+IRONFLOW_ENABLE_LOCAL_WORKER=0 python scripts/ironflow_server.py start --backend-only
+```
+
+**Terminal 2 — deploy manifest, then start worker:**
+
+```bash
+export IRONFLOW_HISTORY_PATH=data/ironflow_history.jsonl
+ironflow deploy --file ironflow.yaml --all
+ironflow worker start --file ironflow.yaml --name worker-1 --pool default-process-pool
+```
+
+The worker process uses the same JSONL/SQLite persistence as the API; both must agree on **`IRONFLOW_HISTORY_PATH`**. Multiple workers with **distinct `--name`** values can claim from the same pool for horizontal scale (same lease/heartbeat model as the embedded worker).
+
+### Expectations vs Prefect
+
+- **Default dev path:** single process via `ironflow_server.py start` (embedded worker + scheduler).
+- **Split path:** `IRONFLOW_ENABLE_LOCAL_WORKER=0` on the API plus `ironflow worker start` or `ironflow serve` / **`serve()`** in Python.
+- **Parity:** IronFlow does **not** offer Prefect Cloud work pools, agents, or full YAML/deploy recipe parity — see **[Compatibility](compatibility.md)**.
 
 ## 6. Related endpoints and UI
 
