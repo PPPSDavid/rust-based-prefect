@@ -5,9 +5,40 @@ A **task** is a Python callable decorated with **`@task`** from **`prefect_compa
 ## Basics
 
 - **`task.submit(*args, wait_for=...)`** — schedule work and get a **future**; use **`future.result()`** or **`wait([...])`** to block inside the flow function.
-- **`@task(name="custom-name")`** — optional runtime task name (defaults to the function name). The static planner resolves names from task objects in the flow module so forecast/DAG labels match task runs.
-- **`task.map(values, wait_for=...)`** — fan out over inputs; returns a list of futures. Combine with **`wait(mapped)`** before downstream **`submit`** calls.
+- **`@task(name="custom-name")`** — optional runtime task name (defaults to the function name). The static planner resolves names from task objects in the flow module or closure so forecast/DAG labels match task runs.
+- **`task.map(values, wait_for=...)`** — fan out over inputs; returns a list of futures. Combine with **`wait(mapped)`** before downstream **`submit`** calls. All mapped task runs share one **logical** DAG node in forecast/UI.
 - Imports and patterns match the subset described in **[Compatibility matrix](../compatibility.md)** and the **[Quick start (demo flow)](../QUICKSTART_DEMO.md)** example.
+
+## Repeated and aliased tasks
+
+IronFlow treats each **`submit`** (or **`map`** site) as its own graph node, even when the Python function or task name repeats.
+
+**Same task, multiple calls** (e.g. status at start and end of a flow):
+
+```python
+@task(name="status-update")
+def notify(msg: str) -> str:
+    return msg
+
+@flow
+def pipeline() -> str:
+    notify.submit("starting")
+    return notify.submit("finished").result()
+```
+
+Logical DAG labels: `status-update-0`, `status-update-1`. Each call gets its own **`planned_node_id`** and task run.
+
+**Different names, shared implementation** — use separate `TaskWrapper` instances; the graph shows separate nodes (`ping-start-0`, `ping-end-0`) because orchestration identity is the task definition, not the shared `def` body:
+
+```python
+def ping_body() -> str:
+    return "pong"
+
+start_ping = task(name="ping-start")(ping_body)
+end_ping = task(name="ping-end")(ping_body)
+```
+
+See **[DAG and forecast](dag-and-forecast.md)** for how this appears in the UI.
 
 ## Transition hooks
 

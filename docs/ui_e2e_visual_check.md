@@ -5,19 +5,42 @@ Use this checklist to quickly verify the full backend-to-UI path.
 ## Preconditions
 
 - API server running on `http://127.0.0.1:8000`
-- UI dev server running on `http://localhost:4173`
+- UI dev server running on `http://localhost:4173` (use `localhost`, not `127.0.0.1`, for the Vite dev server)
+
+Start both with:
+
+```bash
+python scripts/ironflow_server.py start
+```
 
 ## 1) Seed test runs
 
 From repo root:
 
-- `python scripts/ui_e2e_seed.py`
+```bash
+python scripts/ui_e2e_seed.py
+```
 
 Optional custom seed volume:
 
-- `python scripts/ui_e2e_seed.py --mapped 4 --chained 4 --complexity 10`
-- Include failure-path DAG coverage:
-  - `python scripts/ui_e2e_seed.py --mapped 2 --chained 2 --failing 2 --complexity 8`
+```bash
+python scripts/ui_e2e_seed.py --mapped 4 --chained 4 --complexity 10
+python scripts/ui_e2e_seed.py --mapped 2 --chained 2 --failing 2 --complexity 8
+```
+
+**Wide and long DAG stress** (via benchmark API):
+
+```bash
+curl -X POST http://127.0.0.1:8000/benchmark/run \
+  -H 'Content-Type: application/json' \
+  -d '{"flavor":"wide","complexity":100}'
+
+curl -X POST http://127.0.0.1:8000/benchmark/run \
+  -H 'Content-Type: application/json' \
+  -d '{"flavor":"long_chain","complexity":100}'
+```
+
+(`mapped` / `chained` flavors are accepted as aliases for `wide` / `long_chain`.)
 
 ## 2) Visual checks in UI
 
@@ -45,10 +68,17 @@ Inside run detail verify tabs:
 - **Events**: state transitions and task events present
 - **Artifacts**: result artifacts present for completed task events
 - **DAG**:
-  - logical mode renders task graph
-  - expanded mode renders task-run graph
-  - node colors track task states (`RUNNING`, `COMPLETED`, `FAILED`, etc.)
-  - for failing runs, downstream node may appear as `NOT_REACHABLE`
+  - **Logical** mode renders the forecast/manifest graph (`source: forecast` when static compile succeeded)
+  - **Expanded** mode renders per task-run nodes
+  - Node colors track task states (`RUNNING`, `COMPLETED`, `FAILED`, `NOT_REACHABLE`, etc.)
+  - Toolbar: **Fit**, **Reset**, **Logical** / **Expanded** toggle
+  - **Search** finds a task by id/label/name, zooms to it, and highlights upstream/downstream path; **Enter** cycles multiple matches
+  - **Scroll** zooms; **drag** pans the canvas (smooth GPU transform)
+  - Wide runs (`wide_flow`): logical mode collapses fan-out; expanded mode lists individual mapped runs
+  - Long chains (`long_chain_flow`): vertical-friendly layout in logical/expanded views; zoom/pan to navigate
+  - Failing runs: downstream nodes may show `NOT_REACHABLE`
+
+See **[DAG and forecast](concepts/dag-and-forecast.md)** for details.
 
 ## 3) Persistence check
 

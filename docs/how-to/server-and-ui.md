@@ -25,6 +25,10 @@ Defaults: backend **`127.0.0.1:8000`**, frontend **`http://localhost:4173`**. Us
 
 The helper runs **`npm install`** and **`npm run dev`** in `frontend/` when the UI is enabled, so **Node.js** and **npm** must be on `PATH` unless you use **`--backend-only`**.
 
+Open the UI at **`http://localhost:4173`** (Vite binds to IPv6 `localhost`). The API defaults to **`http://127.0.0.1:8000`**.
+
+For run **DAG** visualization (zoom, search, wide/long graphs), see **[DAG and forecast](../concepts/dag-and-forecast.md)** and **[Optional: verify the web UI](../ui_e2e_visual_check.md)**.
+
 ## Deployments and schedules
 
 For deployment lifecycle operations (create/update/trigger) and schedule examples

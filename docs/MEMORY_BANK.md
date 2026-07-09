@@ -12,7 +12,7 @@ This file is a compact context handoff for future sessions.
 
 - `rust-engine/`: deterministic state-machine kernel and append-only event model.
 - `python-shim/`: Prefect-style ergonomics (`@flow`, `@task`, `submit`, `map`, `wait_for`) with compatibility runtime.
-- `static-planner/`: static graph IR + forecast for supported flow subset.
+- `static-planner/`: static graph IR + forecast for supported flow subset (`@flow` body, `submit`/`map`, repeated tasks, `@task(name=...)`, UI DAG logical/expanded).
 - `benchmarks/`: performance comparisons (`ironflow`, `ironflow_http`, `prefect` local).
 
 ## Compatibility Baseline
