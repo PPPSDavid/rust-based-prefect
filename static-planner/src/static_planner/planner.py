@@ -14,6 +14,17 @@ class CompileDiagnostics:
     fallback_required: bool
 
 
+def _flow_statements(tree: ast.Module, flow_name: str) -> list[ast.stmt]:
+    """Return statements to analyze: a single @flow body, a named function, or module-level code."""
+    func_defs = [n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+    if len(func_defs) == 1:
+        return func_defs[0].body
+    for func in func_defs:
+        if func.name == flow_name:
+            return func.body
+    return list(tree.body)
+
+
 def compile_flow_source(source: str, flow_name: str = "flow") -> tuple[GraphIR, CompileDiagnostics]:
     tree = ast.parse(source)
     nodes: list[TaskNode] = []
@@ -69,7 +80,7 @@ def compile_flow_source(source: str, flow_name: str = "flow") -> tuple[GraphIR, 
                 )
                 return
 
-    for stmt in tree.body:
+    for stmt in _flow_statements(tree, flow_name):
         visit_stmt(stmt)
 
     graph = GraphIR(flow_name=flow_name, nodes=nodes)
@@ -100,12 +111,30 @@ def _extract_task_call(call: ast.Call, bound_nodes: dict[str, str]) -> dict[str,
     if isinstance(call.func.value, ast.Name):
         task_name = call.func.value.id
 
-    deps: list[str] = []
-    for arg in call.args:
-        if isinstance(arg, ast.Name) and arg.id in bound_nodes:
-            deps.append(bound_nodes[arg.id])
+    dep_ids: list[str] = []
+    seen: set[str] = set()
 
-    return {"task_name": task_name, "op_type": attr, "deps": deps}
+    def add_dep(name: str | None) -> None:
+        if not name or name not in bound_nodes:
+            return
+        node_id = bound_nodes[name]
+        if node_id not in seen:
+            seen.add(node_id)
+            dep_ids.append(node_id)
+
+    for arg in call.args:
+        if isinstance(arg, ast.Name):
+            add_dep(arg.id)
+
+    for kw in call.keywords:
+        if kw.arg != "wait_for":
+            continue
+        if isinstance(kw.value, (ast.List, ast.Tuple)):
+            for elt in kw.value.elts:
+                if isinstance(elt, ast.Name):
+                    add_dep(elt.id)
+
+    return {"task_name": task_name, "op_type": attr, "deps": dep_ids}
 
 
 def _bounded_range(node: ast.AST) -> int | None:
