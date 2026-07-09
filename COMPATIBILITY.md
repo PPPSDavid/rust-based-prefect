@@ -22,6 +22,7 @@ Maintainers should use `docs/compatibility_review_workflow.md` before changing t
   - `@flow` and `@task` decorated functions (compatibility shim).
   - `task.submit()` dependency chains.
   - `task.map()` with moderate fan-out.
+  - `@task(name=...)` custom task names (runtime + static forecast when tasks are module-level or flow-closure visible).
   - retries / timeouts / cancellation intent propagation.
   - concurrency limit tags (control-plane enforced).
   - **State transition hooks** (IronFlow extension, not Prefect API names): pass `transition_hooks=` to `@flow` / `@task` as a sequence of `TransitionHookSpec` from `on_transition(fn, from_state=..., to_state=...)`. `None` for `from_state` or `to_state` is a wildcard. Hooks run **synchronously in-process** after each successful control-plane transition (including the two edges produced by the batched `PENDING`/`RUNNING` start path), **without** holding the control-plane lock. User hook bodies may block arbitrarily; IronFlow only guarantees low overhead when **no** hooks are registered. Hook exceptions are logged and do not fail the run. Prefect’s separate `on_running` / `on_failure` / … style maps to explicit edges (e.g. `PENDING→RUNNING`, any `→FAILED`).

@@ -25,7 +25,11 @@ def _flow_statements(tree: ast.Module, flow_name: str) -> list[ast.stmt]:
     return list(tree.body)
 
 
-def compile_flow_source(source: str, flow_name: str = "flow") -> tuple[GraphIR, CompileDiagnostics]:
+def compile_flow_source(
+    source: str,
+    flow_name: str = "flow",
+    task_names: dict[str, str] | None = None,
+) -> tuple[GraphIR, CompileDiagnostics]:
     tree = ast.parse(source)
     nodes: list[TaskNode] = []
     bound_nodes: dict[str, str] = {}
@@ -34,9 +38,15 @@ def compile_flow_source(source: str, flow_name: str = "flow") -> tuple[GraphIR, 
     counter = 0
     task_instance_counts: dict[str, int] = {}
 
-    def _make_node(task_name: str, op_type: str, deps: list[str]) -> TaskNode:
+    name_lookup = task_names or {}
+
+    def _resolve_task_name(symbol: str) -> str:
+        return name_lookup.get(symbol, symbol)
+
+    def _make_node(symbol: str, op_type: str, deps: list[str]) -> TaskNode:
         nonlocal counter
         counter += 1
+        task_name = _resolve_task_name(symbol)
         instance = task_instance_counts.get(task_name, 0)
         task_instance_counts[task_name] = instance + 1
         return TaskNode(
@@ -47,16 +57,23 @@ def compile_flow_source(source: str, flow_name: str = "flow") -> tuple[GraphIR, 
             label=f"{task_name}-{instance}",
         )
 
+    def _append_task_call(call: ast.Call) -> None:
+        maybe = _extract_task_call(call, bound_nodes)
+        if maybe is not None:
+            nodes.append(_make_node(maybe["symbol"], maybe["op_type"], maybe["deps"]))
+
     def visit_stmt(stmt: ast.stmt) -> None:
         nonlocal fallback_required
-        if isinstance(stmt, ast.Assign) and isinstance(stmt.value, ast.Call):
-            maybe = _extract_task_call(stmt.value, bound_nodes)
-            if maybe is not None and len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name):
+        if isinstance(stmt, ast.Assign):
+            call = _locate_task_call(stmt.value)
+            if call is not None and len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name):
                 var_name = stmt.targets[0].id
-                node = _make_node(maybe["task_name"], maybe["op_type"], maybe["deps"])
-                nodes.append(node)
-                bound_nodes[var_name] = node.node_id
-                return
+                maybe = _extract_task_call(call, bound_nodes)
+                if maybe is not None:
+                    node = _make_node(maybe["symbol"], maybe["op_type"], maybe["deps"])
+                    nodes.append(node)
+                    bound_nodes[var_name] = node.node_id
+                    return
 
         if isinstance(stmt, ast.For):
             unrolled = _bounded_range(stmt.iter)
@@ -74,10 +91,16 @@ def compile_flow_source(source: str, flow_name: str = "flow") -> tuple[GraphIR, 
             fallback_required = True
             return
 
-        if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call):
-            maybe = _extract_task_call(stmt.value, bound_nodes)
-            if maybe is not None:
-                nodes.append(_make_node(maybe["task_name"], maybe["op_type"], maybe["deps"]))
+        if isinstance(stmt, ast.Expr):
+            call = _locate_task_call(stmt.value)
+            if call is not None:
+                _append_task_call(call)
+                return
+
+        if isinstance(stmt, ast.Return) and stmt.value is not None:
+            call = _locate_task_call(stmt.value)
+            if call is not None:
+                _append_task_call(call)
                 return
 
     for stmt in _flow_statements(tree, flow_name):
@@ -87,8 +110,12 @@ def compile_flow_source(source: str, flow_name: str = "flow") -> tuple[GraphIR, 
     return graph, CompileDiagnostics(warnings=warnings, fallback_required=fallback_required)
 
 
-def compile_and_forecast(source: str, flow_name: str = "flow") -> dict[str, Any]:
-    graph, diagnostics = compile_flow_source(source, flow_name)
+def compile_and_forecast(
+    source: str,
+    flow_name: str = "flow",
+    task_names: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    graph, diagnostics = compile_flow_source(source, flow_name, task_names=task_names)
     forecast = forecast_graph(graph)
     return {
         "manifest": graph.as_manifest(),
@@ -107,9 +134,9 @@ def _extract_task_call(call: ast.Call, bound_nodes: dict[str, str]) -> dict[str,
     if attr not in {"submit", "map"}:
         return None
 
-    task_name = "unknown_task"
+    symbol = "unknown_task"
     if isinstance(call.func.value, ast.Name):
-        task_name = call.func.value.id
+        symbol = call.func.value.id
 
     dep_ids: list[str] = []
     seen: set[str] = set()
@@ -134,7 +161,16 @@ def _extract_task_call(call: ast.Call, bound_nodes: dict[str, str]) -> dict[str,
                 if isinstance(elt, ast.Name):
                     add_dep(elt.id)
 
-    return {"task_name": task_name, "op_type": attr, "deps": dep_ids}
+    return {"symbol": symbol, "op_type": attr, "deps": dep_ids}
+
+
+def _locate_task_call(node: ast.AST) -> ast.Call | None:
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+        if node.func.attr in {"submit", "map"}:
+            return node
+        if node.func.attr == "result":
+            return _locate_task_call(node.func.value)
+    return None
 
 
 def _bounded_range(node: ast.AST) -> int | None:

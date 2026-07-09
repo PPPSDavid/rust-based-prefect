@@ -492,6 +492,29 @@ def _compile_forecast_for_flow(flow_fn: Callable[..., Any], flow_name: str) -> d
     return info
 
 
+def _task_symbols_for_flow(flow_fn: Callable[..., Any]) -> dict[str, str]:
+    """Map flow-local symbols to runtime task names (including @task(name=...))."""
+    symbols: dict[str, str] = {}
+    try:
+        unwrapped = inspect.unwrap(flow_fn)
+        module = inspect.getmodule(unwrapped)
+        namespaces: list[dict[str, Any]] = []
+        if module is not None:
+            namespaces.append(vars(module))
+        closure = inspect.getclosurevars(unwrapped)
+        if closure.globals:
+            namespaces.append(closure.globals)
+        if closure.nonlocals:
+            namespaces.append(closure.nonlocals)
+        for namespace in namespaces:
+            for key, value in namespace.items():
+                if isinstance(value, TaskWrapper):
+                    symbols[key] = value.name
+    except Exception:
+        return symbols
+    return symbols
+
+
 def _compile_forecast_for_flow_uncached(flow_fn: Callable[..., Any], flow_name: str) -> dict[str, Any]:
     try:
         from static_planner import compile_and_forecast
@@ -512,7 +535,8 @@ def _compile_forecast_for_flow_uncached(flow_fn: Callable[..., Any], flow_name: 
 
     try:
         source = textwrap.dedent(inspect.getsource(flow_fn))
-        result = compile_and_forecast(source, flow_name=flow_name)
+        task_names = _task_symbols_for_flow(flow_fn)
+        result = compile_and_forecast(source, flow_name=flow_name, task_names=task_names)
         diagnostics = result.get("diagnostics", {})
         return {
             "manifest": result.get("manifest", {}),

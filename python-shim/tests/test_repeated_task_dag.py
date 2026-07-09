@@ -63,3 +63,56 @@ def test_repeated_expr_submits_get_distinct_manifest_planned_nodes(tmp_path: Pat
     rows = plane.list_task_runs(run.run_id).items
     planned = sorted([row["planned_node_id"] for row in rows if row["task_name"] == "status"])
     assert planned == ["n1", "n2"]
+
+
+def test_custom_task_name_aligns_forecast_and_planned_nodes(tmp_path: Path) -> None:
+    history = tmp_path / "custom-name-history.jsonl"
+    plane = InMemoryControlPlane(history_path=str(history))
+    set_control_plane(plane)
+
+    @task(name="status-update")
+    def notify(msg: str) -> str:
+        return msg
+
+    @flow
+    def notify_flow() -> str:
+        notify.submit("start")
+        return notify.submit("end").result()
+
+    assert notify_flow() == "end"
+    run = plane.latest_flow()
+    assert run is not None
+
+    rows = sorted(
+        plane.list_task_runs(run.run_id).items,
+        key=lambda row: row["planned_node_id"] or "",
+    )
+    assert [row["task_name"] for row in rows] == ["status-update", "status-update"]
+    assert [row["planned_node_id"] for row in rows] == ["n1", "n2"]
+
+    dag = plane.get_flow_run_dag(run.run_id, mode="logical")
+    assert dag["source"] == "forecast"
+    assert [node["label"] for node in dag["nodes"]] == ["status-update-0", "status-update-1"]
+
+
+def test_distinct_wrappers_same_function_are_separate_tasks(tmp_path: Path) -> None:
+    history = tmp_path / "alias-task-history.jsonl"
+    plane = InMemoryControlPlane(history_path=str(history))
+    set_control_plane(plane)
+
+    def ping_body() -> str:
+        return "pong"
+
+    start_ping = task(name="ping-start")(ping_body)
+    end_ping = task(name="ping-end")(ping_body)
+
+    @flow
+    def ping_flow() -> list[str]:
+        a = start_ping.submit()
+        b = end_ping.submit(wait_for=[a])
+        return [a.result(), b.result()]
+
+    assert ping_flow() == ["pong", "pong"]
+    dag = plane.get_flow_run_dag(plane.latest_flow().run_id, mode="logical")
+    labels = [node["label"] for node in dag["nodes"]]
+    assert labels == ["ping-start-0", "ping-end-0"]

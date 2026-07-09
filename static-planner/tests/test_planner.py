@@ -101,6 +101,42 @@ def status_flow() -> None:
     assert status_nodes[1]["deps"] == [work_node["node_id"]]
 
 
+def test_compile_resolves_custom_task_names_via_symbol_map():
+    source = """
+def demo() -> str:
+    notify.submit("start")
+    return notify.submit("end").result()
+"""
+    graph, diagnostics = compile_flow_source(
+        source,
+        flow_name="demo",
+        task_names={"notify": "status-update"},
+    )
+    manifest = graph.as_manifest()
+
+    assert diagnostics.fallback_required is False
+    assert len(manifest["nodes"]) == 2
+    assert all(node["task_name"] == "status-update" for node in manifest["nodes"])
+    assert manifest["nodes"][0]["label"] == "status-update-0"
+    assert manifest["nodes"][1]["label"] == "status-update-1"
+
+
+def test_compile_distinct_symbols_with_different_runtime_names():
+    source = """
+def demo() -> None:
+    start_ping.submit()
+    end_ping.submit()
+"""
+    graph, _ = compile_flow_source(
+        source,
+        flow_name="demo",
+        task_names={"start_ping": "ping-start", "end_ping": "ping-end"},
+    )
+    manifest = graph.as_manifest()
+    names = [node["task_name"] for node in manifest["nodes"]]
+    assert names == ["ping-start", "ping-end"]
+
+
 def test_conditional_falls_back():
     source = """
 if flag:

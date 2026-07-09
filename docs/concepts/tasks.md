@@ -5,6 +5,7 @@ A **task** is a Python callable decorated with **`@task`** from **`prefect_compa
 ## Basics
 
 - **`task.submit(*args, wait_for=...)`** — schedule work and get a **future**; use **`future.result()`** or **`wait([...])`** to block inside the flow function.
+- **`@task(name="custom-name")`** — optional runtime task name (defaults to the function name). The static planner resolves names from task objects in the flow module so forecast/DAG labels match task runs.
 - **`task.map(values, wait_for=...)`** — fan out over inputs; returns a list of futures. Combine with **`wait(mapped)`** before downstream **`submit`** calls.
 - Imports and patterns match the subset described in **[Compatibility matrix](../compatibility.md)** and the **[Quick start (demo flow)](../QUICKSTART_DEMO.md)** example.
 
