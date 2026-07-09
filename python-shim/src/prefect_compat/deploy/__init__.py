@@ -1,3 +1,4 @@
+from .api import deploy, serve
 from .client import DeployClient
 from .spec import (
     DeploymentSpec,
@@ -14,6 +15,8 @@ __all__ = [
     "IronflowManifest",
     "ScheduleSpec",
     "WorkPoolRef",
+    "deploy",
     "load_manifest",
     "parse_entrypoint",
+    "serve",
 ]
