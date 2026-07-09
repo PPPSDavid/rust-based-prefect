@@ -1365,7 +1365,7 @@ class InMemoryControlPlane:
                 """
                 SELECT id,name,flow_name,entrypoint,path,default_parameters,paused,
                        concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,
-                       schedule_next_run_at,schedule_enabled,created_at,updated_at
+                       schedule_next_run_at,schedule_enabled,work_pool_id,created_at,updated_at
                 FROM deployments
                 WHERE name = ?
                 LIMIT 1
@@ -1433,7 +1433,7 @@ class InMemoryControlPlane:
                 """
                 SELECT id,name,flow_name,entrypoint,path,default_parameters,paused,
                        concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,
-                       schedule_next_run_at,schedule_enabled,created_at,updated_at
+                       schedule_next_run_at,schedule_enabled,work_pool_id,created_at,updated_at
                 FROM deployments
                 WHERE id = ?
                 LIMIT 1
