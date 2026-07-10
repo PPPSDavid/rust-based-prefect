@@ -31,6 +31,9 @@ jobs:
       - name: Run reduced deterministic suite
         run: |
           python benchmarks/perf_matrix.py run --preset lite --repetitions 2 --warmups 1 --jobs 2 --out-json docs/perf_pr_results.json --out-md docs/perf_pr_summary.md
+      - name: Run subflow lite suite
+        run: |
+          python benchmarks/perf_matrix.py run --preset subflow_lite --repetitions 1 --warmups 0 --jobs 2 --out-json docs/perf_subflow_pr_results.json --out-md docs/perf_subflow_pr_summary.md
       - name: Upload reduced suite artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -38,6 +41,8 @@ jobs:
           path: |
             docs/perf_pr_results.json
             docs/perf_pr_summary.md
+            docs/perf_subflow_pr_results.json
+            docs/perf_subflow_pr_summary.md
 
   perf-pr-cross:
     if: github.event_name == 'pull_request'
@@ -83,6 +88,9 @@ jobs:
       - name: Run full deterministic suite
         run: |
           python benchmarks/perf_matrix.py run --preset full --repetitions 5 --warmups 2 --jobs 2 --out-json docs/perf_main_results.json --out-md docs/perf_main_summary.md
+      - name: Run subflow suite
+        run: |
+          python benchmarks/perf_matrix.py run --preset subflow --repetitions 3 --warmups 1 --jobs 2 --out-json docs/perf_subflow_main_results.json --out-md docs/perf_subflow_main_summary.md
       - name: Upload full suite artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -90,3 +98,5 @@ jobs:
           path: |
             docs/perf_main_results.json
             docs/perf_main_summary.md
+            docs/perf_subflow_main_results.json
+            docs/perf_subflow_main_summary.md
