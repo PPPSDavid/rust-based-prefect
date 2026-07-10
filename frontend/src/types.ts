@@ -11,6 +11,24 @@ export type FlowRun = {
   created_at: string;
   updated_at: string;
   deployment_id?: string | null;
+  parent_flow_run_id?: string | null;
+  root_flow_run_id?: string | null;
+  execution_mode?: string | null;
+  depth?: number;
+  breadcrumb?: FlowRunBreadcrumb[];
+  children_summary?: FlowRunChildrenSummary;
+};
+
+export type FlowRunBreadcrumb = {
+  id: string;
+  name: string;
+  execution_mode?: string | null;
+};
+
+export type FlowRunChildrenSummary = {
+  inline_subflows: number;
+  subflow_tasks: number;
+  deployment_subflows: number;
 };
 
 export type TaskRun = {
@@ -62,6 +80,10 @@ export type DagNode = {
   op_type?: string;
   planned_node_id?: string | null;
   state: string;
+  kind?: "task" | "inline_subflow" | "subflow_task";
+  child_flow_run_id?: string | null;
+  child_deployment_run_id?: string | null;
+  execution_mode?: string | null;
 };
 
 export type DagEdge = {

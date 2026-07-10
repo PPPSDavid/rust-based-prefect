@@ -42,7 +42,7 @@ fn query_flow_runs(conn: &Connection, params_json: &str) -> Result<String, Strin
     let cursor = parse_opt_string(params_json, "cursor").and_then(|v| v.parse::<i64>().ok());
     let limit = parse_limit(params_json, 50);
     let mut sql =
-        "SELECT seq,id,name,state,version,created_at,updated_at FROM flow_runs".to_string();
+        "SELECT seq,id,name,state,version,created_at,updated_at,parent_flow_run_id,parent_task_run_id,root_flow_run_id,execution_mode,depth FROM flow_runs".to_string();
     let mut has_where = false;
     if state.is_some() {
         sql.push_str(" WHERE state = ?1");
@@ -69,6 +69,11 @@ fn query_flow_runs(conn: &Connection, params_json: &str) -> Result<String, Strin
                     "version": row.get::<_, i64>(4)?,
                     "created_at": row.get::<_, String>(5)?,
                     "updated_at": row.get::<_, String>(6)?,
+                    "parent_flow_run_id": row.get::<_, Option<String>>(7)?,
+                    "parent_task_run_id": row.get::<_, Option<String>>(8)?,
+                    "root_flow_run_id": row.get::<_, Option<String>>(9)?,
+                    "execution_mode": row.get::<_, Option<String>>(10)?,
+                    "depth": row.get::<_, i64>(11)?,
                     "seq": row.get::<_, i64>(0)?
                 }))
             },
@@ -84,7 +89,7 @@ fn query_flow_run_detail(conn: &Connection, params_json: &str) -> Result<String,
     let flow_run_id = parse_opt_string(params_json, "flow_run_id")
         .ok_or_else(|| "flow_run_id required".to_string())?;
     let mut stmt = conn
-        .prepare("SELECT id,name,state,version,created_at,updated_at FROM flow_runs WHERE id = ?1 LIMIT 1")
+        .prepare("SELECT id,name,state,version,created_at,updated_at,parent_flow_run_id,parent_task_run_id,root_flow_run_id,execution_mode,depth FROM flow_runs WHERE id = ?1 LIMIT 1")
         .map_err(|e| e.to_string())?;
     let mut rows = stmt.query(params![flow_run_id]).map_err(|e| e.to_string())?;
     if let Some(row) = rows.next().map_err(|e| e.to_string())? {
@@ -94,7 +99,12 @@ fn query_flow_run_detail(conn: &Connection, params_json: &str) -> Result<String,
             "state": row.get::<_, String>(2).map_err(|e| e.to_string())?,
             "version": row.get::<_, i64>(3).map_err(|e| e.to_string())?,
             "created_at": row.get::<_, String>(4).map_err(|e| e.to_string())?,
-            "updated_at": row.get::<_, String>(5).map_err(|e| e.to_string())?
+            "updated_at": row.get::<_, String>(5).map_err(|e| e.to_string())?,
+            "parent_flow_run_id": row.get::<_, Option<String>>(6).map_err(|e| e.to_string())?,
+            "parent_task_run_id": row.get::<_, Option<String>>(7).map_err(|e| e.to_string())?,
+            "root_flow_run_id": row.get::<_, Option<String>>(8).map_err(|e| e.to_string())?,
+            "execution_mode": row.get::<_, Option<String>>(9).map_err(|e| e.to_string())?,
+            "depth": row.get::<_, i64>(10).map_err(|e| e.to_string())?
         }))
         .map_err(|e| e.to_string())
     } else {
@@ -107,7 +117,7 @@ fn query_task_runs(conn: &Connection, params_json: &str) -> Result<String, Strin
         .ok_or_else(|| "flow_run_id required".to_string())?;
     let cursor = parse_opt_string(params_json, "cursor").and_then(|v| v.parse::<i64>().ok());
     let limit = parse_limit(params_json, 200);
-    let mut sql = "SELECT seq,id,flow_run_id,task_name,planned_node_id,state,version,created_at,updated_at FROM task_runs WHERE flow_run_id = ?1".to_string();
+    let mut sql = "SELECT seq,id,flow_run_id,task_name,planned_node_id,state,version,created_at,updated_at,kind,child_flow_run_id,child_deployment_run_id FROM task_runs WHERE flow_run_id = ?1".to_string();
     if cursor.is_some() {
         sql.push_str(" AND seq < ?2");
     }
@@ -124,6 +134,9 @@ fn query_task_runs(conn: &Connection, params_json: &str) -> Result<String, Strin
                 "version": row.get::<_, i64>(6)?,
                 "created_at": row.get::<_, String>(7)?,
                 "updated_at": row.get::<_, String>(8)?,
+                "kind": row.get::<_, Option<String>>(9)?.unwrap_or_else(|| "task".to_string()),
+                "child_flow_run_id": row.get::<_, Option<String>>(10)?,
+                "child_deployment_run_id": row.get::<_, Option<String>>(11)?,
                 "seq": row.get::<_, i64>(0)?
             }))
         })

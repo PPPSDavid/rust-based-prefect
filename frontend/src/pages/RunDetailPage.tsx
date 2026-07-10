@@ -111,15 +111,34 @@ export function RunDetailPage() {
   if (run.isLoading && !run.data) return <p>Loading run...</p>;
   if ((run.error && !run.data) || !run.data) return <p>Unable to load run.</p>;
 
+  const breadcrumbItems =
+    run.data.breadcrumb && run.data.breadcrumb.length > 0
+      ? [
+          { label: "Flow Runs", to: "/runs" },
+          ...run.data.breadcrumb.map((crumb, index) => ({
+            label:
+              crumb.execution_mode === "inline" && index < run.data!.breadcrumb!.length - 1
+                ? `${crumb.name} (inline)`
+                : crumb.name,
+            to: index < run.data!.breadcrumb!.length - 1 ? `/runs/${crumb.id}` : undefined
+          }))
+        ]
+      : [
+          { label: "Flow Runs", to: "/runs" },
+          { label: run.data.name }
+        ];
+
+  const children = run.data.children_summary;
+  const hasChildren =
+    children &&
+    (children.inline_subflows > 0 || children.subflow_tasks > 0 || children.deployment_subflows > 0);
+
   return (
     <section>
       <PageHeader
         title={run.data.name}
         subtitle={`Run ${run.data.id}`}
-        breadcrumbs={[
-          { label: "Flow Runs", to: "/runs" },
-          { label: run.data.name }
-        ]}
+        breadcrumbs={breadcrumbItems}
         actions={
           <>
             {CANCELLABLE.has(run.data.state) ? (
@@ -138,7 +157,21 @@ export function RunDetailPage() {
       <p>
         <StateBadge state={run.data.state} /> · version {run.data.version} · updated{" "}
         {new Date(run.data.updated_at).toLocaleString()}
+        {run.data.execution_mode ? ` · ${run.data.execution_mode} subflow` : ""}
+        {typeof run.data.depth === "number" && run.data.depth > 0 ? ` · depth ${run.data.depth}` : ""}
       </p>
+      {run.data.parent_flow_run_id ? (
+        <p>
+          Parent run:{" "}
+          <Link to={`/runs/${run.data.parent_flow_run_id}`}>{run.data.parent_flow_run_id.slice(0, 8)}…</Link>
+        </p>
+      ) : null}
+      {hasChildren ? (
+        <p className="run-children-summary">
+          Subflows: {children!.inline_subflows} inline · {children!.subflow_tasks} deployment task
+          {children!.deployment_subflows > 0 ? ` · ${children!.deployment_subflows} deployment child` : ""}
+        </p>
+      ) : null}
       {run.data.deployment_id ? (
         <p>
           Deployment: <Link to={`/deployments/${run.data.deployment_id}`}>{run.data.deployment_id.slice(0, 8)}</Link>

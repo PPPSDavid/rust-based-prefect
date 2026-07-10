@@ -1,6 +1,7 @@
 from .decorators import flow, set_control_plane, task, wait
 from .hooks import TransitionContext, TransitionHookSpec, on_transition
 from .runtime import InMemoryControlPlane, RunState
+from .subflows import SubflowFuture, deployment_ref
 from .task_runners import (
     ProcessPoolTaskRunner,
     SequentialTaskRunner,
@@ -22,4 +23,6 @@ __all__ = [
     "ThreadPoolTaskRunner",
     "ProcessPoolTaskRunner",
     "default_task_runner_from_env",
+    "deployment_ref",
+    "SubflowFuture",
 ]

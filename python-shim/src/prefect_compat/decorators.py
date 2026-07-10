@@ -49,7 +49,7 @@ class TaskFuture(Generic[T]):
         return self.value
 
 
-def wait(futures: Sequence["TaskFuture[Any]"]) -> list[Any]:
+def wait(futures: Sequence["TaskFuture[Any] | SubflowFuture[Any]"]) -> list[Any]:  # noqa: F821
     return [future.result() for future in futures]
 
 
@@ -76,7 +76,12 @@ class TaskWrapper:
         resolved_kwargs = {k: _resolve(v) for k, v in kwargs.items()}
         return self.fn(*resolved_args, **resolved_kwargs)
 
-    def submit(self, *args: Any, wait_for: Sequence[TaskFuture[Any]] | None = None, **kwargs: Any) -> TaskFuture[T]:
+    def submit(
+        self,
+        *args: Any,
+        wait_for: Sequence["TaskFuture[Any] | SubflowFuture[Any]"] | None = None,
+        **kwargs: Any,
+    ) -> TaskFuture[T]:
         if wait_for:
             wait(wait_for)
 
@@ -149,7 +154,7 @@ class TaskWrapper:
             raise
 
     def map(
-        self, values: Iterable[Any], wait_for: Sequence[TaskFuture[Any]] | None = None
+        self, values: Iterable[Any], wait_for: Sequence["TaskFuture[Any] | SubflowFuture[Any]"] | None = None
     ) -> list[TaskFuture[T]]:
         runner = _ACTIVE_TASK_RUNNER.get()
         if runner is None:
@@ -330,12 +335,32 @@ def flow(
             from .cancellation import FlowRunCancelled
 
             token = _ACTIVE_TASK_RUNNER.set(resolved_runner)
+            parent_active_flow_run = _ACTIVE_FLOW_RUN.get()
             flow_token = _ACTIVE_FLOW_RUN.set(None)
             fh = compiled_flow_hooks
             try:
-                record = _CONTROL_PLANE.create_flow_run(flow_name)
-                _ACTIVE_FLOW_RUN.set(record.run_id)
                 dep_run_id = _ACTIVE_DEPLOYMENT_RUN.get()
+                parent_flow_run_id = None
+                parent_task_run_id = None
+                execution_mode = None
+                if dep_run_id is not None:
+                    dep_run = _CONTROL_PLANE.get_deployment_run(dep_run_id)
+                    if dep_run:
+                        if dep_run.get("parent_flow_run_id"):
+                            parent_flow_run_id = UUID(str(dep_run["parent_flow_run_id"]))
+                        if dep_run.get("parent_task_run_id"):
+                            parent_task_run_id = UUID(str(dep_run["parent_task_run_id"]))
+                        execution_mode = "deployment"
+                elif parent_active_flow_run is not None:
+                    parent_flow_run_id = parent_active_flow_run
+                    execution_mode = "inline"
+                record = _CONTROL_PLANE.create_flow_run(
+                    flow_name,
+                    parent_flow_run_id=parent_flow_run_id,
+                    parent_task_run_id=parent_task_run_id,
+                    execution_mode=execution_mode,
+                )
+                _ACTIVE_FLOW_RUN.set(record.run_id)
                 if dep_run_id is not None:
                     _CONTROL_PLANE.attach_flow_run_to_deployment_run(dep_run_id, record.run_id)
                 manifest_info = _compile_forecast_for_flow(f, flow_name)
@@ -362,14 +387,25 @@ def flow(
                     )
                 try:
                     result = f(*args, **kwargs)
-                    prev = _CONTROL_PLANE.get_flow(record.run_id).state
+                    current = _CONTROL_PLANE.get_flow(record.run_id)
+                    if current.state == RunState.CANCELLED:
+                        raise FlowRunCancelled(f"flow run {record.run_id} was cancelled")
+                    prev = current.state
                     done = _CONTROL_PLANE.set_flow_state(
-                        record.run_id, RunState.COMPLETED, uuid4(), "complete", expected_version=2
+                        record.run_id, RunState.COMPLETED, uuid4(), "complete", expected_version=current.version
                     )
                     if fh and done.status == "applied":
                         _emit_flow_transition(fh, record.run_id, prev, RunState.COMPLETED, "complete")
+                    _CONTROL_PLANE.set_flow_result(record.run_id, result)
                     return result
                 except FlowRunCancelled:
+                    if _CONTROL_PLANE.get_flow(record.run_id).state != RunState.CANCELLED:
+                        prev = _CONTROL_PLANE.get_flow(record.run_id).state
+                        cancelled = _CONTROL_PLANE.set_flow_state(
+                            record.run_id, RunState.CANCELLED, uuid4(), "cancel", expected_version=2
+                        )
+                        if fh and cancelled.status == "applied":
+                            _emit_flow_transition(fh, record.run_id, prev, RunState.CANCELLED, "cancel")
                     raise
                 except Exception:
                     if _CONTROL_PLANE.get_flow(record.run_id).state == RunState.CANCELLED:
@@ -477,6 +513,10 @@ def _emit_task_single_hook_edge(
 
 def _resolve(value: Any) -> Any:
     if isinstance(value, TaskFuture):
+        return value.result()
+    from .subflows import SubflowFuture
+
+    if isinstance(value, SubflowFuture):
         return value.result()
     return value
 
