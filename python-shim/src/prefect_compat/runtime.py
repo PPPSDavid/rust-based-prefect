@@ -1742,22 +1742,72 @@ class InMemoryControlPlane:
     _DEPLOYMENT_TERMINAL = frozenset({"COMPLETED", "FAILED", "CANCELLED"})
     _DEPLOYMENT_ACTIVE = frozenset({"SCHEDULED", "CLAIMED", "RUNNING"})
 
-    def update_subflow_task_child_flow_run(self, task_run_id: UUID, child_flow_run_id: UUID) -> None:
+    def update_subflow_task_linkage(
+        self,
+        task_run_id: UUID,
+        *,
+        child_flow_run_id: UUID | None = None,
+        child_deployment_run_id: UUID | None = None,
+    ) -> None:
+        if child_flow_run_id is None and child_deployment_run_id is None:
+            return
+        changed = False
         with self._lock:
             task = self._tasks.get(task_run_id)
             if task is None:
                 return
-            task.child_flow_run_id = child_flow_run_id
-            self._sqlite_conn.execute(
-                "UPDATE task_runs SET child_flow_run_id = ? WHERE id = ?",
-                [str(child_flow_run_id), str(task_run_id)],
-            )
+            updates: list[str] = []
+            params: list[str] = []
+            if child_flow_run_id is not None and task.child_flow_run_id != child_flow_run_id:
+                task.child_flow_run_id = child_flow_run_id
+                updates.append("child_flow_run_id = ?")
+                params.append(str(child_flow_run_id))
+                changed = True
+            if child_deployment_run_id is not None and task.child_deployment_run_id != child_deployment_run_id:
+                task.child_deployment_run_id = child_deployment_run_id
+                updates.append("child_deployment_run_id = ?")
+                params.append(str(child_deployment_run_id))
+                changed = True
+            if updates:
+                params.append(str(task_run_id))
+                self._sqlite_conn.execute(
+                    f"UPDATE task_runs SET {', '.join(updates)} WHERE id = ?",
+                    params,
+                )
+        if changed:
+            self._persist_task_subflow_linkage(task_run_id, child_flow_run_id, child_deployment_run_id)
+
+    def _persist_task_subflow_linkage(
+        self,
+        task_run_id: UUID,
+        child_flow_run_id: UUID | None,
+        child_deployment_run_id: UUID | None,
+    ) -> None:
+        self._persist_record(
+            {
+                "record_type": "task_subflow_linkage",
+                "task_run_id": str(task_run_id),
+                "child_flow_run_id": str(child_flow_run_id) if child_flow_run_id else None,
+                "child_deployment_run_id": str(child_deployment_run_id)
+                if child_deployment_run_id
+                else None,
+            }
+        )
+
+    def update_subflow_task_child_flow_run(self, task_run_id: UUID, child_flow_run_id: UUID) -> None:
+        self.update_subflow_task_linkage(task_run_id, child_flow_run_id=child_flow_run_id)
 
     def mirror_subflow_task_from_deployment(self, task_run_id: UUID, deployment_run: dict[str, Any]) -> None:
         status = str(deployment_run.get("status", ""))
+        dep_run_id = deployment_run.get("id")
         child_flow_run_id = deployment_run.get("flow_run_id")
+        linkage_kwargs: dict[str, UUID] = {}
+        if dep_run_id:
+            linkage_kwargs["child_deployment_run_id"] = UUID(str(dep_run_id))
         if child_flow_run_id:
-            self.update_subflow_task_child_flow_run(task_run_id, UUID(str(child_flow_run_id)))
+            linkage_kwargs["child_flow_run_id"] = UUID(str(child_flow_run_id))
+        if linkage_kwargs:
+            self.update_subflow_task_linkage(task_run_id, **linkage_kwargs)
 
         task = self.get_task_run(task_run_id)
         if status in {"SCHEDULED", "CLAIMED"} and task.state == RunState.SCHEDULED:
@@ -2562,6 +2612,36 @@ class InMemoryControlPlane:
             token = rec.get("transition_token")
             if token:
                 self._tokens.add(UUID(str(token)))
+        elif record_type == "task_subflow_linkage":
+            task_id = UUID(rec["task_run_id"])
+            child_flow_run_id = (
+                UUID(str(rec["child_flow_run_id"])) if rec.get("child_flow_run_id") else None
+            )
+            child_deployment_run_id = (
+                UUID(str(rec["child_deployment_run_id"]))
+                if rec.get("child_deployment_run_id")
+                else None
+            )
+            if task_id in self._tasks:
+                task = self._tasks[task_id]
+                if child_flow_run_id is not None:
+                    task.child_flow_run_id = child_flow_run_id
+                if child_deployment_run_id is not None:
+                    task.child_deployment_run_id = child_deployment_run_id
+            updates: list[str] = []
+            params: list[str] = []
+            if child_flow_run_id is not None:
+                updates.append("child_flow_run_id = ?")
+                params.append(str(child_flow_run_id))
+            if child_deployment_run_id is not None:
+                updates.append("child_deployment_run_id = ?")
+                params.append(str(child_deployment_run_id))
+            if updates:
+                params.append(str(task_id))
+                self._sqlite_conn.execute(
+                    f"UPDATE task_runs SET {', '.join(updates)} WHERE id = ?",
+                    params,
+                )
         elif record_type == "task_event":
             task_id = UUID(rec["task_run_id"])
             if task_id in self._tasks:
@@ -3044,7 +3124,29 @@ class InMemoryControlPlane:
                 ):
                     node["state"] = "NOT_REACHABLE"
                     node_state[node["id"]] = "NOT_REACHABLE"
+        out_nodes, edges = self._prune_orphan_forecast_nodes(out_nodes, edges, meta_by_planned)
         return out_nodes, edges
+
+    def _prune_orphan_forecast_nodes(
+        self,
+        out_nodes: list[dict[str, Any]],
+        edges: list[dict[str, str]],
+        meta_by_planned: dict[str, dict[str, Any]],
+    ) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
+        drop_ids: set[str] = set()
+        for node in out_nodes:
+            if str(node.get("task_name", "")) != "unknown_task":
+                continue
+            node_id = str(node["id"])
+            if node_id not in meta_by_planned and node.get("state") == "PENDING":
+                drop_ids.add(node_id)
+        if not drop_ids:
+            return out_nodes, edges
+        pruned_nodes = [node for node in out_nodes if str(node["id"]) not in drop_ids]
+        pruned_edges = [
+            edge for edge in edges if edge["from"] not in drop_ids and edge["to"] not in drop_ids
+        ]
+        return pruned_nodes, pruned_edges
 
     def _expanded_dag(
         self, manifest: dict[str, Any], task_rows: list[dict[str, Any]]
@@ -3167,11 +3269,59 @@ class InMemoryControlPlane:
                 task = self._tasks.get(UUID(str(task_id)))
                 if task and task.child_deployment_run_id:
                     dep_run_id = str(task.child_deployment_run_id)
-        if not dep_run_id:
-            return None
-        dep = self.get_deployment_run(UUID(str(dep_run_id)))
-        if dep and dep.get("flow_run_id"):
-            return str(dep["flow_run_id"])
+        if dep_run_id:
+            dep = self.get_deployment_run(UUID(str(dep_run_id)))
+            if dep and dep.get("flow_run_id"):
+                return str(dep["flow_run_id"])
+        if task_id:
+            dep_rows = self._query_rows(
+                """
+                SELECT flow_run_id
+                FROM deployment_runs
+                WHERE parent_task_run_id = ? AND flow_run_id IS NOT NULL
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                [str(task_id)],
+            )
+            if dep_rows and dep_rows[0]["flow_run_id"]:
+                return str(dep_rows[0]["flow_run_id"])
+            child_rows = self._query_rows(
+                """
+                SELECT id
+                FROM flow_runs
+                WHERE parent_task_run_id = ?
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                [str(task_id)],
+            )
+            if child_rows:
+                return str(child_rows[0]["id"])
+        return None
+
+    def _resolve_subflow_child_deployment_run_id(self, task_row: dict[str, Any]) -> str | None:
+        dep_run_id = task_row.get("child_deployment_run_id")
+        if dep_run_id:
+            return str(dep_run_id)
+        task_id = task_row.get("id")
+        if task_id:
+            with self._lock:
+                task = self._tasks.get(UUID(str(task_id)))
+                if task and task.child_deployment_run_id:
+                    return str(task.child_deployment_run_id)
+            dep_rows = self._query_rows(
+                """
+                SELECT id
+                FROM deployment_runs
+                WHERE parent_task_run_id = ?
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                [str(task_id)],
+            )
+            if dep_rows:
+                return str(dep_rows[0]["id"])
         return None
 
     def _enrich_dag_subflow_nodes(
@@ -3213,9 +3363,9 @@ class InMemoryControlPlane:
             child_flow_run_id = self._resolve_subflow_child_flow_run_id(row)
             if child_flow_run_id:
                 node["child_flow_run_id"] = child_flow_run_id
-            dep_run_id = row.get("child_deployment_run_id")
+            dep_run_id = self._resolve_subflow_child_deployment_run_id(row)
             if dep_run_id:
-                node["child_deployment_run_id"] = str(dep_run_id)
+                node["child_deployment_run_id"] = dep_run_id
 
         inline_rows = self._query_rows(
             """

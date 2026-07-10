@@ -106,13 +106,10 @@ class DeploymentSubflowHandle:
             parent_deployment_run_id=parent_dep_run_id,
         )
         dep_run_id = UUID(str(dep_run["id"]))
-        with plane._lock:
-            task = plane._tasks[task_run.task_run_id]
-            task.child_deployment_run_id = dep_run_id
-            plane._sqlite_conn.execute(
-                "UPDATE task_runs SET child_deployment_run_id = ? WHERE id = ?",
-                [str(dep_run_id), str(task_run.task_run_id)],
-            )
+        plane.update_subflow_task_linkage(
+            task_run.task_run_id,
+            child_deployment_run_id=dep_run_id,
+        )
 
         plane.record_task_event(
             task_run.task_run_id,

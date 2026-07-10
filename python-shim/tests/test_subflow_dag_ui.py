@@ -172,3 +172,111 @@ def test_inline_child_dag_fetchable_for_mini_view(tmp_path: Path) -> None:
     child_dag = client.get(f"/api/flow-runs/{child_run.run_id}/dag?mode=logical")
     assert child_dag.status_code == 200
     assert isinstance(child_dag.json()["nodes"], list)
+
+
+def test_deployment_subflow_linkage_survives_history_reload(tmp_path: Path) -> None:
+    history = tmp_path / "subflow-reload.jsonl"
+    plane = InMemoryControlPlane(history_path=str(history))
+    set_control_plane(plane)
+    registry: dict = {}
+    stop = threading.Event()
+
+    @flow
+    def child_flow() -> int:
+        return 11
+
+    @flow
+    def parent_flow() -> int:
+        return deployment_ref("child-deploy").submit().result()
+
+    registry["child_flow"] = child_flow
+    registry["parent_flow"] = parent_flow
+    plane.create_deployment(
+        name="child-deploy",
+        flow_name="child_flow",
+        default_parameters={},
+        paused=False,
+    )
+    worker = threading.Thread(
+        target=run_worker_loop,
+        kwargs={
+            "control_plane": plane,
+            "worker_name": "reload-worker",
+            "work_pool_id": "default-process-pool",
+            "flow_registry": registry,
+            "lease_seconds": 30,
+            "stop_event": stop,
+        },
+        daemon=True,
+    )
+    worker.start()
+    try:
+        assert parent_flow() == 11
+        parent_run = next(f for f in plane._flows.values() if f.name == "parent_flow")
+        parent_id = parent_run.run_id
+    finally:
+        stop.set()
+        worker.join(timeout=5)
+
+    reloaded = InMemoryControlPlane(history_path=str(history))
+    dag = reloaded.get_flow_run_dag(parent_id, mode="logical")
+    subflow_nodes = [n for n in dag["nodes"] if n.get("kind") == "subflow_task"]
+    assert len(subflow_nodes) == 1
+    assert subflow_nodes[0].get("child_flow_run_id")
+    assert all(n.get("task_name") != "unknown_task" for n in dag["nodes"])
+
+    task_rows = reloaded._query_rows(
+        "SELECT child_flow_run_id, child_deployment_run_id FROM task_runs WHERE flow_run_id = ?",
+        [str(parent_id)],
+    )
+    assert len(task_rows) == 1
+    assert task_rows[0]["child_flow_run_id"]
+    assert task_rows[0]["child_deployment_run_id"]
+
+
+def test_deployment_subflow_dag_has_no_unknown_task_phantom(tmp_path: Path) -> None:
+    plane = _plane(tmp_path)
+    set_control_plane(plane)
+    registry: dict = {}
+    stop = threading.Event()
+
+    @flow
+    def child_flow() -> int:
+        return 3
+
+    @flow
+    def parent_flow() -> int:
+        return deployment_ref("child-deploy").submit().result()
+
+    registry["child_flow"] = child_flow
+    registry["parent_flow"] = parent_flow
+    plane.create_deployment(
+        name="child-deploy",
+        flow_name="child_flow",
+        default_parameters={},
+        paused=False,
+    )
+    worker = threading.Thread(
+        target=run_worker_loop,
+        kwargs={
+            "control_plane": plane,
+            "worker_name": "phantom-worker",
+            "work_pool_id": "default-process-pool",
+            "flow_registry": registry,
+            "lease_seconds": 30,
+            "stop_event": stop,
+        },
+        daemon=True,
+    )
+    worker.start()
+    try:
+        assert parent_flow() == 3
+        parent_run = next(f for f in plane._flows.values() if f.name == "parent_flow")
+        dag = plane.get_flow_run_dag(parent_run.run_id, mode="logical")
+        assert all(n.get("task_name") != "unknown_task" for n in dag["nodes"])
+        subflow_nodes = [n for n in dag["nodes"] if n.get("kind") == "subflow_task"]
+        assert len(subflow_nodes) == 1
+        assert subflow_nodes[0].get("child_flow_run_id")
+    finally:
+        stop.set()
+        worker.join(timeout=5)
