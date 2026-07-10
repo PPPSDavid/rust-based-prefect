@@ -21,6 +21,8 @@ from uuid import uuid4
 
 ROOT = Path(__file__).resolve().parents[1]
 PYTHON_SHIM_SRC = ROOT / "python-shim" / "src"
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 if str(PYTHON_SHIM_SRC) not in sys.path:
     sys.path.insert(0, str(PYTHON_SHIM_SRC))
 
@@ -45,6 +47,8 @@ class WorkloadRecipe:
     decorator_hook_profile: str | None = None
     # When set, run ``@flow`` with ``ThreadPoolTaskRunner`` map workloads (``tasks_per_flow`` = map width).
     decorator_map_width: int | None = None
+    # Subflow benchmark profile (inline depth, deploy wait chain, etc.).
+    subflow_profile: str | None = None
     # Concurrent reader threads in mixed recipes (writers always use one thread).
     mixed_reader_count: int = 1
     # Exercise FSM batch APIs (task_pending/running/completed) instead of heartbeat events.
@@ -296,6 +300,72 @@ def _recipe_catalog() -> dict[str, WorkloadRecipe]:
             sqlite_enabled=True,
             decorator_map_width=100,
         ),
+        "subflow_inline_depth_3": WorkloadRecipe(
+            name="subflow_inline_depth_3",
+            flow_count=3,
+            tasks_per_flow=10,
+            task_events_per_task=3,
+            read_ratio=0.0,
+            mixed=False,
+            cold_start=True,
+            sqlite_enabled=True,
+            subflow_profile="inline_depth",
+        ),
+        "subflow_deploy_wait_chain": WorkloadRecipe(
+            name="subflow_deploy_wait_chain",
+            flow_count=3,
+            tasks_per_flow=1,
+            task_events_per_task=3,
+            read_ratio=0.0,
+            mixed=False,
+            cold_start=True,
+            sqlite_enabled=True,
+            subflow_profile="deploy_wait_chain",
+        ),
+        "subflow_deploy_cross_pool": WorkloadRecipe(
+            name="subflow_deploy_cross_pool",
+            flow_count=1,
+            tasks_per_flow=3,
+            task_events_per_task=2,
+            read_ratio=0.0,
+            mixed=False,
+            cold_start=True,
+            sqlite_enabled=True,
+            subflow_profile="deploy_cross_pool",
+        ),
+        "subflow_fire_forget_burst": WorkloadRecipe(
+            name="subflow_fire_forget_burst",
+            flow_count=50,
+            tasks_per_flow=1,
+            task_events_per_task=3,
+            read_ratio=0.0,
+            mixed=False,
+            cold_start=True,
+            sqlite_enabled=True,
+            subflow_profile="fire_forget_burst",
+        ),
+        "subflow_cancel_propagation": WorkloadRecipe(
+            name="subflow_cancel_propagation",
+            flow_count=5,
+            tasks_per_flow=1,
+            task_events_per_task=2,
+            read_ratio=0.0,
+            mixed=False,
+            cold_start=True,
+            sqlite_enabled=True,
+            subflow_profile="cancel_propagation",
+        ),
+        "subflow_query_dag_nested": WorkloadRecipe(
+            name="subflow_query_dag_nested",
+            flow_count=3,
+            tasks_per_flow=25,
+            task_events_per_task=1,
+            read_ratio=0.0,
+            mixed=False,
+            cold_start=False,
+            sqlite_enabled=True,
+            subflow_profile="query_dag_nested",
+        ),
     }
 
 
@@ -324,10 +394,25 @@ def _presets() -> dict[str, list[str]]:
             "medium_narrow_fsm_batch_warm",
             "medium_narrow_heavy_mixed_2readers_warm",
         ],
+        "subflow_lite": [
+            "subflow_inline_depth_3",
+            "subflow_deploy_wait_chain",
+            "subflow_query_dag_nested",
+        ],
+        "subflow": [
+            "subflow_inline_depth_3",
+            "subflow_deploy_wait_chain",
+            "subflow_deploy_cross_pool",
+            "subflow_fire_forget_burst",
+            "subflow_cancel_propagation",
+            "subflow_query_dag_nested",
+        ],
         "full": [
             k
             for k in _recipe_catalog().keys()
-            if not k.startswith("micro_decorator_hooks_") and not k.startswith("micro_map_")
+            if not k.startswith("micro_decorator_hooks_")
+            and not k.startswith("micro_map_")
+            and not k.startswith("subflow_")
         ],
     }
 
@@ -709,6 +794,113 @@ def _run_decorator_map_micro_iteration(
     )
 
 
+def _run_subflow_iteration(
+    recipe: WorkloadRecipe,
+    seed: int,
+    warmup: bool,
+) -> RecipeRunSample:
+    """Benchmark subflow workloads (inline depth, deployment chains, cancel, DAG reads)."""
+    _ = seed
+    profile = recipe.subflow_profile
+    if profile is None:
+        raise RuntimeError("subflow bench requires subflow_profile")
+
+    latencies: dict[str, list[float]] = {}
+    notes: list[str] = [f"subflow profile={profile}"]
+    isolated_deploy = profile in {
+        "deploy_wait_chain",
+        "deploy_cross_pool",
+        "fire_forget_burst",
+        "cancel_propagation",
+    }
+
+    with tempfile.TemporaryDirectory(prefix="perf-matrix-subflow-") as td:
+        history_path = Path(td) / "history.jsonl"
+        db_path = history_path.with_suffix(".db")
+        if not recipe.sqlite_enabled or isolated_deploy:
+            history_path = None
+            db_path = Path(td) / "unused.db"
+
+        plane = InMemoryControlPlane(history_path=str(history_path) if history_path else None)
+        sqlite_before = float(db_path.stat().st_size) if db_path.exists() else 0.0
+        wal_path = db_path.with_suffix(".db-wal")
+        wal_before = float(wal_path.stat().st_size) if wal_path.exists() else 0.0
+        before_proc = _process_snapshot()
+
+        from benchmarks.subflow_perf import run_subflow_profile
+
+        wall_start = time.perf_counter()
+        profile_counts = run_subflow_profile(
+            profile,
+            flow_count=recipe.flow_count,
+            tasks_per_flow=recipe.tasks_per_flow,
+            sample_iterations=max(1, recipe.task_events_per_task),
+            plane=plane,
+            latencies=latencies,
+            warmup=warmup,
+            history_dir=Path(td),
+        )
+        wall_seconds = time.perf_counter() - wall_start
+
+        after_proc = _process_snapshot()
+        sqlite_after = float(db_path.stat().st_size) if db_path.exists() else sqlite_before
+        wal_after = float(wal_path.stat().st_size) if wal_path.exists() else wal_before
+        events = len(plane.events())
+        _close_plane_footprint(plane)
+        from prefect_compat import set_control_plane
+
+        set_control_plane(InMemoryControlPlane(history_path=str(Path(td) / "teardown.jsonl")))
+
+    counts = {
+        "flows_created": int(profile_counts.get("flows_created", 0)),
+        "tasks_created": 0,
+        "flow_transitions": 0,
+        "task_events_recorded": events,
+        "read_queries": int(profile_counts.get("read_queries", 0)),
+    }
+    for key, value in profile_counts.items():
+        if key not in counts:
+            counts[key] = int(value)
+
+    throughput = {
+        "flows_per_sec": counts["flows_created"] / wall_seconds if wall_seconds else 0.0,
+        "tasks_per_sec": 0.0,
+        "transitions_per_sec": events / wall_seconds if wall_seconds else 0.0,
+        "task_events_per_sec": events / wall_seconds if wall_seconds else 0.0,
+    }
+    latency_ms = {key: _latency_stats_ms(values) for key, values in latencies.items() if values}
+    process = {
+        "cpu_seconds_used": max(0.0, after_proc.cpu_seconds - before_proc.cpu_seconds),
+        "rss_bytes_start": float(before_proc.rss_bytes),
+        "rss_bytes_end": float(after_proc.rss_bytes),
+        "rss_bytes_delta": float(after_proc.rss_bytes - before_proc.rss_bytes),
+    }
+    sqlite: dict[str, float] = {
+        "db_bytes_before": sqlite_before,
+        "db_bytes_after": sqlite_after,
+        "db_bytes_growth": max(0.0, sqlite_after - sqlite_before),
+        "wal_bytes_before": wal_before,
+        "wal_bytes_after": wal_after,
+        "wal_bytes_growth": max(0.0, wal_after - wal_before),
+        "bytes_per_write_op": 0.0,
+    }
+    if notes:
+        sqlite["notes"] = float(len(notes))
+
+    return RecipeRunSample(
+        recipe=recipe.name,
+        iteration=0,
+        warmup=warmup,
+        seed=seed,
+        wall_clock_seconds=wall_seconds,
+        counts=counts,
+        throughput=throughput,
+        latency_ms=latency_ms,
+        process=process,
+        sqlite=sqlite,
+    )
+
+
 def _measure_read_queries(
     plane: InMemoryControlPlane,
     flow_ids: list[Any],
@@ -851,6 +1043,8 @@ def _run_recipe_iteration(
         return _run_decorator_hook_micro_iteration(recipe, seed, warmup)
     if recipe.decorator_map_width is not None:
         return _run_decorator_map_micro_iteration(recipe, seed, warmup)
+    if recipe.subflow_profile is not None:
+        return _run_subflow_iteration(recipe, seed, warmup)
 
     rng = random.Random(seed)
     latencies: dict[str, list[float]] = {}
