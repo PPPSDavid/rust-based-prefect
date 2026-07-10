@@ -83,7 +83,7 @@ def test_multi_worker_recursive_deploy_chain_rust_bound(tmp_path: Path) -> None:
     stop, workers = _start_workers(plane, registry, count=3)
     try:
         for _ in range(3):
-            parent_flow()
+            assert parent_flow() == 3
     finally:
         stop.set()
         for t in workers:
