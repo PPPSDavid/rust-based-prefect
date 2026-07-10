@@ -19,29 +19,21 @@ export const DAG_VIEW_MODES: Record<
   }
 };
 
-/** Human-readable dependency flow for the active auto-layout. */
-export function layoutFlowLabel(orientation: LayoutOrientation): string {
-  if (orientation === "vertical") {
-    return "Dependencies: top → bottom · parallel branches: left → right";
-  }
-  return "Dependencies: left → right · parallel tasks: top → bottom";
+/** Dependencies always flow left → right; parallel siblings stack top → bottom. */
+export const DAG_LAYOUT_FLOW_LABEL =
+  "Dependencies: left → right · parallel tasks: top → bottom";
+
+export function layoutFlowLabel(_orientation: LayoutOrientation = "horizontal"): string {
+  return DAG_LAYOUT_FLOW_LABEL;
 }
 
 export function edgeEndpoints(
   from: { x: number; y: number },
   to: { x: number; y: number },
-  orientation: LayoutOrientation,
+  _orientation: LayoutOrientation,
   nodeWidth: number,
   nodeHeight: number
 ): { x1: number; y1: number; x2: number; y2: number } {
-  if (orientation === "vertical") {
-    return {
-      x1: from.x + nodeWidth / 2,
-      y1: from.y + nodeHeight,
-      x2: to.x + nodeWidth / 2,
-      y2: to.y
-    };
-  }
   return {
     x1: from.x + nodeWidth,
     y1: from.y + nodeHeight / 2,

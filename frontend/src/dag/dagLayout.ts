@@ -14,7 +14,7 @@ export type DagBounds = {
   height: number;
 };
 
-export type LayoutOrientation = "horizontal" | "vertical";
+export type LayoutOrientation = "horizontal";
 
 export type LayoutResult = {
   nodes: PositionedNode[];
@@ -51,11 +51,6 @@ function computeDepths(nodes: DagNode[], edges: DagEdge[]): Map<string, number> 
   return depth;
 }
 
-function chooseOrientation(maxDepth: number, maxLaneSize: number): LayoutOrientation {
-  if (maxDepth >= 8 && maxLaneSize <= 3) return "vertical";
-  return "horizontal";
-}
-
 function spacingForLane(maxLaneSize: number, maxDepth: number) {
   const laneSpacing = maxLaneSize > 30 ? 48 : maxLaneSize > 12 ? 56 : maxLaneSize > 6 ? 64 : 80;
   const depthSpacing = maxDepth > 24 ? 140 : maxDepth > 12 ? 180 : 220;
@@ -80,25 +75,16 @@ export function layoutDag(nodes: DagNode[], edges: DagEdge[]): LayoutResult {
 
   const maxDepth = Math.max(...lanes.keys(), 0);
   const maxLaneSize = Math.max(...[...lanes.values()].map((lane) => lane.length), 1);
-  const orientation = chooseOrientation(maxDepth, maxLaneSize);
   const { laneSpacing, depthSpacing } = spacingForLane(maxLaneSize, maxDepth);
 
   const positioned: PositionedNode[] = [];
   for (const [lane, laneNodes] of [...lanes.entries()].sort((a, b) => a[0] - b[0])) {
     laneNodes.forEach((node, idx) => {
-      if (orientation === "vertical") {
-        positioned.push({
-          ...node,
-          x: idx * (NODE_WIDTH + 40) + 20,
-          y: lane * laneSpacing + 20
-        });
-      } else {
-        positioned.push({
-          ...node,
-          x: lane * depthSpacing + 20,
-          y: idx * laneSpacing + 20
-        });
-      }
+      positioned.push({
+        ...node,
+        x: lane * depthSpacing + 20,
+        y: idx * laneSpacing + 20
+      });
     });
   }
 
@@ -117,7 +103,7 @@ export function layoutDag(nodes: DagNode[], edges: DagEdge[]): LayoutResult {
       width: maxX - minX,
       height: maxY - minY
     },
-    orientation
+    orientation: "horizontal"
   };
 }
 

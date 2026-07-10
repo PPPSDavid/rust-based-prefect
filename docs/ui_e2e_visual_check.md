@@ -70,7 +70,7 @@ Inside run detail verify tabs:
 - **DAG**:
   - **Aggregated fan-out** mode renders the forecast/manifest graph (`source: forecast` when static compile succeeded; `map()` fan-out collapsed)
   - **Task runs** mode renders one node per execution
-  - Definition line states layout: dependencies **left → right** (wide) or **top → bottom** (long chains)
+  - Definition line: dependencies **left → right**, parallel tasks **top → bottom**
   - Toolbar: **Fit**, **Reset**, **Aggregated fan-out** / **Task runs** toggle
   - **Search** finds a task by id/label/name, zooms to it, and highlights upstream/downstream path; **Enter** cycles multiple matches
   - **Scroll** zooms; **drag** pans the canvas (smooth GPU transform)

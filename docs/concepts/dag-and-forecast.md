@@ -8,11 +8,7 @@ The run **DAG** (directed acyclic graph) shows **task dependencies** for a singl
 
 - **Nodes** — tasks or task runs (depending on view mode).
 - **Edges** — dependency arrows pointing **downstream** (from prerequisites to dependents).
-- **Layout** — auto-selected from graph shape:
-  - **Wide fan-out** (many parallel tasks at one step): dependencies flow **left → right**; parallel siblings stack **top → bottom**.
-  - **Deep serial chains** (long prerequisite chains): dependencies flow **top → bottom**; rare parallel branches stack **left → right**.
-
-Arrows always follow dependency direction, never execution time left-to-right unless that matches the dependency depth axis.
+- **Layout** — dependencies always flow **left → right**; parallel siblings at the same depth stack **top → bottom** (both view modes).
 
 ## View modes
 
@@ -55,7 +51,7 @@ Open any flow run → **DAG** tab.
 | **Click node** | Focus and highlight upstream + downstream path |
 | **Scroll / drag** | Zoom toward cursor; pan the canvas |
 
-A definition line under the toolbar restates the active view and layout direction (e.g. “Dependencies: left → right · parallel tasks: top → bottom”).
+A definition line under the toolbar restates the active view and layout: “Dependencies: left → right · parallel tasks: top → bottom”.
 
 ### Seed large graphs for manual testing
 

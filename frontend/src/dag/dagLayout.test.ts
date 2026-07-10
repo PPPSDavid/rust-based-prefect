@@ -18,7 +18,7 @@ describe("layoutDag", () => {
     expect(result.nodes[2].y).toBeGreaterThan(result.nodes[1].y);
   });
 
-  it("uses vertical layout for long serial chains", () => {
+  it("uses left-to-right layout for long serial chains", () => {
     const nodes = Array.from({ length: 12 }, (_, i) => ({
       id: `n${i}`,
       label: `inc-${i}`,
@@ -26,7 +26,8 @@ describe("layoutDag", () => {
     }));
     const edges = nodes.slice(1).map((n, i) => ({ from: `n${i}`, to: n.id }));
     const result = layoutDag(nodes, edges);
-    expect(result.orientation).toBe("vertical");
-    expect(result.nodes[1].y).toBeGreaterThan(result.nodes[0].y);
+    expect(result.orientation).toBe("horizontal");
+    expect(result.nodes[1].x).toBeGreaterThan(result.nodes[0].x);
+    expect(result.nodes[0].y).toBe(result.nodes[1].y);
   });
 });

@@ -18,7 +18,7 @@ This project is **not** a drop-in replacement for Prefect Cloud or the full Pref
 | State hooks (`on_running`, …) | IronFlow uses **`transition_hooks`** on `@flow` / `@task` with `TransitionHookSpec` / `on_transition`—see `COMPATIBILITY.md`. This is an **extension**, not Prefect’s hook API. |
 | Event stream / observability | Local persistence (JSONL + SQLite) and optional API/SSE; see README **History persistence**. |
 | Static DAG / compile-time insights | `static-planner/` analyzes `@flow` bodies (`submit`, `map`, `wait_for`, repeated tasks, `@task(name=...)`) and stores a per-run manifest + forecast. See **[DAG and forecast](concepts/dag-and-forecast.md)**. Dynamic regions fall back to runtime-inferred DAGs. |
-| Run DAG UI | Local UI **DAG** tab: **Aggregated fan-out** (planned graph, fan-out collapsed) vs **Task runs**; dependencies flow left→right or top→bottom; zoom/pan, search, path highlight. API: `mode=logical|expanded`. |
+| Run DAG UI | Local UI **DAG** tab: **Aggregated fan-out** (planned graph, fan-out collapsed) vs **Task runs**; dependencies always left→right, parallel top→bottom; zoom/pan, search, path highlight. API: `mode=logical|expanded`. |
 
 ## Practical “bring your own tasks” path
 
