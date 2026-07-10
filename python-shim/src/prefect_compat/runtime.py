@@ -185,6 +185,11 @@ class InMemoryControlPlane:
         handle = self._rust_fsm_handle
         if not bridge or not handle:
             raise RuntimeError("Rust FSM bridge is not initialized")
+        # When bind_db is active, Rust and Python share one SQLite file via separate
+        # connections. Serialize all Rust FFI with Python writes on ``_lock``.
+        if self._rust_db_bound:
+            with self._lock:
+                return bridge.control(handle, op, body)
         return bridge.control(handle, op, body)
 
     def _persist_payload(self, request: dict[str, Any], **extras: Any) -> dict[str, Any]:
@@ -416,10 +421,12 @@ class InMemoryControlPlane:
 
     def worker_heartbeat(self, worker_name: str, work_pool_id: str | None = None) -> None:
         pool_id = work_pool_id or os.getenv("IRONFLOW_WORK_POOL", DEFAULT_WORK_POOL_ID)
-        self._rust_deployment_dispatch(
+        rust = self._rust_deployment_dispatch(
             "deployment_worker_heartbeat",
             {"worker_name": worker_name, "work_pool_id": pool_id},
         )
+        if rust is not None and rust.get("ok"):
+            return
         now = self._now()
         with self._lock:
             self._sqlite_conn.execute(
@@ -2413,6 +2420,15 @@ class InMemoryControlPlane:
             )
 
     def attach_flow_run_to_deployment_run(self, deployment_run_id: UUID, flow_run_id: UUID) -> None:
+        rust = self._rust_deployment_dispatch(
+            "deployment_attach_flow_run",
+            {
+                "deployment_run_id": str(deployment_run_id),
+                "flow_run_id": str(flow_run_id),
+            },
+        )
+        if rust is not None and rust.get("ok"):
+            return
         now = self._now()
         with self._lock:
             self._sqlite_conn.execute(

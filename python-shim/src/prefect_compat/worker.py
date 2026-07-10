@@ -12,6 +12,17 @@ from .decorators import _ACTIVE_DEPLOYMENT_RUN
 from .runtime import RunState
 
 
+def _deployment_run_flow_run_id(control_plane: Any, deployment_run_id: UUID) -> UUID | None:
+    """Flow run created for this deployment execution (set at @flow entry)."""
+    dep_run = control_plane.get_deployment_run(deployment_run_id)
+    if dep_run is None:
+        return None
+    raw = dep_run.get("flow_run_id")
+    if raw is None or str(raw).strip() == "":
+        return None
+    return UUID(str(raw))
+
+
 def resolve_flow_callable(
     flow_name: str,
     entrypoint: str | None = None,
@@ -65,9 +76,8 @@ def execute_claimed_deployment_run(
         )
         params = claimed.get("resolved_parameters", {}) or {}
         flow_fn(**params)
-        latest = control_plane.latest_flow()
-        if latest is not None:
-            flow_run_id = latest.run_id
+        flow_run_id = _deployment_run_flow_run_id(control_plane, dep_run_id)
+        if flow_run_id is not None:
             if control_plane.get_flow(flow_run_id).state == RunState.CANCELLED:
                 control_plane.mark_deployment_run_finished(
                     deployment_run_id=UUID(claimed["id"]),
@@ -81,9 +91,7 @@ def execute_claimed_deployment_run(
             flow_run_id=flow_run_id,
         )
     except FlowRunCancelled:
-        latest = control_plane.latest_flow()
-        if latest is not None:
-            flow_run_id = latest.run_id
+        flow_run_id = _deployment_run_flow_run_id(control_plane, dep_run_id)
         control_plane.mark_deployment_run_finished(
             deployment_run_id=UUID(claimed["id"]),
             status="CANCELLED",

@@ -166,6 +166,10 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                 .ok_or_else(|| "missing string field db_path".to_string())?
                 .to_string();
             let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
+            conn.busy_timeout(Duration::from_millis(5_000))
+                .map_err(|e| e.to_string())?;
+            conn.execute_batch("PRAGMA journal_mode=WAL;")
+                .map_err(|e| e.to_string())?;
             ctx.db_path = Some(db_path);
             ctx.db_conn = Some(conn);
             Ok(json!({"ok": true}))
@@ -740,6 +744,23 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| "missing string field deployment_run_id".to_string())?;
             deployment_ops::mark_deployment_run_started(conn, id).map_err(|e| e.to_string())?;
+            Ok(json!({"ok": true}))
+        }
+        "deployment_attach_flow_run" => {
+            let conn = ctx
+                .db_conn
+                .as_ref()
+                .ok_or_else(|| "deployment_attach_flow_run requires bind_db".to_string())?;
+            let deployment_run_id = body
+                .get("deployment_run_id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| "missing string field deployment_run_id".to_string())?;
+            let flow_run_id = body
+                .get("flow_run_id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| "missing string field flow_run_id".to_string())?;
+            deployment_ops::attach_flow_run_to_deployment_run(conn, deployment_run_id, flow_run_id)
+                .map_err(|e| e.to_string())?;
             Ok(json!({"ok": true}))
         }
         "deployment_mark_run_finished" => {

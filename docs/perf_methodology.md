@@ -29,6 +29,11 @@ Concurrency / FSM batch regression gate (FSM batch transitions + multi-reader mi
 
 - `python benchmarks/perf_matrix.py run --preset concurrency --repetitions 2 --warmups 1 --jobs 1`
 
+Subflow regression gate (inline nested depth, deployment wait chain, nested DAG reads; full catalog adds cross-pool, fire-and-forget burst, cancel propagation):
+
+- `python benchmarks/perf_matrix.py run --preset subflow_lite --repetitions 1 --warmups 0 --jobs 2`
+- `python benchmarks/perf_matrix.py run --preset subflow --repetitions 3 --warmups 1 --jobs 2`
+
 ## Workload Dimensions
 
 The recipe catalog spans:
@@ -41,8 +46,9 @@ The recipe catalog spans:
 - FSM batch path (`fsm_task_lifecycle=True`: `record_task_events_batch` with pending/running/completed instead of heartbeat events)
 - cold start vs warm run (`cold_start`)
 - optional **decorator transition-hook microbench** (`decorator_hook_profile` on select recipes): `flow_count` is timed shim iterations; `tasks_per_flow` is warmup iterations before the timer; profiles `none` / `flow` / `task` / `both` compare baseline vs no-op hooks.
+- optional **subflow microbench** (`subflow_profile` on `subflow_*` recipes): `flow_count` maps to depth/burst/child-count per profile; `tasks_per_flow` maps to fan-out or query iterations; `task_events_per_task` is timed sample iterations. Profiles: `inline_depth`, `deploy_wait_chain`, `deploy_cross_pool`, `fire_forget_burst`, `cancel_propagation`, `query_dag_nested`. Deployment profiles use multiple in-process workers per sample (same as production); Rust `bind_db` path is exercised when `IRONFLOW_USE_RUST_FSM=1` (default).
 
-Use defaults for consistency (`--preset lite`, `--preset pr`, `--preset hook_micro`, `--preset concurrency`, or `--preset full`) or override with:
+Use defaults for consistency (`--preset lite`, `--preset pr`, `--preset hook_micro`, `--preset concurrency`, `--preset subflow_lite`, `--preset subflow`, or `--preset full`) or override with:
 
 - `--recipes small_narrow_few_write_cold,medium_wide_heavy_write_warm`
 - `--repetitions 5 --warmups 2 --seed 20260416`
@@ -69,6 +75,7 @@ For each recipe/iteration, the runner records:
     - `query.get_flow_run_detail`
   - for `micro_decorator_hooks_*` recipes: `decorator_hook_micro.invocation_ms` (per `@flow` invocation, including `@task.submit` work)
   - for `micro_map_*` recipes: `decorator_map_micro.invocation_ms` (per `@flow` with `ThreadPoolTaskRunner` map)
+  - for `subflow_*` recipes: `subflow.inline_depth_ms`, `subflow.deploy_wait_ms`, `subflow.deploy_cross_pool_ms`, `subflow.fire_forget_burst_ms`, `subflow.cancel_propagation_ms`, `subflow.detail_query_ms`, `subflow.dag_query_ms` (per profile)
 - process-level CPU and RSS memory
   - `process.cpu_seconds_used`
   - `process.rss_bytes_start/end/delta`
@@ -156,6 +163,7 @@ Agents and contributors must preserve this contract when touching `runtime.py` o
 ### Write path (must stay serialized per control plane)
 
 - `InMemoryControlPlane` holds an `RLock` (`_lock`) around all mutations: flow/task creation, state transitions, event append, and Python SQLite writes.
+- When `bind_db` is active (`_rust_db_bound`), Rust deployment FFI calls also acquire `_lock` so the Python and Rust SQLite connections do not write concurrently to the same file.
 - Rust FSM calls (`ironflow_control`) take a **per-handle** mutex. Different engine handles can dispatch in parallel; a single handle is still single-writer.
 - **Do not** remove the Python write lock or shard it by flow without an explicit determinism design — optimistic concurrency and transition tokens assume ordered application per plane.
 

@@ -219,3 +219,56 @@ def test_surrogate_subflow_task_state(tmp_path: Path) -> None:
     assert task.state == RunState.COMPLETED
     assert task.child_deployment_run_id is not None
     assert task.child_flow_run_id is not None
+
+
+def test_recursive_deploy_chain_returns_aggregate_result(tmp_path: Path) -> None:
+    """Depth-3 recursive deployment subflows must return the root flow result, not a nested leaf."""
+    plane = _plane(tmp_path)
+    set_control_plane(plane)
+    registry: dict = {}
+    child_name = "chain-child-deploy"
+
+    @flow
+    def chain_child(k: int = 0) -> int:
+        if k <= 0:
+            return 1
+        return deployment_ref(child_name).submit(k=k - 1).result() + 1
+
+    @flow
+    def parent_flow() -> int:
+        return deployment_ref(child_name).submit(k=2).result()
+
+    registry["chain_child"] = chain_child
+    registry["parent_flow"] = parent_flow
+
+    dep = plane.create_deployment(
+        name=child_name,
+        flow_name="chain_child",
+        default_parameters={},
+        paused=False,
+    )
+    pool_id = dep.get("work_pool_id") or "default-process-pool"
+
+    stop = threading.Event()
+    threads: list[threading.Thread] = []
+    for idx in range(3):
+        thread = threading.Thread(
+            target=run_worker_loop,
+            kwargs={
+                "control_plane": plane,
+                "worker_name": f"subflow-test-worker-{idx}",
+                "work_pool_id": pool_id,
+                "flow_registry": registry,
+                "lease_seconds": 30,
+                "stop_event": stop,
+            },
+            daemon=True,
+        )
+        thread.start()
+        threads.append(thread)
+    try:
+        assert parent_flow() == 3
+    finally:
+        stop.set()
+        for thread in threads:
+            thread.join(timeout=10)
