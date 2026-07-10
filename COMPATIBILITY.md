@@ -42,7 +42,7 @@ Maintainers should use `docs/compatibility_review_workflow.md` before changing t
   - Distinct task wrappers on a shared Python function body (separate graph nodes per wrapper).
   - Bounded loops with static upper bounds (`for i in range(N)` where `N` is a constant).
   - Per-run manifest + forecast (task/edge counts, critical path, parallelism).
-  - Run DAG API and UI: logical / expanded modes, zoom-pan, search, path highlight (see `docs/concepts/dag-and-forecast.md`).
+  - Run DAG API and UI: **Aggregated fan-out** (`mode=logical`) / **Task runs** (`mode=expanded`); documented layout conventions (left→right vs top→bottom); zoom-pan, search, path highlight (see `docs/concepts/dag-and-forecast.md`).
 - Fallback:
   - Non-analyzable dynamic sections (`if`, `range(n)` with runtime `n`, tasks not visible to the compiler) run via the runtime path; DAG may show `source: runtime` with runtime-inferred nodes.
 

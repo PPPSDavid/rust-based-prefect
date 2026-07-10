@@ -6,7 +6,7 @@ A **task** is a Python callable decorated with **`@task`** from **`prefect_compa
 
 - **`task.submit(*args, wait_for=...)`** — schedule work and get a **future**; use **`future.result()`** or **`wait([...])`** to block inside the flow function.
 - **`@task(name="custom-name")`** — optional runtime task name (defaults to the function name). The static planner resolves names from task objects in the flow module or closure so forecast/DAG labels match task runs.
-- **`task.map(values, wait_for=...)`** — fan out over inputs; returns a list of futures. Combine with **`wait(mapped)`** before downstream **`submit`** calls. All mapped task runs share one **logical** DAG node in forecast/UI.
+- **`task.map(values, wait_for=...)`** — fan out over inputs; returns a list of futures. Combine with **`wait(mapped)`** before downstream **`submit`** calls. All mapped task runs share one **Aggregated fan-out** DAG node in forecast/UI (fan-out collapsed).
 - Imports and patterns match the subset described in **[Compatibility matrix](../compatibility.md)** and the **[Quick start (demo flow)](../QUICKSTART_DEMO.md)** example.
 
 ## Repeated and aliased tasks
@@ -26,7 +26,7 @@ def pipeline() -> str:
     return notify.submit("finished").result()
 ```
 
-Logical DAG labels: `status-update-0`, `status-update-1`. Each call gets its own **`planned_node_id`** and task run.
+Logical DAG labels: `status-update-0`, `status-update-1`. Each call gets its own **`planned_node_id`** and task run. In the UI **Aggregated fan-out** view these appear as separate planned steps; **Task runs** shows each execution.
 
 **Different names, shared implementation** — use separate `TaskWrapper` instances; the graph shows separate nodes (`ping-start-0`, `ping-end-0`) because orchestration identity is the task definition, not the shared `def` body:
 

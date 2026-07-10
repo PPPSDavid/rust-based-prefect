@@ -9,7 +9,7 @@ This project is **not** a drop-in replacement for Prefect Cloud or the full Pref
 | Prefect engine / orchestrator (Python services, workers, …) | **Rust `rust-engine`** owns the deterministic state machine and durable history; Python proposes transitions and runs user task code. Build the `cdylib` and load it from the shim (see README). |
 | `from prefect import flow, task` | `from prefect_compat import flow, task` (and `wait`, `set_control_plane`, etc.). Imports come from the **`prefect_compat`** package in this repo, not from `prefect`. |
 | Prefect orchestration / API server | Optional HTTP API in `prefect_compat.server` (e.g. `uvicorn python-shim.src.prefect_compat.server:app`). Start with `python scripts/ironflow_server.py start` or run flows **without** any server—orchestration works in-process. |
-| Prefect UI | Optional Vite/React app under `frontend/` when you want a local dashboard; run **DAG** tab with logical/expanded views, zoom-pan, and search (see **[DAG and forecast](concepts/dag-and-forecast.md)**). Not the Prefect Cloud UI. |
+| Prefect UI | Optional Vite/React app under `frontend/` when you want a local dashboard; run **DAG** tab with **Aggregated fan-out** / **Task runs** views, zoom-pan, and search (see **[DAG and forecast](concepts/dag-and-forecast.md)**). Not the Prefect Cloud UI. |
 | Deployments, work pools, workers | **Subset:** create/list/trigger deployments, optional **interval, cron, or limited RRule** schedules, local worker loop claiming `deployment_runs`. **UI HTTP subset:** cancel/retry flow runs, process work pools, worker visibility. Not production-parity with Prefect Cloud work pools; schedule/worker hot paths prefer **Rust** when `bind_db` is active. See `COMPATIBILITY.md`. |
 | `task.submit()` / futures | Supported for dependency chains within the MVP subset. |
 | `task.map()` | Supported with moderate fan-out (see `COMPATIBILITY.md`). |
@@ -18,7 +18,7 @@ This project is **not** a drop-in replacement for Prefect Cloud or the full Pref
 | State hooks (`on_running`, …) | IronFlow uses **`transition_hooks`** on `@flow` / `@task` with `TransitionHookSpec` / `on_transition`—see `COMPATIBILITY.md`. This is an **extension**, not Prefect’s hook API. |
 | Event stream / observability | Local persistence (JSONL + SQLite) and optional API/SSE; see README **History persistence**. |
 | Static DAG / compile-time insights | `static-planner/` analyzes `@flow` bodies (`submit`, `map`, `wait_for`, repeated tasks, `@task(name=...)`) and stores a per-run manifest + forecast. See **[DAG and forecast](concepts/dag-and-forecast.md)**. Dynamic regions fall back to runtime-inferred DAGs. |
-| Run DAG UI | Local UI **DAG** tab: logical vs expanded, zoom/pan, search, path highlight. Not Prefect Cloud’s graph UX. |
+| Run DAG UI | Local UI **DAG** tab: **Aggregated fan-out** (planned graph, fan-out collapsed) vs **Task runs**; dependencies flow left→right or top→bottom; zoom/pan, search, path highlight. API: `mode=logical|expanded`. |
 
 ## Practical “bring your own tasks” path
 

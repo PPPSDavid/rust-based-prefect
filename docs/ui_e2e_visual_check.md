@@ -68,14 +68,14 @@ Inside run detail verify tabs:
 - **Events**: state transitions and task events present
 - **Artifacts**: result artifacts present for completed task events
 - **DAG**:
-  - **Logical** mode renders the forecast/manifest graph (`source: forecast` when static compile succeeded)
-  - **Expanded** mode renders per task-run nodes
-  - Node colors track task states (`RUNNING`, `COMPLETED`, `FAILED`, `NOT_REACHABLE`, etc.)
-  - Toolbar: **Fit**, **Reset**, **Logical** / **Expanded** toggle
+  - **Aggregated fan-out** mode renders the forecast/manifest graph (`source: forecast` when static compile succeeded; `map()` fan-out collapsed)
+  - **Task runs** mode renders one node per execution
+  - Definition line states layout: dependencies **left → right** (wide) or **top → bottom** (long chains)
+  - Toolbar: **Fit**, **Reset**, **Aggregated fan-out** / **Task runs** toggle
   - **Search** finds a task by id/label/name, zooms to it, and highlights upstream/downstream path; **Enter** cycles multiple matches
   - **Scroll** zooms; **drag** pans the canvas (smooth GPU transform)
-  - Wide runs (`wide_flow`): logical mode collapses fan-out; expanded mode lists individual mapped runs
-  - Long chains (`long_chain_flow`): vertical-friendly layout in logical/expanded views; zoom/pan to navigate
+  - Wide runs (`wide_flow`): Aggregated fan-out mode collapses fan-out; Task runs lists individual mapped runs
+  - Long chains (`long_chain_flow`): top-to-bottom dependency layout; zoom/pan to navigate
   - Failing runs: downstream nodes may show `NOT_REACHABLE`
 
 See **[DAG and forecast](concepts/dag-and-forecast.md)** for details.

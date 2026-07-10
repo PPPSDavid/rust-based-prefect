@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FlowRunDag } from "../types";
 import { computeHighlight, findMatchingNodeIds } from "../dag/dagPathHighlight";
 import { NODE_HEIGHT, NODE_WIDTH, layoutDag } from "../dag/dagLayout";
+import { DAG_VIEW_MODES, edgeEndpoints, layoutFlowLabel } from "../dag/dagConventions";
 import { useDagViewport } from "../dag/useDagViewport";
 
 const stateColor: Record<string, string> = {
@@ -90,16 +91,30 @@ export function RunDagPanel({ dag, mode, onModeChange }: Props) {
   };
 
   const hasHighlight = highlight.nodeIds.size > 0;
+  const viewMode = DAG_VIEW_MODES[mode];
+  const flowLabel = layoutFlowLabel(layout.orientation);
 
   return (
     <div className="dag-panel">
       <div className="dag-toolbar">
         <div className="dag-toolbar-left">
-          <button type="button" disabled={mode === "logical"} onClick={() => onModeChange("logical")}>
-            Logical
+          <button
+            type="button"
+            className={mode === "logical" ? "dag-mode-btn active" : "dag-mode-btn"}
+            disabled={mode === "logical"}
+            title={DAG_VIEW_MODES.logical.title}
+            onClick={() => onModeChange("logical")}
+          >
+            {DAG_VIEW_MODES.logical.label}
           </button>
-          <button type="button" disabled={mode === "expanded"} onClick={() => onModeChange("expanded")}>
-            Expanded
+          <button
+            type="button"
+            className={mode === "expanded" ? "dag-mode-btn active" : "dag-mode-btn"}
+            disabled={mode === "expanded"}
+            title={DAG_VIEW_MODES.expanded.title}
+            onClick={() => onModeChange("expanded")}
+          >
+            {DAG_VIEW_MODES.expanded.label}
           </button>
           <button type="button" className="dag-ghost-btn" onClick={() => fitAll(layout.bounds)}>
             Fit
@@ -125,9 +140,13 @@ export function RunDagPanel({ dag, mode, onModeChange }: Props) {
           ) : null}
         </div>
         <div className="dag-meta">
-          source: <b>{dag.source}</b> {dag.fallback_required ? "(fallback)" : ""} · {layout.orientation}
+          source: <b>{dag.source}</b>
+          {dag.fallback_required ? " (fallback)" : ""}
         </div>
       </div>
+      <p className="dag-definition">
+        <strong>{viewMode.label} view.</strong> {viewMode.description} {flowLabel}.
+      </p>
       {dag.warnings.length > 0 ? <p className="dag-warning">{dag.warnings[0]}</p> : null}
       <div className="dag-legend">
         {Object.entries(stateColor).map(([state, color]) => (
@@ -152,13 +171,14 @@ export function RunDagPanel({ dag, mode, onModeChange }: Props) {
               const edgeKey = `${edge.from}->${edge.to}`;
               const onPath = highlight.edgeKeys.has(edgeKey);
               const dimmed = hasHighlight && !onPath;
+              const { x1, y1, x2, y2 } = edgeEndpoints(from, to, layout.orientation, NODE_WIDTH, NODE_HEIGHT);
               return (
                 <line
                   key={`${edge.from}-${edge.to}-${idx}`}
-                  x1={from.x + NODE_WIDTH}
-                  y1={from.y + NODE_HEIGHT / 2}
-                  x2={to.x}
-                  y2={to.y + NODE_HEIGHT / 2}
+                  x1={x1}
+                  y1={y1}
+                  x2={x2}
+                  y2={y2}
                   stroke={onPath ? "#7eb6ff" : "#556082"}
                   strokeWidth={onPath ? 2.5 : 1.5}
                   strokeOpacity={dimmed ? 0.15 : 1}

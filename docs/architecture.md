@@ -21,7 +21,7 @@ See **[DAG and forecast](concepts/dag-and-forecast.md)** for UI behavior and tes
 
 ## UI DAG view
 
-The optional Vite/React frontend renders run DAGs from `GET /api/flow-runs/{id}/dag` with **logical** (manifest) and **expanded** (per task run) modes, GPU-accelerated zoom/pan, search-to-focus, and upstream/downstream path highlighting. Layout adapts to wide fan-out vs long serial chains.
+The optional Vite/React frontend renders run DAGs from `GET /api/flow-runs/{id}/dag` with **Aggregated fan-out** (planned manifest, `mode=logical`) and **Task runs** (`mode=expanded`) views. Dependencies flow **left → right** for wide graphs or **top → bottom** for deep chains. GPU-accelerated zoom/pan, search-to-focus, and upstream/downstream path highlighting.
 
 ## Compatibility scope (MVP)
 
