@@ -1,5 +1,9 @@
-import { useMemo } from "react";
-import type { DagEdge, DagNode, FlowRunDag } from "../types";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { FlowRunDag } from "../types";
+import { computeHighlight, findMatchingNodeIds } from "../dag/dagPathHighlight";
+import { NODE_HEIGHT, NODE_WIDTH, layoutDag } from "../dag/dagLayout";
+import { DAG_VIEW_MODES, edgeEndpoints, layoutFlowLabel } from "../dag/dagConventions";
+import { useDagViewport } from "../dag/useDagViewport";
 
 const stateColor: Record<string, string> = {
   COMPLETED: "#2b9155",
@@ -11,49 +15,6 @@ const stateColor: Record<string, string> = {
   NOT_REACHABLE: "#7a7f90"
 };
 
-type PositionedNode = DagNode & { x: number; y: number };
-
-function layout(nodes: DagNode[], edges: DagEdge[]): PositionedNode[] {
-  const byId = new Map(nodes.map((n) => [n.id, n]));
-  const indegree = new Map<string, number>(nodes.map((n) => [n.id, 0]));
-  const incoming = new Map<string, string[]>();
-  for (const edge of edges) {
-    if (!byId.has(edge.from) || !byId.has(edge.to)) continue;
-    indegree.set(edge.to, (indegree.get(edge.to) ?? 0) + 1);
-    incoming.set(edge.to, [...(incoming.get(edge.to) ?? []), edge.from]);
-  }
-
-  const queue = nodes.filter((n) => (indegree.get(n.id) ?? 0) === 0).map((n) => n.id);
-  const depth = new Map<string, number>(nodes.map((n) => [n.id, 0]));
-
-  while (queue.length > 0) {
-    const id = queue.shift()!;
-    const fromDepth = depth.get(id) ?? 0;
-    for (const edge of edges) {
-      if (edge.from !== id) continue;
-      const next = edge.to;
-      if (!byId.has(next)) continue;
-      depth.set(next, Math.max(depth.get(next) ?? 0, fromDepth + 1));
-      indegree.set(next, (indegree.get(next) ?? 1) - 1);
-      if ((indegree.get(next) ?? 0) === 0) queue.push(next);
-    }
-  }
-
-  const lanes = new Map<number, DagNode[]>();
-  for (const node of nodes) {
-    const d = depth.get(node.id) ?? 0;
-    lanes.set(d, [...(lanes.get(d) ?? []), node]);
-  }
-
-  const out: PositionedNode[] = [];
-  for (const [lane, laneNodes] of [...lanes.entries()].sort((a, b) => a[0] - b[0])) {
-    laneNodes.forEach((node, idx) => {
-      out.push({ ...node, x: lane * 220 + 20, y: idx * 80 + 20 });
-    });
-  }
-  return out;
-}
-
 type Props = {
   dag: FlowRunDag;
   mode: "logical" | "expanded";
@@ -61,76 +22,217 @@ type Props = {
 };
 
 export function RunDagPanel({ dag, mode, onModeChange }: Props) {
-  const positioned = useMemo(() => layout(dag.nodes, dag.edges), [dag.nodes, dag.edges]);
+  const layout = useMemo(() => layoutDag(dag.nodes, dag.edges), [dag.nodes, dag.edges]);
+  const positioned = layout.nodes;
   const byId = useMemo(() => new Map(positioned.map((n) => [n.id, n])), [positioned]);
-  const width = Math.max(900, ...positioned.map((n) => n.x + 220));
-  const height = Math.max(400, ...positioned.map((n) => n.y + 100));
+  const { containerRef, contentRef, fitAll, resetView, zoomToBounds } = useDagViewport();
+
+  const [search, setSearch] = useState("");
+  const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
+  const [matchIndex, setMatchIndex] = useState(0);
+
+  const matches = useMemo(() => findMatchingNodeIds(dag.nodes, search), [dag.nodes, search]);
+  const activeMatchId = matches.length > 0 ? matches[matchIndex % matches.length] : null;
+  const highlightTarget = focusedNodeId ?? activeMatchId;
+  const highlight = useMemo(
+    () => computeHighlight(highlightTarget, dag.edges),
+    [highlightTarget, dag.edges]
+  );
+
+  const svgWidth = Math.max(900, layout.bounds.maxX + 40);
+  const svgHeight = Math.max(400, layout.bounds.maxY + 40);
+
+  const focusNode = useCallback(
+    (nodeId: string) => {
+      const node = byId.get(nodeId);
+      if (!node) return;
+      setFocusedNodeId(nodeId);
+      zoomToBounds(
+        {
+          minX: node.x - 24,
+          minY: node.y - 24,
+          maxX: node.x + NODE_WIDTH + 24,
+          maxY: node.y + NODE_HEIGHT + 24,
+          width: NODE_WIDTH + 48,
+          height: NODE_HEIGHT + 48
+        },
+        24,
+        true
+      );
+    },
+    [byId, zoomToBounds]
+  );
+
+  useEffect(() => {
+    if (!activeMatchId) return;
+    focusNode(activeMatchId);
+  }, [activeMatchId, focusNode]);
+
+  useEffect(() => {
+    setMatchIndex(0);
+    if (!search.trim()) setFocusedNodeId(null);
+  }, [search]);
+
+  useEffect(() => {
+    fitAll(layout.bounds);
+  }, [dag.flow_run_id, mode, fitAll, layout.bounds]);
+
+  const onSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter" && matches.length > 0) {
+      event.preventDefault();
+      const next = (matchIndex + 1) % matches.length;
+      setMatchIndex(next);
+      setFocusedNodeId(matches[next]);
+    }
+    if (event.key === "Escape") {
+      setSearch("");
+      setFocusedNodeId(null);
+    }
+  };
+
+  const hasHighlight = highlight.nodeIds.size > 0;
+  const viewMode = DAG_VIEW_MODES[mode];
+  const flowLabel = layoutFlowLabel(layout.orientation);
 
   return (
-    <div>
+    <div className="dag-panel">
       <div className="dag-toolbar">
-        <div>
-          <button disabled={mode === "logical"} onClick={() => onModeChange("logical")}>
-            Logical
+        <div className="dag-toolbar-left">
+          <button
+            type="button"
+            className={mode === "logical" ? "dag-mode-btn active" : "dag-mode-btn"}
+            disabled={mode === "logical"}
+            title={DAG_VIEW_MODES.logical.title}
+            onClick={() => onModeChange("logical")}
+          >
+            {DAG_VIEW_MODES.logical.label}
           </button>
-          <button disabled={mode === "expanded"} onClick={() => onModeChange("expanded")}>
-            Expanded
+          <button
+            type="button"
+            className={mode === "expanded" ? "dag-mode-btn active" : "dag-mode-btn"}
+            disabled={mode === "expanded"}
+            title={DAG_VIEW_MODES.expanded.title}
+            onClick={() => onModeChange("expanded")}
+          >
+            {DAG_VIEW_MODES.expanded.label}
           </button>
+          <button type="button" className="dag-ghost-btn" onClick={() => fitAll(layout.bounds)}>
+            Fit
+          </button>
+          <button type="button" className="dag-ghost-btn" onClick={resetView}>
+            Reset
+          </button>
+        </div>
+        <div className="dag-search-wrap">
+          <input
+            className="dag-search"
+            type="search"
+            placeholder="Search task runs (id, name, label)…"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            onKeyDown={onSearchKeyDown}
+            aria-label="Search DAG task runs"
+          />
+          {matches.length > 1 ? (
+            <span className="dag-search-meta">
+              {matchIndex + 1}/{matches.length} · Enter for next
+            </span>
+          ) : null}
         </div>
         <div className="dag-meta">
-          source: <b>{dag.source}</b> {dag.fallback_required ? "(fallback)" : ""}
+          source: <b>{dag.source}</b>
+          {dag.fallback_required ? " (fallback)" : ""}
         </div>
       </div>
-      {dag.warnings.length > 0 && (
-        <p className="dag-warning">{dag.warnings[0]}</p>
-      )}
+      <p className="dag-definition">
+        <strong>{viewMode.label} view.</strong> {viewMode.description} {flowLabel}.
+      </p>
+      {dag.warnings.length > 0 ? <p className="dag-warning">{dag.warnings[0]}</p> : null}
       <div className="dag-legend">
         {Object.entries(stateColor).map(([state, color]) => (
           <span key={state}>
             <i style={{ background: color }} /> {state}
           </span>
         ))}
+        {hasHighlight ? (
+          <span className="dag-legend-highlight">
+            <i /> Path highlight
+          </span>
+        ) : null}
       </div>
-      <div className="dag-canvas">
-        <svg width={width} height={height}>
-          {dag.edges.map((edge, idx) => {
-            const from = byId.get(edge.from);
-            const to = byId.get(edge.to);
-            if (!from || !to) return null;
-            return (
-              <line
-                key={`${edge.from}-${edge.to}-${idx}`}
-                x1={from.x + 180}
-                y1={from.y + 22}
-                x2={to.x}
-                y2={to.y + 22}
-                stroke="#556082"
-                strokeWidth="1.5"
-              />
-            );
-          })}
-          {positioned.map((node) => (
-            <g key={node.id}>
-              <rect
-                x={node.x}
-                y={node.y}
-                width={180}
-                height={44}
-                rx={8}
-                fill="#1b2238"
-                stroke={stateColor[node.state] ?? "#556082"}
-                strokeWidth={2}
-              />
-              <text x={node.x + 10} y={node.y + 18} fill="#e9eefc" fontSize={12}>
-                {node.label}
-              </text>
-              <text x={node.x + 10} y={node.y + 34} fill="#9db2d8" fontSize={11}>
-                {node.state}
-              </text>
-            </g>
-          ))}
-        </svg>
+      <p className="dag-hint">Scroll to zoom · drag to pan · click a node to focus path</p>
+      <div ref={containerRef} className="dag-canvas dag-canvas-interactive">
+        <div ref={contentRef} className="dag-canvas-content">
+          <svg width={svgWidth} height={svgHeight} className="dag-svg">
+            {dag.edges.map((edge, idx) => {
+              const from = byId.get(edge.from);
+              const to = byId.get(edge.to);
+              if (!from || !to) return null;
+              const edgeKey = `${edge.from}->${edge.to}`;
+              const onPath = highlight.edgeKeys.has(edgeKey);
+              const dimmed = hasHighlight && !onPath;
+              const { x1, y1, x2, y2 } = edgeEndpoints(from, to, layout.orientation, NODE_WIDTH, NODE_HEIGHT);
+              return (
+                <line
+                  key={`${edge.from}-${edge.to}-${idx}`}
+                  x1={x1}
+                  y1={y1}
+                  x2={x2}
+                  y2={y2}
+                  stroke={onPath ? "#7eb6ff" : "#556082"}
+                  strokeWidth={onPath ? 2.5 : 1.5}
+                  strokeOpacity={dimmed ? 0.15 : 1}
+                />
+              );
+            })}
+            {positioned.map((node) => {
+              const onPath = highlight.nodeIds.has(node.id);
+              const isFocus = highlightTarget === node.id;
+              const dimmed = hasHighlight && !onPath;
+              return (
+                <g
+                  key={node.id}
+                  className="dag-node"
+                  onClick={() => focusNode(node.id)}
+                  style={{ cursor: "pointer" }}
+                >
+                  <rect
+                    x={node.x}
+                    y={node.y}
+                    width={NODE_WIDTH}
+                    height={NODE_HEIGHT}
+                    rx={8}
+                    fill={dimmed ? "#141a2c" : "#1b2238"}
+                    stroke={isFocus ? "#f0c674" : onPath ? "#7eb6ff" : (stateColor[node.state] ?? "#556082")}
+                    strokeWidth={isFocus ? 3 : onPath ? 2.5 : 2}
+                    opacity={dimmed ? 0.35 : 1}
+                  />
+                  <text
+                    x={node.x + 10}
+                    y={node.y + 18}
+                    fill={dimmed ? "#6f7d9c" : "#e9eefc"}
+                    fontSize={12}
+                  >
+                    {truncate(node.label, 22)}
+                  </text>
+                  <text
+                    x={node.x + 10}
+                    y={node.y + 34}
+                    fill={dimmed ? "#56627a" : "#9db2d8"}
+                    fontSize={11}
+                  >
+                    {node.state}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
       </div>
     </div>
   );
+}
+
+function truncate(value: string, max: number) {
+  return value.length <= max ? value : `${value.slice(0, max - 1)}…`;
 }

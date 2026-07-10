@@ -22,6 +22,7 @@ Maintainers should use `docs/compatibility_review_workflow.md` before changing t
   - `@flow` and `@task` decorated functions (compatibility shim).
   - `task.submit()` dependency chains.
   - `task.map()` with moderate fan-out.
+  - `@task(name=...)` custom task names (runtime + static forecast when tasks are module-level or flow-closure visible).
   - retries / timeouts / cancellation intent propagation.
   - concurrency limit tags (control-plane enforced).
   - **State transition hooks** (IronFlow extension, not Prefect API names): pass `transition_hooks=` to `@flow` / `@task` as a sequence of `TransitionHookSpec` from `on_transition(fn, from_state=..., to_state=...)`. `None` for `from_state` or `to_state` is a wildcard. Hooks run **synchronously in-process** after each successful control-plane transition (including the two edges produced by the batched `PENDING`/`RUNNING` start path), **without** holding the control-plane lock. User hook bodies may block arbitrarily; IronFlow only guarantees low overhead when **no** hooks are registered. Hook exceptions are logged and do not fail the run. Prefect’s separate `on_running` / `on_failure` / … style maps to explicit edges (e.g. `PENDING→RUNNING`, any `→FAILED`).
@@ -34,12 +35,16 @@ Maintainers should use `docs/compatibility_review_workflow.md` before changing t
 
 ## Phase 2 static planning compatibility
 
-- Supported subset (planned):
-  - analyzable `submit/map` dependency chains.
-  - bounded loops with static upper bounds.
-  - explicit task dependencies and resource hints.
+- Supported subset (current):
+  - `@flow` function body analysis for `submit` / `map` and `wait_for` dependencies.
+  - `@task(name=...)` custom names when task objects are module-level or flow-closure visible.
+  - Repeated invocations of the same task in one flow (`task-0`, `task-1`, … labels; distinct `planned_node_id` per call).
+  - Distinct task wrappers on a shared Python function body (separate graph nodes per wrapper).
+  - Bounded loops with static upper bounds (`for i in range(N)` where `N` is a constant).
+  - Per-run manifest + forecast (task/edge counts, critical path, parallelism).
+  - Run DAG API and UI: **Aggregated fan-out** (`mode=logical`) / **Task runs** (`mode=expanded`); layout: dependencies left→right, parallel top→bottom; zoom-pan, search, path highlight (see `docs/concepts/dag-and-forecast.md`).
 - Fallback:
-  - non-analyzable dynamic sections run via runtime path and are represented as opaque subgraphs.
+  - Non-analyzable dynamic sections (`if`, `range(n)` with runtime `n`, tasks not visible to the compiler) run via the runtime path; DAG may show `source: runtime` with runtime-inferred nodes.
 
 ## Notes
 

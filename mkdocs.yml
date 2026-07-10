@@ -45,6 +45,7 @@ nav:
       - Flows: concepts/flows.md
       - Tasks: concepts/tasks.md
       - Runners: concepts/runners.md
+      - "DAG and forecast": concepts/dag-and-forecast.md
       - "States and transitions": concepts/states-and-transitions.md
       - "Prefect → IronFlow": PREFECT_IRONFLOW_MAPPING.md
       - Architecture: architecture.md

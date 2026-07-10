@@ -11,13 +11,22 @@ IronFlow is intentionally **Rust-first**: the **`rust-engine`** crate is the **a
 
 ## Static planning path
 
-1. Source for selected Prefect-style patterns is parsed into Graph IR.
-2. Unsupported dynamic constructs trigger diagnostics and dynamic fallback flags.
-3. Forecast model emits task count, edge count, critical path, and parallelism estimate.
+1. On flow start, IronFlow compiles the **`@flow` function body** (AST) into graph IR via `static-planner/`.
+2. Supported patterns: `submit` / `map` chains, `wait_for`, constant bounded loops, repeated same-task calls, and `@task(name=...)` when task objects are visible to the flow module/closure.
+3. The manifest is stored per flow run; each `submit` receives the next matching **`planned_node_id`** (or a dynamic `dyn_<task>_<n>` id when the forecast is exhausted). **`map()`** shares one planned node across all fan-out task runs in a batch.
+4. Unsupported constructs (`if`, dynamic `range(n)`, opaque control flow) set **`fallback_required`**; the UI/API can still build a runtime-inferred DAG from task-run history.
+5. Forecast emits task count, edge count, critical path length, and parallelism estimate.
+
+See **[DAG and forecast](concepts/dag-and-forecast.md)** for UI behavior and testing wide/long graphs.
+
+## UI DAG view
+
+The optional Vite/React frontend renders run DAGs from `GET /api/flow-runs/{id}/dag` with **Aggregated fan-out** (planned manifest, `mode=logical`) and **Task runs** (`mode=expanded`) views. Dependencies always flow **left → right**; parallel siblings stack **top → bottom**. GPU-accelerated zoom/pan, search-to-focus, and upstream/downstream path highlighting.
 
 ## Compatibility scope (MVP)
 
 - `task.submit` chains
 - `task.map` fan-out (subset)
+- `@task(name=...)` and repeated same-task invocations in one flow
 - retries/timeouts/cancellation semantics at control-plane level
 - concurrency-limit intent

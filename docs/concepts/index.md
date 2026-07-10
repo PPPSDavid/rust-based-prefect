@@ -5,8 +5,9 @@ IronFlow splits work into a **Rust orchestration kernel** (`rust-engine`) and **
 Use these pages to learn the IronFlow model end-to-end:
 
 - **[Flows](flows.md)** — `@flow`, flow runs, and transition hooks.
-- **[Tasks](tasks.md)** — `@task`, `submit`, `map`, futures.
+- **[Tasks](tasks.md)** — `@task`, `submit`, `map`, futures, custom names, repeated invocations.
 - **[Runners](runners.md)** — task runners and concurrent `map`.
+- **[DAG and forecast](dag-and-forecast.md)** — static planner, run DAG UI, wide/long graphs.
 - **[States and transitions](states-and-transitions.md)** — `RunState` values and allowed edges (enforced in Rust).
 - **[Prefect → IronFlow](../PREFECT_IRONFLOW_MAPPING.md)** — table mapping Prefect mental models to this project.
 - **[Architecture](../architecture.md)** — how Python calls the engine and where persistence hooks live.

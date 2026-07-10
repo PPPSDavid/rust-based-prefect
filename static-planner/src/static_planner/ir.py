@@ -9,6 +9,7 @@ class TaskNode:
     task_name: str
     op_type: str
     deps: list[str] = field(default_factory=list)
+    label: str = ""
 
 
 @dataclass

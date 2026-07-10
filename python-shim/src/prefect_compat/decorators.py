@@ -172,10 +172,12 @@ class TaskWrapper:
     def _prepare_map_task_runs(self, vals: list[Any]) -> list[tuple[TaskRunRecord | None, Any]]:
         flow_run_id = _ACTIVE_FLOW_RUN.get()
         metas: list[tuple[TaskRunRecord | None, Any]] = []
+        planned_node_id: str | None = None
         for v in vals:
             task_run = None
             if flow_run_id is not None:
-                planned_node_id = _CONTROL_PLANE.next_planned_node_id(flow_run_id, self.name)
+                if planned_node_id is None:
+                    planned_node_id = _CONTROL_PLANE.next_planned_node_id(flow_run_id, self.name)
                 task_run = _CONTROL_PLANE.create_task_run(
                     flow_run_id, self.name, planned_node_id=planned_node_id
                 )
@@ -490,6 +492,29 @@ def _compile_forecast_for_flow(flow_fn: Callable[..., Any], flow_name: str) -> d
     return info
 
 
+def _task_symbols_for_flow(flow_fn: Callable[..., Any]) -> dict[str, str]:
+    """Map flow-local symbols to runtime task names (including @task(name=...))."""
+    symbols: dict[str, str] = {}
+    try:
+        unwrapped = inspect.unwrap(flow_fn)
+        module = inspect.getmodule(unwrapped)
+        namespaces: list[dict[str, Any]] = []
+        if module is not None:
+            namespaces.append(vars(module))
+        closure = inspect.getclosurevars(unwrapped)
+        if closure.globals:
+            namespaces.append(closure.globals)
+        if closure.nonlocals:
+            namespaces.append(closure.nonlocals)
+        for namespace in namespaces:
+            for key, value in namespace.items():
+                if isinstance(value, TaskWrapper):
+                    symbols[key] = value.name
+    except Exception:
+        return symbols
+    return symbols
+
+
 def _compile_forecast_for_flow_uncached(flow_fn: Callable[..., Any], flow_name: str) -> dict[str, Any]:
     try:
         from static_planner import compile_and_forecast
@@ -510,7 +535,8 @@ def _compile_forecast_for_flow_uncached(flow_fn: Callable[..., Any], flow_name: 
 
     try:
         source = textwrap.dedent(inspect.getsource(flow_fn))
-        result = compile_and_forecast(source, flow_name=flow_name)
+        task_names = _task_symbols_for_flow(flow_fn)
+        result = compile_and_forecast(source, flow_name=flow_name, task_names=task_names)
         diagnostics = result.get("diagnostics", {})
         return {
             "manifest": result.get("manifest", {}),

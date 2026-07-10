@@ -274,13 +274,83 @@ a {
 
 .dag-toolbar {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
   margin-bottom: 8px;
 }
 
+.dag-toolbar-left {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 .dag-toolbar button {
-  margin-right: 8px;
+  margin-right: 0;
+}
+
+.dag-ghost-btn {
+  background: transparent;
+  border: 1px solid #3a4468;
+  color: #c5d4f2;
+}
+
+.dag-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 240px;
+  min-width: 200px;
+}
+
+.dag-search {
+  flex: 1;
+  min-width: 180px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #3a4468;
+  background: #12182b;
+  color: #e9eefc;
+}
+
+.dag-search-meta {
+  font-size: 11px;
+  color: #9db2d8;
+  white-space: nowrap;
+}
+
+.dag-mode-btn.active {
+  font-weight: 600;
+  border-color: #5b8def;
+}
+
+.dag-definition {
+  font-size: 12px;
+  color: #9db2d8;
+  margin: 0 0 8px;
+  line-height: 1.45;
+}
+
+.dag-definition strong {
+  color: #c5d4f2;
+}
+
+.dag-hint {
+  font-size: 11px;
+  color: #7a8aab;
+  margin: 0 0 8px;
+}
+
+.dag-legend-highlight i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 4px;
+  background: #7eb6ff;
 }
 
 .dag-meta {
@@ -312,7 +382,27 @@ a {
 .dag-canvas {
   border: 1px solid #2c3147;
   border-radius: 8px;
-  overflow: auto;
-  max-height: 560px;
+  overflow: hidden;
+  height: min(72vh, 680px);
+  min-height: 420px;
   background: #0f1426;
+  touch-action: none;
+  user-select: none;
+}
+
+.dag-canvas-interactive {
+  position: relative;
+}
+
+.dag-canvas-content {
+  will-change: transform;
+  transform-origin: 0 0;
+}
+
+.dag-svg {
+  display: block;
+}
+
+.dag-node {
+  transition: opacity 120ms ease;
 }
