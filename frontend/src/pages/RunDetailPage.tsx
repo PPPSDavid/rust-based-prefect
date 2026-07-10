@@ -129,9 +129,14 @@ export function RunDetailPage() {
         ];
 
   const children = run.data.children_summary;
+  const childRuns = run.data.children ?? [];
   const hasChildren =
     children &&
     (children.inline_subflows > 0 || children.subflow_tasks > 0 || children.deployment_subflows > 0);
+  const parentCrumb =
+    run.data.breadcrumb && run.data.breadcrumb.length > 1
+      ? run.data.breadcrumb[run.data.breadcrumb.length - 2]
+      : undefined;
 
   return (
     <section>
@@ -163,7 +168,10 @@ export function RunDetailPage() {
       {run.data.parent_flow_run_id ? (
         <p>
           Parent run:{" "}
-          <Link to={`/runs/${run.data.parent_flow_run_id}`}>{run.data.parent_flow_run_id.slice(0, 8)}…</Link>
+          <Link to={`/runs/${run.data.parent_flow_run_id}`}>
+            {parentCrumb?.name ?? run.data.parent_flow_run_id.slice(0, 8) + "…"}
+          </Link>
+          {parentCrumb?.execution_mode ? ` (${parentCrumb.execution_mode})` : ""}
         </p>
       ) : null}
       {hasChildren ? (
@@ -171,6 +179,21 @@ export function RunDetailPage() {
           Subflows: {children!.inline_subflows} inline · {children!.subflow_tasks} deployment task
           {children!.deployment_subflows > 0 ? ` · ${children!.deployment_subflows} deployment child` : ""}
         </p>
+      ) : null}
+      {childRuns.length > 0 ? (
+        <section className="run-children-list" aria-label="Child flow runs">
+          <h3>Child flow runs</h3>
+          <ul>
+            {childRuns.map((child) => (
+              <li key={child.id}>
+                <Link to={`/runs/${child.id}`}>{child.name}</Link>{" "}
+                <StateBadge state={child.state} />
+                {child.execution_mode ? ` · ${child.execution_mode}` : ""}
+                <span className="mono"> · {child.id}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
       ) : null}
       {run.data.deployment_id ? (
         <p>
@@ -184,6 +207,13 @@ export function RunDetailPage() {
           {tasks.data?.items.map((task) => (
             <li key={task.id}>
               {task.task_name} - {task.state}
+              {task.kind === "subflow" && task.child_flow_run_id ? (
+                <>
+                  {" "}
+                  ·{" "}
+                  <Link to={`/runs/${task.child_flow_run_id}`}>child run {task.child_flow_run_id.slice(0, 8)}…</Link>
+                </>
+              ) : null}
             </li>
           ))}
         </ul>

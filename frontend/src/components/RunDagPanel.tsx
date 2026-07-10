@@ -121,6 +121,16 @@ export function RunDagPanel({ dag, mode, onModeChange }: Props) {
     [dag.nodes, focusNode, navigate, toggleInlineExpand]
   );
 
+  const onNodeDoubleClick = useCallback(
+    (nodeId: string) => {
+      const meta = dag.nodes.find((node) => node.id === nodeId);
+      if (meta?.kind === "inline_subflow" && meta.child_flow_run_id) {
+        navigate(`/runs/${meta.child_flow_run_id}`);
+      }
+    },
+    [dag.nodes, navigate]
+  );
+
   useEffect(() => {
     if (!activeMatchId) return;
     focusNode(activeMatchId);
@@ -228,7 +238,7 @@ export function RunDagPanel({ dag, mode, onModeChange }: Props) {
       </div>
       <p className="dag-hint">
         Scroll to zoom · drag to pan · click task to focus path · click deployment subflow to open child run ·
-        click inline subflow to expand
+        click inline subflow to expand · double-click inline subflow to open child run
       </p>
       <div ref={containerRef} className="dag-canvas dag-canvas-interactive">
         <div ref={contentRef} className="dag-canvas-content">
@@ -284,6 +294,7 @@ export function RunDagPanel({ dag, mode, onModeChange }: Props) {
                   key={node.id}
                   className={nodeClass}
                   onClick={() => onNodeClick(node.id)}
+                  onDoubleClick={() => onNodeDoubleClick(node.id)}
                   style={{ cursor: "pointer" }}
                 >
                   <rect

@@ -1233,6 +1233,7 @@ class InMemoryControlPlane:
             result["deployment_id"] = dep_rows[0]["deployment_id"]
         result["breadcrumb"] = self._flow_run_breadcrumb(flow_run_id)
         result["children_summary"] = self._flow_run_children_summary(flow_run_id)
+        result["children"] = self._flow_run_children(flow_run_id)
         return result
 
     def list_task_runs(
@@ -3443,6 +3444,32 @@ class InMemoryControlPlane:
             "subflow_tasks": int(subflow_rows[0]["c"]) if subflow_rows else 0,
             "deployment_subflows": int(deployment_rows[0]["c"]) if deployment_rows else 0,
         }
+
+    def _flow_run_children(self, flow_run_id: UUID) -> list[dict[str, Any]]:
+        rows = self._query_rows(
+            """
+            SELECT id, name, state, execution_mode, depth, created_at, updated_at
+            FROM flow_runs
+            WHERE parent_flow_run_id = ?
+            ORDER BY created_at ASC
+            """,
+            [str(flow_run_id)],
+        )
+        children: list[dict[str, Any]] = []
+        for row in rows:
+            keys = row.keys()
+            children.append(
+                {
+                    "id": row["id"],
+                    "name": row["name"],
+                    "state": row["state"],
+                    "execution_mode": row["execution_mode"] if "execution_mode" in keys else None,
+                    "depth": int(row["depth"]) if "depth" in keys and row["depth"] is not None else 0,
+                    "created_at": row["created_at"],
+                    "updated_at": row["updated_at"],
+                }
+            )
+        return children
 
     def _aggregate_state(self, states: list[str]) -> str:
         if not states:

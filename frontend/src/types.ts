@@ -17,6 +17,17 @@ export type FlowRun = {
   depth?: number;
   breadcrumb?: FlowRunBreadcrumb[];
   children_summary?: FlowRunChildrenSummary;
+  children?: FlowRunChild[];
+};
+
+export type FlowRunChild = {
+  id: string;
+  name: string;
+  state: string;
+  execution_mode?: string | null;
+  depth?: number;
+  created_at: string;
+  updated_at: string;
 };
 
 export type FlowRunBreadcrumb = {
@@ -40,6 +51,9 @@ export type TaskRun = {
   version: number;
   created_at: string;
   updated_at: string;
+  kind?: string;
+  child_flow_run_id?: string | null;
+  child_deployment_run_id?: string | null;
 };
 
 export type LogRecord = {

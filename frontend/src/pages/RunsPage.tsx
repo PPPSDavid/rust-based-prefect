@@ -78,9 +78,27 @@ export function RunsPage() {
       <DataTable
         columns={[
           {
+            key: "context",
+            header: "Context",
+            render: (run) =>
+              run.parent_flow_run_id ? (
+                <span>
+                  <Link to={`/runs/${run.parent_flow_run_id}`}>subflow</Link>
+                  {run.execution_mode ? ` (${run.execution_mode})` : ""}
+                </span>
+              ) : (
+                "root"
+              )
+          },
+          {
             key: "name",
             header: "Name",
-            render: (run) => <Link to={`/runs/${run.id}`}>{run.name}</Link>
+            render: (run) => (
+              <span>
+                <Link to={`/runs/${run.id}`}>{run.name}</Link>
+                <span className="mono"> · {run.id.slice(0, 8)}…</span>
+              </span>
+            )
           },
           {
             key: "state",
