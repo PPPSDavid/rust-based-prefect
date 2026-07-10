@@ -999,6 +999,53 @@ pub fn mark_deployment_run_finished(
     Ok(())
 }
 
+/// Cancel active deployment runs enqueued as subflows of ``parent_flow_run_id``.
+/// Returns JSON array of cancelled run summaries (id, flow_run_id, parent_task_run_id).
+pub fn cancel_deployment_runs_for_parent_flow(
+    conn: &Connection,
+    parent_flow_run_id: &str,
+) -> Result<Vec<Value>, String> {
+    let now = now_iso();
+    let mut stmt = conn
+        .prepare(
+            "SELECT id,flow_run_id,parent_task_run_id FROM deployment_runs \
+             WHERE parent_flow_run_id = ?1 AND status IN ('SCHEDULED','CLAIMED','RUNNING')",
+        )
+        .map_err(|e| e.to_string())?;
+    let targets: Vec<(String, Option<String>, Option<String>)> = stmt
+        .query_map(params![parent_flow_run_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, Option<String>>(1)?,
+                row.get::<_, Option<String>>(2)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    if targets.is_empty() {
+        return Ok(Vec::new());
+    }
+    conn.execute(
+        "UPDATE deployment_runs SET status = 'CANCELLED', error = 'parent flow cancelled', \
+         finished_at = ?1, updated_at = ?1, lease_until = NULL \
+         WHERE parent_flow_run_id = ?2 AND status IN ('SCHEDULED','CLAIMED','RUNNING')",
+        params![now, parent_flow_run_id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(targets
+        .into_iter()
+        .map(|(id, flow_run_id, parent_task_run_id)| {
+            json!({
+                "id": id,
+                "flow_run_id": flow_run_id,
+                "parent_task_run_id": parent_task_run_id,
+                "status": "CANCELLED",
+            })
+        })
+        .collect())
+}
+
 /// Read a single deployment run row (hot path for subflow wait polling).
 pub fn get_deployment_run(conn: &Connection, deployment_run_id: &str) -> Result<Option<Value>, String> {
     conn.query_row(
@@ -1152,5 +1199,53 @@ mod tests {
         assert_eq!(run["parent_flow_run_id"], "flow-parent");
         assert_eq!(run["parent_task_run_id"], "task-parent");
         assert_eq!(run["parent_deployment_run_id"], "dep-run-parent");
+    }
+
+    #[test]
+    fn cancel_deployment_runs_for_parent_flow_cancels_scheduled_children() {
+        let conn = Connection::open_in_memory().expect("open");
+        conn.execute_batch(
+            "CREATE TABLE deployment_runs (
+                id TEXT UNIQUE NOT NULL,
+                deployment_id TEXT NOT NULL,
+                status TEXT NOT NULL,
+                requested_parameters TEXT NOT NULL,
+                resolved_parameters TEXT NOT NULL,
+                idempotency_key TEXT,
+                worker_name TEXT,
+                lease_until TEXT,
+                flow_run_id TEXT,
+                error TEXT,
+                parent_flow_run_id TEXT,
+                parent_task_run_id TEXT,
+                parent_deployment_run_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                started_at TEXT,
+                finished_at TEXT
+            );",
+        )
+        .expect("schema");
+        conn.execute(
+            "INSERT INTO deployment_runs (id,deployment_id,status,requested_parameters,resolved_parameters,created_at,updated_at,parent_flow_run_id,parent_task_run_id) \
+             VALUES ('dr-1','dep-1','SCHEDULED','{}','{}','2020-01-01T00:00:00Z','2020-01-01T00:00:00Z','parent-flow','task-1')",
+            [],
+        )
+        .expect("insert");
+
+        let cancelled =
+            cancel_deployment_runs_for_parent_flow(&conn, "parent-flow").expect("cancel");
+        assert_eq!(cancelled.len(), 1);
+        assert_eq!(cancelled[0]["id"], "dr-1");
+        assert_eq!(cancelled[0]["status"], "CANCELLED");
+
+        let status: String = conn
+            .query_row(
+                "SELECT status FROM deployment_runs WHERE id = 'dr-1'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("status");
+        assert_eq!(status, "CANCELLED");
     }
 }

@@ -678,6 +678,20 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                 Err(e) => Ok(json!({"ok": false, "error": {"code": "deployment", "message": e}})),
             }
         }
+        "deployment_cancel_by_parent_flow" => {
+            let conn = ctx
+                .db_conn
+                .as_ref()
+                .ok_or_else(|| "deployment_cancel_by_parent_flow requires bind_db".to_string())?;
+            let parent_flow_run_id = body
+                .get("parent_flow_run_id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| "missing string field parent_flow_run_id".to_string())?;
+            match deployment_ops::cancel_deployment_runs_for_parent_flow(conn, parent_flow_run_id) {
+                Ok(cancelled) => Ok(json!({"ok": true, "cancelled": cancelled})),
+                Err(e) => Ok(json!({"ok": false, "error": {"code": "deployment", "message": e}})),
+            }
+        }
         "deployment_reclaim_expired" => {
             let conn = ctx
                 .db_conn

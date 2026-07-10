@@ -1780,9 +1780,18 @@ class InMemoryControlPlane:
         timeout_seconds: float = 3600.0,
         poll_seconds: float = 0.05,
     ) -> dict[str, Any]:
+        from .cancellation import FlowRunCancelled, assert_flow_not_cancelled
+        from .decorators import _ACTIVE_FLOW_RUN
+
         deadline = time.monotonic() + max(0.0, timeout_seconds)
         last: dict[str, Any] | None = None
         while time.monotonic() < deadline:
+            parent_flow_id = _ACTIVE_FLOW_RUN.get()
+            if parent_flow_id is not None:
+                try:
+                    assert_flow_not_cancelled(parent_flow_id)
+                except FlowRunCancelled:
+                    raise
             last = self.get_deployment_run(deployment_run_id)
             if last is None:
                 if time.monotonic() + poll_seconds < deadline:
@@ -1936,41 +1945,131 @@ class InMemoryControlPlane:
         next_cursor = str(rows[-1]["seq"]) if len(rows) == limit else None
         return PageResult(items=items, next_cursor=next_cursor)
 
+    def _cancel_deployment_runs_for_parent_flow(self, parent_flow_run_id: UUID) -> list[dict[str, Any]]:
+        """Cancel SCHEDULED/CLAIMED/RUNNING deployment runs triggered from a parent flow."""
+        rust = self._rust_deployment_dispatch(
+            "deployment_cancel_by_parent_flow",
+            {"parent_flow_run_id": str(parent_flow_run_id)},
+        )
+        if rust is not None:
+            if rust.get("ok"):
+                cancelled = rust.get("cancelled") or []
+                for row in cancelled:
+                    ptid = row.get("parent_task_run_id")
+                    if ptid:
+                        self.mirror_subflow_task_from_deployment(
+                            UUID(str(ptid)),
+                            {**row, "status": "CANCELLED", "error": "parent flow cancelled"},
+                        )
+                return list(cancelled)
+            err = rust.get("error") or {}
+            raise RuntimeError(str(err.get("message", "deployment cancel failed")))
+
+        now = self._now()
+        rows = self._query_rows(
+            """
+            SELECT id, flow_run_id, parent_task_run_id
+            FROM deployment_runs
+            WHERE parent_flow_run_id = ? AND status IN ('SCHEDULED','CLAIMED','RUNNING')
+            """,
+            [str(parent_flow_run_id)],
+        )
+        if not rows:
+            return []
+        self._sqlite_conn.execute(
+            """
+            UPDATE deployment_runs
+            SET status = 'CANCELLED', error = 'parent flow cancelled', finished_at = ?, updated_at = ?, lease_until = NULL
+            WHERE parent_flow_run_id = ? AND status IN ('SCHEDULED','CLAIMED','RUNNING')
+            """,
+            [now, now, str(parent_flow_run_id)],
+        )
+        out: list[dict[str, Any]] = []
+        for row in rows:
+            item = {
+                "id": row["id"],
+                "flow_run_id": row["flow_run_id"],
+                "parent_task_run_id": row["parent_task_run_id"],
+                "status": "CANCELLED",
+            }
+            out.append(item)
+            if row["parent_task_run_id"]:
+                self.mirror_subflow_task_from_deployment(
+                    UUID(str(row["parent_task_run_id"])),
+                    {**item, "error": "parent flow cancelled"},
+                )
+        return out
+
+    def _set_flow_cancelled_internal(self, flow_run_id: UUID) -> None:
+        flow = self._flows.get(flow_run_id)
+        if flow is None:
+            return
+        if flow.state not in {RunState.SCHEDULED, RunState.PENDING, RunState.RUNNING}:
+            return
+        try:
+            self.set_flow_state(flow_run_id, RunState.CANCELLED, uuid4(), "parent_cancel")
+        except ValueError:
+            return
+        now = self._now()
+        self._sqlite_conn.execute(
+            """
+            UPDATE task_runs
+            SET state = 'CANCELLED', updated_at = ?
+            WHERE flow_run_id = ? AND state IN ('SCHEDULED','PENDING','RUNNING')
+            """,
+            [now, str(flow_run_id)],
+        )
+        for task in self._tasks.values():
+            if task.flow_run_id == flow_run_id and task.state in {
+                RunState.SCHEDULED,
+                RunState.PENDING,
+                RunState.RUNNING,
+            }:
+                task.state = RunState.CANCELLED
+
+    def _propagate_cancel_to_subflows(self, root_flow_run_id: UUID) -> None:
+        """BFS cancel of inline/deployment child flow runs and linked deployment runs."""
+        frontier: list[UUID] = [root_flow_run_id]
+        visited: set[UUID] = {root_flow_run_id}
+        for _ in range(SUBFLOW_MAX_DEPTH):
+            if not frontier:
+                break
+            next_frontier: list[UUID] = []
+            for parent_id in frontier:
+                for row in self._cancel_deployment_runs_for_parent_flow(parent_id):
+                    fid = row.get("flow_run_id")
+                    if fid:
+                        child_flow_id = UUID(str(fid))
+                        if child_flow_id not in visited:
+                            self._set_flow_cancelled_internal(child_flow_id)
+                            visited.add(child_flow_id)
+                            next_frontier.append(child_flow_id)
+                for flow in list(self._flows.values()):
+                    if flow.parent_flow_run_id != parent_id:
+                        continue
+                    if flow.run_id in visited:
+                        continue
+                    if flow.state not in {RunState.SCHEDULED, RunState.PENDING, RunState.RUNNING}:
+                        continue
+                    self._set_flow_cancelled_internal(flow.run_id)
+                    visited.add(flow.run_id)
+                    next_frontier.append(flow.run_id)
+            frontier = next_frontier
+
     def _cancel_inline_child_flow_runs(self, parent_flow_run_id: UUID) -> None:
-        """Cancel active inline subflow children when a parent flow is cancelled."""
-        for flow in list(self._flows.values()):
-            if flow.parent_flow_run_id != parent_flow_run_id:
-                continue
-            if flow.execution_mode != "inline":
-                continue
-            if flow.state not in {RunState.SCHEDULED, RunState.PENDING, RunState.RUNNING}:
-                continue
-            try:
-                self.set_flow_state(flow.run_id, RunState.CANCELLED, uuid4(), "parent_cancel")
-            except ValueError:
-                continue
-            self._sqlite_conn.execute(
-                """
-                UPDATE task_runs
-                SET state = 'CANCELLED', updated_at = ?
-                WHERE flow_run_id = ? AND state IN ('SCHEDULED','PENDING','RUNNING')
-                """,
-                [self._now(), str(flow.run_id)],
-            )
-            for task in self._tasks.values():
-                if task.flow_run_id == flow.run_id and task.state in {
-                    RunState.SCHEDULED,
-                    RunState.PENDING,
-                    RunState.RUNNING,
-                }:
-                    task.state = RunState.CANCELLED
+        """Deprecated: use _propagate_cancel_to_subflows from cancel_flow_run."""
+        self._propagate_cancel_to_subflows(parent_flow_run_id)
 
     def cancel_flow_run(self, flow_run_id: UUID) -> dict[str, Any]:
         detail = self.get_flow_run_detail(flow_run_id)
         if detail is None:
             raise ValueError("flow run not found")
         state = str(detail["state"])
-        if state in {"COMPLETED", "FAILED", "CANCELLED"}:
+        if state == "CANCELLED":
+            return detail
+        if state in {"COMPLETED", "FAILED"}:
+            with self._lock:
+                self._propagate_cancel_to_subflows(flow_run_id)
             return detail
         if state not in {"SCHEDULED", "PENDING", "RUNNING"}:
             raise ValueError(f"cannot cancel from state {state}")
@@ -1986,7 +2085,7 @@ class InMemoryControlPlane:
 
         now = self._now()
         with self._lock:
-            self._cancel_inline_child_flow_runs(flow_run_id)
+            self._propagate_cancel_to_subflows(flow_run_id)
             self._sqlite_conn.execute(
                 """
                 UPDATE task_runs

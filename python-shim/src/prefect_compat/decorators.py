@@ -385,9 +385,12 @@ def flow(
                     )
                 try:
                     result = f(*args, **kwargs)
-                    prev = _CONTROL_PLANE.get_flow(record.run_id).state
+                    current = _CONTROL_PLANE.get_flow(record.run_id)
+                    if current.state == RunState.CANCELLED:
+                        raise FlowRunCancelled(f"flow run {record.run_id} was cancelled")
+                    prev = current.state
                     done = _CONTROL_PLANE.set_flow_state(
-                        record.run_id, RunState.COMPLETED, uuid4(), "complete", expected_version=2
+                        record.run_id, RunState.COMPLETED, uuid4(), "complete", expected_version=current.version
                     )
                     if fh and done.status == "applied":
                         _emit_flow_transition(fh, record.run_id, prev, RunState.COMPLETED, "complete")
