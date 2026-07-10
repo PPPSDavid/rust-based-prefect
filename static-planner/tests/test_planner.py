@@ -137,6 +137,21 @@ def demo() -> None:
     assert names == ["ping-start", "ping-end"]
 
 
+def test_compile_deployment_ref_subflow():
+    source = """
+def parent_deploy() -> int:
+    fut = deployment_ref("child-deploy").submit()
+    return fut.result()
+"""
+    graph, diagnostics = compile_flow_source(source, flow_name="parent_deploy")
+    manifest = graph.as_manifest()
+
+    assert diagnostics.fallback_required is False
+    assert len(manifest["nodes"]) == 1
+    assert manifest["nodes"][0]["task_name"] == "subflow:child-deploy"
+    assert manifest["nodes"][0]["op_type"] == "submit"
+
+
 def test_conditional_falls_back():
     source = """
 if flag:

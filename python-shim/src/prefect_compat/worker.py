@@ -49,9 +49,14 @@ def execute_claimed_deployment_run(
         )
         return
 
-    control_plane.mark_deployment_run_started(UUID(claimed["id"]))
+    dep_run_id = UUID(claimed["id"])
+    fresh = control_plane.get_deployment_run(dep_run_id)
+    if fresh is not None and str(fresh.get("status")) == "CANCELLED":
+        return
+
+    control_plane.mark_deployment_run_started(dep_run_id)
     flow_run_id: UUID | None = None
-    dep_token = _ACTIVE_DEPLOYMENT_RUN.set(UUID(claimed["id"]))
+    dep_token = _ACTIVE_DEPLOYMENT_RUN.set(dep_run_id)
     try:
         flow_fn = resolve_flow_callable(
             deployment["flow_name"],

@@ -111,15 +111,39 @@ export function RunDetailPage() {
   if (run.isLoading && !run.data) return <p>Loading run...</p>;
   if ((run.error && !run.data) || !run.data) return <p>Unable to load run.</p>;
 
+  const breadcrumbItems =
+    run.data.breadcrumb && run.data.breadcrumb.length > 0
+      ? [
+          { label: "Flow Runs", to: "/runs" },
+          ...run.data.breadcrumb.map((crumb, index) => ({
+            label:
+              crumb.execution_mode === "inline" && index < run.data!.breadcrumb!.length - 1
+                ? `${crumb.name} (inline)`
+                : crumb.name,
+            to: index < run.data!.breadcrumb!.length - 1 ? `/runs/${crumb.id}` : undefined
+          }))
+        ]
+      : [
+          { label: "Flow Runs", to: "/runs" },
+          { label: run.data.name }
+        ];
+
+  const children = run.data.children_summary;
+  const childRuns = run.data.children ?? [];
+  const hasChildren =
+    children &&
+    (children.inline_subflows > 0 || children.subflow_tasks > 0 || children.deployment_subflows > 0);
+  const parentCrumb =
+    run.data.breadcrumb && run.data.breadcrumb.length > 1
+      ? run.data.breadcrumb[run.data.breadcrumb.length - 2]
+      : undefined;
+
   return (
     <section>
       <PageHeader
         title={run.data.name}
         subtitle={`Run ${run.data.id}`}
-        breadcrumbs={[
-          { label: "Flow Runs", to: "/runs" },
-          { label: run.data.name }
-        ]}
+        breadcrumbs={breadcrumbItems}
         actions={
           <>
             {CANCELLABLE.has(run.data.state) ? (
@@ -138,7 +162,39 @@ export function RunDetailPage() {
       <p>
         <StateBadge state={run.data.state} /> · version {run.data.version} · updated{" "}
         {new Date(run.data.updated_at).toLocaleString()}
+        {run.data.execution_mode ? ` · ${run.data.execution_mode} subflow` : ""}
+        {typeof run.data.depth === "number" && run.data.depth > 0 ? ` · depth ${run.data.depth}` : ""}
       </p>
+      {run.data.parent_flow_run_id ? (
+        <p>
+          Parent run:{" "}
+          <Link to={`/runs/${run.data.parent_flow_run_id}`}>
+            {parentCrumb?.name ?? run.data.parent_flow_run_id.slice(0, 8) + "…"}
+          </Link>
+          {parentCrumb?.execution_mode ? ` (${parentCrumb.execution_mode})` : ""}
+        </p>
+      ) : null}
+      {hasChildren ? (
+        <p className="run-children-summary">
+          Subflows: {children!.inline_subflows} inline · {children!.subflow_tasks} deployment task
+          {children!.deployment_subflows > 0 ? ` · ${children!.deployment_subflows} deployment child` : ""}
+        </p>
+      ) : null}
+      {childRuns.length > 0 ? (
+        <section className="run-children-list" aria-label="Child flow runs">
+          <h3>Child flow runs</h3>
+          <ul>
+            {childRuns.map((child) => (
+              <li key={child.id}>
+                <Link to={`/runs/${child.id}`}>{child.name}</Link>{" "}
+                <StateBadge state={child.state} />
+                {child.execution_mode ? ` · ${child.execution_mode}` : ""}
+                <span className="mono"> · {child.id}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       {run.data.deployment_id ? (
         <p>
           Deployment: <Link to={`/deployments/${run.data.deployment_id}`}>{run.data.deployment_id.slice(0, 8)}</Link>
@@ -151,6 +207,13 @@ export function RunDetailPage() {
           {tasks.data?.items.map((task) => (
             <li key={task.id}>
               {task.task_name} - {task.state}
+              {task.kind === "subflow" && task.child_flow_run_id ? (
+                <>
+                  {" "}
+                  ·{" "}
+                  <Link to={`/runs/${task.child_flow_run_id}`}>child run {task.child_flow_run_id.slice(0, 8)}…</Link>
+                </>
+              ) : null}
             </li>
           ))}
         </ul>

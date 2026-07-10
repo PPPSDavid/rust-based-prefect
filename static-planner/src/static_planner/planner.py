@@ -127,6 +127,17 @@ def compile_and_forecast(
     }
 
 
+def _deployment_ref_name(call: ast.Call) -> str | None:
+    if not isinstance(call.func, ast.Name) or call.func.id != "deployment_ref":
+        return None
+    if not call.args:
+        return None
+    arg = call.args[0]
+    if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+        return arg.value
+    return None
+
+
 def _extract_task_call(call: ast.Call, bound_nodes: dict[str, str]) -> dict[str, Any] | None:
     if not isinstance(call.func, ast.Attribute):
         return None
@@ -137,6 +148,10 @@ def _extract_task_call(call: ast.Call, bound_nodes: dict[str, str]) -> dict[str,
     symbol = "unknown_task"
     if isinstance(call.func.value, ast.Name):
         symbol = call.func.value.id
+    elif isinstance(call.func.value, ast.Call):
+        dep_name = _deployment_ref_name(call.func.value)
+        if dep_name is not None:
+            symbol = f"subflow:{dep_name}"
 
     dep_ids: list[str] = []
     seen: set[str] = set()

@@ -72,6 +72,9 @@ fn deployment_run_row_to_json(row: &rusqlite::Row) -> SqlResult<Value> {
         "lease_until": row.get::<_, Option<String>>("lease_until")?,
         "flow_run_id": row.get::<_, Option<String>>("flow_run_id")?,
         "error": row.get::<_, Option<String>>("error")?,
+        "parent_flow_run_id": row.get::<_, Option<String>>("parent_flow_run_id")?,
+        "parent_task_run_id": row.get::<_, Option<String>>("parent_task_run_id")?,
+        "parent_deployment_run_id": row.get::<_, Option<String>>("parent_deployment_run_id")?,
         "created_at": row.get::<_, String>("created_at")?,
         "updated_at": row.get::<_, String>("updated_at")?,
         "started_at": row.get::<_, Option<String>>("started_at")?,
@@ -192,7 +195,8 @@ pub fn claim_next_deployment_run(
     let row = tx
         .query_row(
             "SELECT id,deployment_id,status,requested_parameters,resolved_parameters,idempotency_key,\
-             worker_name,lease_until,flow_run_id,error,created_at,updated_at,started_at,finished_at \
+             worker_name,lease_until,flow_run_id,error,parent_flow_run_id,parent_task_run_id,parent_deployment_run_id,\
+             created_at,updated_at,started_at,finished_at \
              FROM deployment_runs WHERE id = ?1 AND status = 'CLAIMED'",
             params![cid],
             |row| deployment_run_row_to_json(row),
@@ -202,6 +206,14 @@ pub fn claim_next_deployment_run(
     Ok(Some(row))
 }
 
+/// Optional parent linkage when a deployment run is triggered as a subflow task.
+#[derive(Debug, Clone, Default)]
+pub struct DeploymentParentLink {
+    pub parent_flow_run_id: Option<String>,
+    pub parent_task_run_id: Option<String>,
+    pub parent_deployment_run_id: Option<String>,
+}
+
 /// Insert a deployment run row (SCHEDULED or CANCELLED for CANCEL_NEW at capacity).
 /// Runs entirely inside `tx` (no nested transaction).
 pub fn trigger_deployment_run_tx(
@@ -209,6 +221,7 @@ pub fn trigger_deployment_run_tx(
     deployment_id: &str,
     requested: Option<&Value>,
     idempotency_key: Option<&str>,
+    parent_link: Option<&DeploymentParentLink>,
 ) -> Result<Value, String> {
     let dep = tx
         .query_row(
@@ -250,7 +263,8 @@ pub fn trigger_deployment_run_tx(
             let row = tx
                 .query_row(
                     "SELECT id,deployment_id,status,requested_parameters,resolved_parameters,idempotency_key,\
-                     worker_name,lease_until,flow_run_id,error,created_at,updated_at,started_at,finished_at \
+                     worker_name,lease_until,flow_run_id,error,parent_flow_run_id,parent_task_run_id,parent_deployment_run_id,\
+                     created_at,updated_at,started_at,finished_at \
                      FROM deployment_runs WHERE id = ?1",
                     params![rid],
                     |row| deployment_run_row_to_json(row),
@@ -279,11 +293,15 @@ pub fn trigger_deployment_run_tx(
 
     let run_id = Uuid::new_v4().to_string();
     let now = now_iso();
+    let parent_flow_run_id = parent_link.and_then(|p| p.parent_flow_run_id.as_deref());
+    let parent_task_run_id = parent_link.and_then(|p| p.parent_task_run_id.as_deref());
+    let parent_deployment_run_id = parent_link.and_then(|p| p.parent_deployment_run_id.as_deref());
     tx.execute(
         "INSERT INTO deployment_runs \
          (id,deployment_id,status,requested_parameters,resolved_parameters,idempotency_key,\
-          worker_name,lease_until,flow_run_id,error,created_at,updated_at,started_at,finished_at) \
-         VALUES (?1,?2,?3,?4,?5,?6,NULL,NULL,NULL,?7,?8,?9,NULL,NULL)",
+          worker_name,lease_until,flow_run_id,error,parent_flow_run_id,parent_task_run_id,parent_deployment_run_id,\
+          created_at,updated_at,started_at,finished_at) \
+         VALUES (?1,?2,?3,?4,?5,?6,NULL,NULL,NULL,?7,?8,?9,?10,?11,?12,NULL,NULL)",
         params![
             run_id,
             dep_id,
@@ -292,6 +310,9 @@ pub fn trigger_deployment_run_tx(
             resolved_str,
             idempotency_key,
             error,
+            parent_flow_run_id,
+            parent_task_run_id,
+            parent_deployment_run_id,
             now,
             now,
         ],
@@ -300,7 +321,8 @@ pub fn trigger_deployment_run_tx(
 
     tx.query_row(
         "SELECT id,deployment_id,status,requested_parameters,resolved_parameters,idempotency_key,\
-         worker_name,lease_until,flow_run_id,error,created_at,updated_at,started_at,finished_at \
+         worker_name,lease_until,flow_run_id,error,parent_flow_run_id,parent_task_run_id,parent_deployment_run_id,\
+         created_at,updated_at,started_at,finished_at \
          FROM deployment_runs WHERE id = ?1",
         params![run_id],
         |row| deployment_run_row_to_json(row),
@@ -313,9 +335,10 @@ pub fn trigger_deployment_run(
     deployment_id: &str,
     requested: Option<&Value>,
     idempotency_key: Option<&str>,
+    parent_link: Option<&DeploymentParentLink>,
 ) -> Result<Value, String> {
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
-    let v = trigger_deployment_run_tx(&tx, deployment_id, requested, idempotency_key)?;
+    let v = trigger_deployment_run_tx(&tx, deployment_id, requested, idempotency_key, parent_link)?;
     tx.commit().map_err(|e| e.to_string())?;
     Ok(v)
 }
@@ -831,7 +854,7 @@ fn tick_interval_schedules(conn: &Connection) -> Result<u64, String> {
     let mut fired: u64 = 0;
     for (dep_id, interval_sec) in ids {
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
-        if let Err(e) = trigger_deployment_run_tx(&tx, &dep_id, Some(&json!({})), None) {
+        if let Err(e) = trigger_deployment_run_tx(&tx, &dep_id, Some(&json!({})), None, None) {
             tx.rollback().map_err(|e| e.to_string())?;
             if e == "deployment not found" {
                 continue;
@@ -875,7 +898,7 @@ fn tick_cron_schedules(conn: &Connection) -> Result<u64, String> {
     let mut fired: u64 = 0;
     for (dep_id, cron_expr) in ids {
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
-        if let Err(e) = trigger_deployment_run_tx(&tx, &dep_id, Some(&json!({})), None) {
+        if let Err(e) = trigger_deployment_run_tx(&tx, &dep_id, Some(&json!({})), None, None) {
             tx.rollback().map_err(|e| e.to_string())?;
             if e == "deployment not found" {
                 continue;
@@ -918,7 +941,7 @@ fn tick_rrule_schedules(conn: &Connection) -> Result<u64, String> {
     let mut fired: u64 = 0;
     for (dep_id, rrule_expr) in ids {
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
-        if let Err(e) = trigger_deployment_run_tx(&tx, &dep_id, Some(&json!({})), None) {
+        if let Err(e) = trigger_deployment_run_tx(&tx, &dep_id, Some(&json!({})), None, None) {
             tx.rollback().map_err(|e| e.to_string())?;
             if e == "deployment not found" {
                 continue;
@@ -974,6 +997,67 @@ pub fn mark_deployment_run_finished(
     )
     .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+/// Cancel active deployment runs enqueued as subflows of ``parent_flow_run_id``.
+/// Returns JSON array of cancelled run summaries (id, flow_run_id, parent_task_run_id).
+pub fn cancel_deployment_runs_for_parent_flow(
+    conn: &Connection,
+    parent_flow_run_id: &str,
+) -> Result<Vec<Value>, String> {
+    let now = now_iso();
+    let mut stmt = conn
+        .prepare(
+            "SELECT id,flow_run_id,parent_task_run_id FROM deployment_runs \
+             WHERE parent_flow_run_id = ?1 AND status IN ('SCHEDULED','CLAIMED','RUNNING')",
+        )
+        .map_err(|e| e.to_string())?;
+    let targets: Vec<(String, Option<String>, Option<String>)> = stmt
+        .query_map(params![parent_flow_run_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, Option<String>>(1)?,
+                row.get::<_, Option<String>>(2)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    if targets.is_empty() {
+        return Ok(Vec::new());
+    }
+    conn.execute(
+        "UPDATE deployment_runs SET status = 'CANCELLED', error = 'parent flow cancelled', \
+         finished_at = ?1, updated_at = ?1, lease_until = NULL \
+         WHERE parent_flow_run_id = ?2 AND status IN ('SCHEDULED','CLAIMED','RUNNING')",
+        params![now, parent_flow_run_id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(targets
+        .into_iter()
+        .map(|(id, flow_run_id, parent_task_run_id)| {
+            json!({
+                "id": id,
+                "flow_run_id": flow_run_id,
+                "parent_task_run_id": parent_task_run_id,
+                "status": "CANCELLED",
+            })
+        })
+        .collect())
+}
+
+/// Read a single deployment run row (hot path for subflow wait polling).
+pub fn get_deployment_run(conn: &Connection, deployment_run_id: &str) -> Result<Option<Value>, String> {
+    conn.query_row(
+        "SELECT id,deployment_id,status,requested_parameters,resolved_parameters,idempotency_key,\
+         worker_name,lease_until,flow_run_id,error,parent_flow_run_id,parent_task_run_id,parent_deployment_run_id,\
+         created_at,updated_at,started_at,finished_at \
+         FROM deployment_runs WHERE id = ?1 LIMIT 1",
+        params![deployment_run_id],
+        |row| deployment_run_row_to_json(row),
+    )
+    .optional()
+    .map_err(|e| e.to_string())
 }
 
 /// One FFI round-trip: reclaim leases, fire due schedules, mark stale workers offline.
@@ -1063,5 +1147,105 @@ mod tests {
         let err =
             next_rrule_occurrence("FREQ=DAILY;COUNT=3", Utc::now()).expect_err("COUNT rejected");
         assert!(err.contains("COUNT"));
+    }
+
+    #[test]
+    fn trigger_deployment_run_persists_parent_linkage() {
+        let conn = Connection::open_in_memory().expect("open db");
+        conn.execute_batch(
+            "CREATE TABLE deployments (
+                id TEXT UNIQUE NOT NULL,
+                name TEXT UNIQUE NOT NULL,
+                flow_name TEXT NOT NULL,
+                default_parameters TEXT NOT NULL,
+                paused INTEGER NOT NULL,
+                concurrency_limit INTEGER,
+                collision_strategy TEXT NOT NULL DEFAULT 'ENQUEUE'
+            );
+            CREATE TABLE deployment_runs (
+                id TEXT UNIQUE NOT NULL,
+                deployment_id TEXT NOT NULL,
+                status TEXT NOT NULL,
+                requested_parameters TEXT NOT NULL,
+                resolved_parameters TEXT NOT NULL,
+                idempotency_key TEXT,
+                worker_name TEXT,
+                lease_until TEXT,
+                flow_run_id TEXT,
+                error TEXT,
+                parent_flow_run_id TEXT,
+                parent_task_run_id TEXT,
+                parent_deployment_run_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                started_at TEXT,
+                finished_at TEXT
+            );",
+        )
+        .expect("schema");
+        conn.execute(
+            "INSERT INTO deployments (id,name,flow_name,default_parameters,paused) VALUES (?1,?2,?3,?4,0)",
+            params!["dep-1", "child", "child_flow", "{}"],
+        )
+        .expect("insert dep");
+
+        let parent_link = DeploymentParentLink {
+            parent_flow_run_id: Some("flow-parent".to_string()),
+            parent_task_run_id: Some("task-parent".to_string()),
+            parent_deployment_run_id: Some("dep-run-parent".to_string()),
+        };
+        let run = trigger_deployment_run(&conn, "dep-1", Some(&json!({"n": 1})), None, Some(&parent_link))
+            .expect("trigger");
+        assert_eq!(run["parent_flow_run_id"], "flow-parent");
+        assert_eq!(run["parent_task_run_id"], "task-parent");
+        assert_eq!(run["parent_deployment_run_id"], "dep-run-parent");
+    }
+
+    #[test]
+    fn cancel_deployment_runs_for_parent_flow_cancels_scheduled_children() {
+        let conn = Connection::open_in_memory().expect("open");
+        conn.execute_batch(
+            "CREATE TABLE deployment_runs (
+                id TEXT UNIQUE NOT NULL,
+                deployment_id TEXT NOT NULL,
+                status TEXT NOT NULL,
+                requested_parameters TEXT NOT NULL,
+                resolved_parameters TEXT NOT NULL,
+                idempotency_key TEXT,
+                worker_name TEXT,
+                lease_until TEXT,
+                flow_run_id TEXT,
+                error TEXT,
+                parent_flow_run_id TEXT,
+                parent_task_run_id TEXT,
+                parent_deployment_run_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                started_at TEXT,
+                finished_at TEXT
+            );",
+        )
+        .expect("schema");
+        conn.execute(
+            "INSERT INTO deployment_runs (id,deployment_id,status,requested_parameters,resolved_parameters,created_at,updated_at,parent_flow_run_id,parent_task_run_id) \
+             VALUES ('dr-1','dep-1','SCHEDULED','{}','{}','2020-01-01T00:00:00Z','2020-01-01T00:00:00Z','parent-flow','task-1')",
+            [],
+        )
+        .expect("insert");
+
+        let cancelled =
+            cancel_deployment_runs_for_parent_flow(&conn, "parent-flow").expect("cancel");
+        assert_eq!(cancelled.len(), 1);
+        assert_eq!(cancelled[0]["id"], "dr-1");
+        assert_eq!(cancelled[0]["status"], "CANCELLED");
+
+        let status: String = conn
+            .query_row(
+                "SELECT status FROM deployment_runs WHERE id = 'dr-1'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("status");
+        assert_eq!(status, "CANCELLED");
     }
 }

@@ -9,7 +9,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: "python -m uvicorn python-shim.src.prefect_compat.server:app --host 127.0.0.1 --port 8000",
+      command: "python3 -m uvicorn python-shim.src.prefect_compat.server:app --host 127.0.0.1 --port 8000",
       cwd: "..",
       url: "http://127.0.0.1:8000/health",
       reuseExistingServer: true,

@@ -26,5 +26,5 @@ test("opens run detail tabs", async ({ page }) => {
     .first()
     .click();
   await page.getByRole("tab", { name: "DAG" }).click();
-  await expect(page.getByRole("button", { name: "Logical" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Aggregated fan-out" })).toBeVisible();
 });

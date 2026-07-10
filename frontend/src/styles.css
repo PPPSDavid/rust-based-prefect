@@ -406,3 +406,57 @@ a {
 .dag-node {
   transition: opacity 120ms ease;
 }
+
+.dag-legend-inline,
+.dag-legend-subflow-task {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.dag-legend-inline {
+  background: #15261a;
+  border: 2px dashed #5f9f6a;
+}
+
+.dag-legend-subflow-task {
+  background: #2a2418;
+  border: 2px solid #c9a227;
+}
+
+.dag-inline-expansions {
+  margin-top: 1rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.dag-inline-expansion {
+  border: 1px solid #2a3558;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  background: #12182a;
+}
+
+.dag-inline-expansion h4 {
+  margin: 0 0 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.dag-inline-open-btn {
+  margin-left: auto;
+}
+
+.dag-inline-mini {
+  max-width: 100%;
+  overflow: auto;
+}
+
+.run-children-summary {
+  color: #9db2d8;
+  font-size: 0.95rem;
+}
