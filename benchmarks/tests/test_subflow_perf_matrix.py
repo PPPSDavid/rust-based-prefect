@@ -1,12 +1,5 @@
 from __future__ import annotations
 
-import os
-
-# Apply before any InMemoryControlPlane is constructed in this module.
-os.environ.setdefault("IRONFLOW_USE_RUST_FSM", "0")
-
-import benchmarks.subflow_perf  # noqa: F401
-
 from benchmarks.perf_matrix import (
     WorkloadRecipe,
     _recipe_catalog,

@@ -982,6 +982,21 @@ pub fn mark_deployment_run_started(
     Ok(())
 }
 
+pub fn attach_flow_run_to_deployment_run(
+    conn: &Connection,
+    deployment_run_id: &str,
+    flow_run_id: &str,
+) -> Result<(), String> {
+    let now = now_iso();
+    conn.execute(
+        "UPDATE deployment_runs SET flow_run_id = ?1, updated_at = ?2 \
+         WHERE id = ?3 AND (flow_run_id IS NULL OR flow_run_id = ?1)",
+        params![flow_run_id, now, deployment_run_id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 pub fn mark_deployment_run_finished(
     conn: &Connection,
     deployment_run_id: &str,

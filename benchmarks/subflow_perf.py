@@ -2,16 +2,11 @@
 
 from __future__ import annotations
 
-import os
 import threading
 import time
 from pathlib import Path
 from typing import Any, Callable
 from uuid import UUID, uuid4
-
-# Deployment subflow recipes run multiple worker threads against one SQLite DB per sample.
-# Prefer the Python deployment path in this harness for stable multi-worker benchmarks.
-os.environ.setdefault("IRONFLOW_USE_RUST_FSM", "0")
 
 from prefect_compat import InMemoryControlPlane, deployment_ref, flow, set_control_plane, task
 from prefect_compat.cancellation import FlowRunCancelled, sleep_cancelable
