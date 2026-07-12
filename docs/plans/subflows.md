@@ -1,21 +1,26 @@
 # Subflows Design Plan (IronFlow)
 
-**Status:** Approved design — ready for phased implementation  
-**Last updated:** 2026-07-09  
-**Scope:** `rust-engine/`, `python-shim/`, `static-planner/`, `frontend/`, `benchmarks/`
+**Status:** Implemented (Phases 0–5 landed on `main` via PRs #34 and #36)  
+**Last updated:** 2026-07-12  
+**Scope:** `rust-engine/`, `python-shim/`, `static-planner/`, `frontend/`, `benchmarks/`  
+**User-facing docs:** [How to compose flows with subflows](../how-to/subflows.md) · [Flows](../concepts/flows.md) · [Compatibility matrix](../../COMPATIBILITY.md)
 
-This document solidifies the subflow feature plan discussed for IronFlow. The goal is a **simpler, two-mechanism model** than Prefect’s full subflow matrix, while supporting **deployment-backed execution**, **arbitrary nesting**, and **performance-first** implementation with benchmarks per phase.
+This document is the **historical design plan** for IronFlow subflows. Prefer the user guide and compatibility matrix for “how do I use this?”. Keep this file for design rationale and phase history. (`docs/plans/**` is **not** published to the MkDocs site.)
+
+The goal was a **simpler, two-mechanism model** than Prefect’s full subflow matrix, with **deployment-backed execution**, **arbitrary nesting**, and **performance-first** benchmarks per phase.
 
 ---
 
-## 1. Problem statement
+## 1. Problem statement (original)
 
-IronFlow today has **no first-class subflow support**. Calling one `@flow` from another accidentally creates an **unlinked sibling flow run** with no parent relationship, no `.submit()` API, and no deployment routing. That is insufficient for real orchestration where:
+Before Phases 0–4, IronFlow had **no first-class subflow support**. Calling one `@flow` from another could create an **unlinked sibling flow run** with no parent relationship, no `.submit()` API, and no deployment routing. That was insufficient for real orchestration where:
 
 - Child work may need a **different worker / work pool** than the parent.
 - Parents need **downstream task dependencies** on subflow completion (or fire-and-forget).
 - Users need **nested** composition (subflows calling subflows).
 - The UI must remain understandable without Prefect-level complexity.
+
+**Current status:** M1 (inline) and M2 (`deployment_ref.submit`) ship on `main` with linkage, cancel propagation, DAG/UI navigation, and `perf_matrix` presets `subflow_lite` / `subflow`.
 
 ---
 
@@ -318,22 +323,37 @@ python benchmarks/perf_matrix.py run --preset lite --recipes subflow_inline_dept
 
 ## 11. Compatibility & documentation
 
-Update when implementing:
+**Shipped with the feature (check these first):**
 
-- `COMPATIBILITY.md` — new “Subflows (subset)” section with M1/M2 explicitly listed.
-- `docs/concepts/flows.md` — user-facing how-to.
-- `docs/PREFECT_IRONFLOW_MAPPING.md` — contrast with Prefect subflow complexity.
-- `docs/ui_phase1_api_contract.md` — DAG node kinds and navigation.
+- `COMPATIBILITY.md` — “Subflows (subset)” under Phase 1 runtime compatibility.
+- `docs/how-to/subflows.md` — primary user guide (MkDocs How-to nav).
+- `docs/concepts/flows.md` — overview + link to how-to.
+- `docs/concepts/dag-and-forecast.md` — `inline_subflow` / `subflow_task` node kinds.
+- `docs/PREFECT_IRONFLOW_MAPPING.md` — Prefect nested-flow row.
+- `docs/index.md`, `docs/concepts/index.md`, `docs/how-to/index.md`, `mkdocs.yml` — discoverability.
+
+Maintainer-only (excluded from published site): this plan under `docs/plans/`.
 
 **Intentionally not in scope (v1):**
 
-- Prefect `SubflowTask` / `run_deployment` API name parity (IronFlow names TBD but semantics aligned).
+- Prefect `SubflowTask` / `run_deployment` API name parity (IronFlow uses `deployment_ref` / `SubflowFuture`).
 - Subflow parameter schema validation beyond deployment defaults.
 - Automatic deployment creation from `@flow` (users must deploy child flows explicitly).
 
 ---
 
 ## 12. Phased implementation plan
+
+### Phase status summary
+
+| Phase | Focus | Status |
+| --- | --- | --- |
+| 0 | Schema & linkage | Done (#34) |
+| 1 | M2 deploy submit/wait | Done (#34) |
+| 2 | M1 inline | Done (#34) |
+| 3 | Cancel + cross-pool | Done (#34) |
+| 4 | DAG/UI navigation | Done (#34) |
+| 5 | `perf_matrix` recipes + multi-worker Rust fixes | Done (#36) |
 
 ### Phase 0 — Schema & linkage foundation
 
@@ -444,17 +464,20 @@ Update when implementing:
 
 ## 16. Acceptance criteria (feature complete)
 
-- [ ] `deployment_ref("x").submit()` enqueues child on child deployment’s work pool and returns awaitable future.
-- [ ] `wait_for=[subflow_future]` gates downstream tasks correctly.
-- [ ] Fire-and-forget subflow does not block parent completion.
-- [ ] `child_flow(...)` blocks in-process; inline DAG visible in UI.
-- [ ] Subflow chains depth ≥ 3 work across M1/M2 combinations.
-- [ ] Parent cancel cancels active children.
-- [ ] All new `perf_matrix` recipes pass compare gate against baseline.
-- [ ] `COMPATIBILITY.md` documents supported subflow subset.
+- [x] `deployment_ref("x").submit()` enqueues child on child deployment’s work pool and returns awaitable future.
+- [x] `wait_for=[subflow_future]` gates downstream tasks correctly.
+- [x] Fire-and-forget subflow does not block parent completion.
+- [x] `child_flow(...)` blocks in-process; inline DAG visible in UI.
+- [x] Subflow chains depth ≥ 3 work across M1/M2 combinations.
+- [x] Parent cancel cancels active children.
+- [x] All new `perf_matrix` recipes exist (`subflow_lite` / `subflow` presets); compare gates use same `matrix_compare_key`.
+- [x] `COMPATIBILITY.md` documents supported subflow subset.
+- [x] User guide + nav discoverability (`docs/how-to/subflows.md`).
 
 ---
 
 ## 17. Next step
 
-Begin **Phase 0** on branch `feat/subflows-schema-foundation` (or subsequent `cursor/*` agent branch per `AGENTS.md`). No user-facing API changes until schema and Rust linkage ops land with tests.
+**For users:** start at **[How to compose flows with subflows](../how-to/subflows.md)**.
+
+**For maintainers:** stale phased PRs (#28–#33) predate the consolidated #34/#36 landings and can be closed. Follow-ups (if any) should be new tasks: Prefect name-parity experiments, richer parameter validation, or Playwright E2E for DAG double-click navigation — not re-opening Phases 0–5.

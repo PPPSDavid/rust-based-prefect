@@ -4,7 +4,7 @@ IronFlow is **subset-compatible** with Prefect 3.x patterns, not a drop-in repla
 
 1. **Swap imports** — Replace `from prefect import flow, task` (and related helpers) with **`from prefect_compat import ...`**. See **[Prefect → IronFlow](../PREFECT_IRONFLOW_MAPPING.md)** for a full concept map.
 2. **Wire the control plane** — Register an **`InMemoryControlPlane`** (or the persistence-backed plane your app uses) with **`set_control_plane`** before running flows, matching patterns in **`python-shim/tests/`** and **[Quick start (demo flow)](../QUICKSTART_DEMO.md)**.
-3. **Stay inside the supported subset** — Prefer **`submit`** chains, **`map`** with clear shape, retries/timeouts/cancellation as documented. Avoid relying on blocks, full deployment/work-pool parity, or Prefect Cloud–only features until **[Compatibility matrix](../compatibility.md)** says otherwise.
+3. **Stay inside the supported subset** — Prefer **`submit`** chains, **`map`** with clear shape, retries/timeouts/cancellation as documented. For nesting, use IronFlow’s **two subflow mechanisms** ([how-to](subflows.md)) instead of Prefect-only APIs. Avoid relying on blocks, full deployment/work-pool parity, or Prefect Cloud–only features until **[Compatibility matrix](../compatibility.md)** says otherwise.
 4. **Rename hooks if you use them** — Prefect’s named lifecycle hooks are not mirrored literally. Use IronFlow **`transition_hooks`** with **`TransitionHookSpec`** / **`on_transition`**; see **[Flows](../concepts/flows.md)** and the compatibility matrix.
 5. **Validate** — Run **`python -m pytest python-shim/tests`** and your own scripts locally; add a small smoke script under `scripts/` if you want a repeatable check.
 

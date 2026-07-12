@@ -49,7 +49,19 @@ Open any flow run → **DAG** tab.
 | **Fit / Reset** | Fit graph to viewport or reset zoom |
 | **Search** | Match task id, label, or name; zoom to selection; **Enter** cycles multiple matches |
 | **Click node** | Focus and highlight upstream + downstream path |
+| **Double-click** | On an **`inline_subflow`** node with a child run id, open that child run detail |
 | **Scroll / drag** | Zoom toward cursor; pan the canvas |
+
+### Subflow node kinds
+
+When a flow nests children (see **[How to compose flows with subflows](../how-to/subflows.md)**), the DAG may include:
+
+| `kind` | Meaning | Typical styling |
+| --- | --- | --- |
+| `inline_subflow` | Blocking inline child flow (M1) | Dashed border; expand / navigate to child run |
+| `subflow_task` | Deployment-backed subflow surrogate task (M2) | Solid accent; links to child flow run when available |
+
+Parent run detail also lists **`children[]`** (id, name, state, `execution_mode`, depth) for breadcrumb navigation.
 
 A definition line under the toolbar restates the active view and layout: “Dependencies: left → right · parallel tasks: top → bottom”.
 
