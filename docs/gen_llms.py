@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from mkdocs_gen_files import open as gen_open
+from mkdocs_gen_files import open as gen_open  # ty: ignore[unresolved-import]
 
 SITE_BASE = "https://pppsdavid.github.io/rust-based-prefect"
 REPO_BASE = "https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs"
