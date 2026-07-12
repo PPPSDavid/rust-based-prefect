@@ -1,6 +1,8 @@
 # REST API overview
 
-IronFlow exposes a FastAPI application at `http://127.0.0.1:8000` by default. There is **no authentication** in the MVP — bind to localhost in development.
+IronFlow exposes a FastAPI application at `http://127.0.0.1:8000` by default.
+
+**Authentication (optional):** set `IRONFLOW_SERVER_API_AUTH_STRING` on the server and `IRONFLOW_API_AUTH_STRING` on clients. When enabled, `/api/*` requires HTTP Basic auth; `/health` does not. See [Secure a self-hosted server](../how-to/secure-self-hosted.md).
 
 **Interactive docs:** `GET /docs` (Swagger UI) and `GET /redoc` when the server is running.
 

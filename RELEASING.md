@@ -38,6 +38,19 @@ The **`ironflow-prefect-compat`** package is published to **https://pypi.org** v
 
 The **TestPyPI** workflow (`.github/workflows/publish-testpypi.yml`) is unchanged and remains the recommended validation index before production uploads.
 
+## Container images (server)
+
+The **`ironflow-server`** image is a **runtime wrapper** around the same PyPI wheel — not a separate artifact line.
+
+| Channel | Artifact | When to use |
+| --- | --- | --- |
+| PyPI | `ironflow-prefect-compat` | Libraries, CLI, custom processes |
+| GHCR (proposed) | `ghcr.io/pppsdavid/ironflow-server:<VERSION>` | Ready-to-run API (`uvicorn` + defaults) |
+
+**Release order:** publish the PyPI wheel first, then build/push the server image with the matching `IRONFLOW_VERSION` build arg (see **`deploy/docker/README.md`**). CI smoke: `.github/workflows/docker-server-smoke.yml`. Automated GHCR push workflow to follow.
+
+Attach `docker pull ghcr.io/pppsdavid/ironflow-server:vX.Y.Z` to GitHub Release notes when images are published.
+
 ## Using a release (downstream)
 
 Consumers should take artifacts from [**GitHub Releases**](https://github.com/PPPSDavid/rust-based-prefect/releases), not from unlabeled `main` snapshots, when they need a reproducible version.

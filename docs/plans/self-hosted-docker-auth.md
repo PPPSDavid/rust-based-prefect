@@ -401,9 +401,8 @@ cargo test --manifest-path rust-engine/Cargo.toml
 
 | PR / branch | Tier | Status | Notes |
 | --- | --- | --- | --- |
-| `cursor/self-hosted-docker-auth-plan-b5da` | — | **Plan doc** | PR #45 |
-| *(pending)* | A | Not started | Minimal server image |
-| *(pending)* | C | Not started | Basic auth |
+| `cursor/self-hosted-docker-auth-plan-b5da` | — | Plan doc | PR #45 |
+| `cursor/docker-tier-a-c-b5da` | A, C | In progress | Server image + basic auth |
 | *(pending)* | B0 | Not started | RFC + storage abstraction |
 | *(pending)* | B1 | Not started | Postgres + migrations |
 | *(pending)* | B2 | Not started | HTTP worker protocol |

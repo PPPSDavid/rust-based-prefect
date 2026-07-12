@@ -16,6 +16,8 @@ If you only need a minimal in-process flow with no network stack, use **[Quick s
 
 For Prefect terminology mapping, see **[Prefect → IronFlow](PREFECT_IRONFLOW_MAPPING.md)**. For exact feature boundaries, **[Compatibility](compatibility.md)** is authoritative.
 
+**Docker:** for a containerized single-server setup, see **[How to run the server in Docker](how-to/docker-quickstart.md)** and **[Secure a self-hosted server](how-to/secure-self-hosted.md)**.
+
 ## 1. Start the API (and optional UI)
 
 From the **repository root**, with dependencies installed as in the README:

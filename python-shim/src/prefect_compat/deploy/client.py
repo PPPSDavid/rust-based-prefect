@@ -7,6 +7,7 @@ from urllib.error import HTTPError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
+from ..auth import merge_auth_headers
 from .spec import DeploymentSpec
 
 DEFAULT_WORK_POOL_NAME = "default-process-pool"
@@ -42,7 +43,7 @@ class _UrllibSession:
     ) -> _UrllibResponse:
         url = f"{self._base_url}{path}"
         data = None
-        headers: dict[str, str] = {}
+        headers = merge_auth_headers()
         if json_body is not None:
             data = json.dumps(json_body).encode("utf-8")
             headers["Content-Type"] = "application/json"
@@ -77,7 +78,10 @@ class DeployClient:
         try:
             import httpx
 
-            return httpx.Client(base_url=self.base_url)
+            return httpx.Client(
+                base_url=self.base_url,
+                headers=merge_auth_headers(),
+            )
         except ImportError:
             return _UrllibSession(self.base_url)
 
