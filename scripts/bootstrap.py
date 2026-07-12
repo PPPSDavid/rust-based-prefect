@@ -2,13 +2,13 @@
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import os
 import shutil
 import subprocess
 import sys
 from importlib.util import find_spec
 from pathlib import Path
+from typing import Any, cast
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SMOKE_TEST = "python-shim/tests/test_compat.py::test_submit_chain_and_map"
@@ -126,7 +126,7 @@ def _native_check() -> int:
 
     @flow
     def _bootstrap_native_flow() -> int:
-        return _bootstrap_native_task.submit().result()
+        return cast(Any, _bootstrap_native_task).submit().result()
 
     try:
         flow_out = _bootstrap_native_flow()

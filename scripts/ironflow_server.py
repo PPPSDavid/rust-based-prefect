@@ -43,7 +43,7 @@ def _start_backend(repo_root: Path, host: str, port: int) -> subprocess.Popen[st
         "--port",
         str(port),
     ]
-    return subprocess.Popen(cmd, cwd=repo_root)
+    return subprocess.Popen(cmd, cwd=repo_root, text=True)
 
 
 def _start_frontend(repo_root: Path, frontend_port: int) -> subprocess.Popen[str]:
@@ -57,7 +57,7 @@ def _start_frontend(repo_root: Path, frontend_port: int) -> subprocess.Popen[str
 
     subprocess.run([*npm_cmd, "install"], cwd=frontend_dir, check=True)
     env = dict(os.environ, PORT=str(frontend_port))
-    return subprocess.Popen([*npm_cmd, "run", "dev"], cwd=frontend_dir, env=env)
+    return subprocess.Popen([*npm_cmd, "run", "dev"], cwd=frontend_dir, env=env, text=True)
 
 
 def _backend_status(repo_root: Path) -> str:

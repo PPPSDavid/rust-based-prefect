@@ -1,0 +1,11 @@
+[tool.ty.environment]
+extra-paths = ["python-shim/src", "static-planner/src"]
+
+[tool.ty.analysis]
+# Optional dev/agent deps: installed via scripts/setup_code_review_graph.sh or extras.
+allowed-unresolved-imports = [
+    "code_review_graph.**",
+    "mcp.**",
+    "torch",
+    "sentence_transformers.**",
+]

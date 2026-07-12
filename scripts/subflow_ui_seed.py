@@ -10,11 +10,11 @@ import argparse
 import json
 import os
 import threading
-import time
 from pathlib import Path
+from typing import cast
 
 from prefect_compat import InMemoryControlPlane, deployment_ref, flow, set_control_plane, task
-from prefect_compat.runtime import RunState
+from prefect_compat.decorators import TaskWrapper
 from prefect_compat.worker import run_worker_loop
 
 
@@ -35,7 +35,7 @@ def seed(history_path: Path) -> dict[str, str]:
 
     @flow
     def leaf_flow(n: int) -> int:
-        return leaf_task.submit(n).result()
+        return cast(TaskWrapper[int], leaf_task).submit(n).result()
 
     @flow
     def child_inline(n: int) -> int:
@@ -103,10 +103,10 @@ def seed(history_path: Path) -> dict[str, str]:
     }
     out = {k: str(v.run_id) for k, v in runs.items()}
     for name, rid in out.items():
-        detail = plane.get_flow_run_detail(runs[name].run_id)
+        detail = plane.get_flow_run_detail(runs[name].run_id) or {}
         dag = plane.get_flow_run_dag(runs[name].run_id, mode="logical")
         kinds = sorted({n.get("kind", "task") for n in dag["nodes"]})
-        print(f"{name}: run_id={rid} state={detail['state']} dag_kinds={kinds}")
+        print(f"{name}: run_id={rid} state={detail.get('state')} dag_kinds={kinds}")
     return out
 
 
