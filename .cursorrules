@@ -7,7 +7,9 @@ review protocol, read **`AGENTS.md`** (Ground Truth Files, Expected Validation,
 
 Package-scoped notes: `rust-engine/AGENTS.md`, `python-shim/AGENTS.md`,
 `static-planner/AGENTS.md`, `benchmarks/AGENTS.md`, `frontend/AGENTS.md`.
-Agent helpers: `docs/agent/` and `.cursor/skills/`.
+Agent helpers: `docs/agent/` (gotchas, golden paths, task template) and
+`.cursor/skills/`. Scoped rules: `.cursor/rules/benchmarks.mdc`,
+`python-shim.mdc`. Hooks: `.cursor/hooks.json` keeps CRG fresh.
 
 **Parallel agents:** each task must use its **own feature branch** off `main`
 (see **Multi-Agent Rules** and **Cloud / Cursor agents** in `AGENTS.md`). Never

@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "hooks": {
+    "afterFileEdit": [
+      {
+        "command": ".cursor/hooks/crg-after-edit.sh",
+        "timeout": 15
+      }
+    ],
+    "sessionStart": [
+      {
+        "command": ".cursor/hooks/crg-session-start.sh",
+        "timeout": 10
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "matcher": "^git\\s+commit",
+        "command": ".cursor/hooks/crg-pre-commit.sh",
+        "timeout": 15
+      }
+    ]
+  }
+}
