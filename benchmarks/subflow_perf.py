@@ -12,6 +12,8 @@ from prefect_compat import InMemoryControlPlane, deployment_ref, flow, set_contr
 from prefect_compat.cancellation import FlowRunCancelled, sleep_cancelable
 from prefect_compat.worker import run_worker_loop
 
+from benchmarks._task_cast import as_task_wrapper
+
 CHILD_DEPLOY_NAME = "subflow-perf-child-deploy"
 SLOW_DEPLOY_NAME = "subflow-perf-slow-child"
 POOL_A = "default-process-pool"
@@ -79,8 +81,10 @@ def _build_inline_depth_flows(depth: int, fanout: int) -> tuple[Callable[[], int
     registry: dict[str, Any] = {}
 
     @task
-    def inc(i: int) -> int:
+    def _inc(i: int) -> int:
         return i + 1
+
+    inc = as_task_wrapper(_inc)
 
     @flow
     def leaf_flow(n: int) -> int:
@@ -205,6 +209,8 @@ def run_query_dag_nested(
 
     def _query_tree() -> int:
         detail = plane.get_flow_run_detail(root_run.run_id)
+        if detail is None:
+            return 0
         _timed(latencies, "subflow.detail_query_ms", plane.get_flow_run_detail, root_run.run_id)
         _timed(latencies, "subflow.dag_query_ms", plane.get_flow_run_dag, root_run.run_id, "logical")
         reads = 2

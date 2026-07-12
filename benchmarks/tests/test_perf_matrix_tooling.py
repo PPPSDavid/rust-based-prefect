@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
+import pytest  # ty: ignore[unresolved-import]
 
 from benchmarks.perf_matrix import (
     canonical_matrix_compare_key,

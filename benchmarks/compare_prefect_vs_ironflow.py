@@ -10,7 +10,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Callable
 
-import httpx
+import httpx  # ty: ignore[unresolved-import]
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -31,22 +31,28 @@ def _run_ironflow(flavor: str, complexity: int) -> PerfResult:
     sys.path.insert(0, str(ROOT / "python-shim" / "src"))
     from prefect_compat import InMemoryControlPlane, flow, set_control_plane, task, wait
 
+    from benchmarks._task_cast import as_task_wrapper
+
     plane = InMemoryControlPlane()
     start_boot = time.perf_counter()
     set_control_plane(plane)
     startup = time.perf_counter() - start_boot
 
     @task
-    def inc(x: int) -> int:
+    def _inc(x: int) -> int:
         return x + 1
 
     @task
-    def dbl(x: int) -> int:
+    def _dbl(x: int) -> int:
         return x * 2
 
     @task
-    def passthrough(x: int) -> int:
+    def _passthrough(x: int) -> int:
         return x
+
+    inc = as_task_wrapper(_inc)
+    dbl = as_task_wrapper(_dbl)
+    passthrough = as_task_wrapper(_passthrough)
 
     @flow
     def mapped(n: int) -> int:

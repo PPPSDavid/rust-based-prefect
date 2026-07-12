@@ -4,7 +4,6 @@ import argparse
 import ctypes
 import concurrent.futures
 import json
-import os
 import platform
 import random
 import statistics
@@ -26,7 +25,7 @@ if str(ROOT) not in sys.path:
 if str(PYTHON_SHIM_SRC) not in sys.path:
     sys.path.insert(0, str(PYTHON_SHIM_SRC))
 
-from prefect_compat.runtime import InMemoryControlPlane, RunState
+from prefect_compat.runtime import InMemoryControlPlane, RunState  # noqa: E402
 
 BASE_SEED = 20260416
 
@@ -133,7 +132,7 @@ def _rss_bytes_now() -> int:
             return int(counters.WorkingSetSize)
         return 0
     try:
-        import resource  # type: ignore
+        import resource
 
         usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
         # Linux reports KB, macOS reports bytes.
@@ -570,14 +569,18 @@ def _run_decorator_hook_micro_iteration(
 
         from prefect_compat import flow, on_transition, set_control_plane, task
 
+        from benchmarks._task_cast import as_task_wrapper
+
         set_control_plane(plane)
         noop = on_transition(_noop_transition_hook)
 
         if profile == "none":
 
             @task
-            def work(x: int) -> int:
+            def _work(x: int) -> int:
                 return x + 1
+
+            work = as_task_wrapper(_work)
 
             @flow
             def sample() -> int:
@@ -586,8 +589,10 @@ def _run_decorator_hook_micro_iteration(
         elif profile == "flow":
 
             @task
-            def work(x: int) -> int:
+            def _work(x: int) -> int:
                 return x + 1
+
+            work = as_task_wrapper(_work)
 
             @flow(transition_hooks=[noop])
             def sample() -> int:
@@ -596,8 +601,10 @@ def _run_decorator_hook_micro_iteration(
         elif profile == "task":
 
             @task(transition_hooks=[noop])
-            def work(x: int) -> int:
+            def _work(x: int) -> int:
                 return x + 1
+
+            work = as_task_wrapper(_work)
 
             @flow
             def sample() -> int:
@@ -606,8 +613,10 @@ def _run_decorator_hook_micro_iteration(
         else:
 
             @task(transition_hooks=[noop])
-            def work(x: int) -> int:
+            def _work(x: int) -> int:
                 return x + 1
+
+            work = as_task_wrapper(_work)
 
             @flow(transition_hooks=[noop])
             def sample() -> int:
@@ -711,15 +720,20 @@ def _run_decorator_map_micro_iteration(
         from prefect_compat import flow, set_control_plane, task, wait
         from prefect_compat.task_runners import ThreadPoolTaskRunner
 
+        from benchmarks._task_cast import as_task_wrapper
+
         set_control_plane(plane)
 
         @task
-        def inc(x: int) -> int:
+        def _inc(x: int) -> int:
             return x + 1
 
         @task
-        def dbl(x: int) -> int:
+        def _dbl(x: int) -> int:
             return x * 2
+
+        inc = as_task_wrapper(_inc)
+        dbl = as_task_wrapper(_dbl)
 
         @flow(task_runner=ThreadPoolTaskRunner())
         def sample() -> int:
@@ -1447,7 +1461,6 @@ def run_suite(
     seed: int,
     jobs: int,
 ) -> dict[str, Any]:
-    catalog = _recipe_catalog()
     samples: list[dict[str, Any]] = []
     aggregates: list[dict[str, Any]] = []
 
@@ -1650,806 +1663,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
-
-def _wait_for_url(url: str, timeout_s: int = 60) -> None:
-    deadline = time.time() + timeout_s
-    while time.time() < deadline:
-        try:
-            with httpx.Client(timeout=1.5) as client:
-                response = client.get(url)
-            if response.status_code < 500:
-                return
-        except Exception:
-            pass
-        time.sleep(0.4)
-    raise TimeoutError(f"Timed out waiting for {url}")
-
-
-def _probe_latency(url: str, calls: int = 9) -> float:
-    timings: list[float] = []
-    with httpx.Client(timeout=10.0) as client:
-        for _ in range(calls):
-            start = time.perf_counter()
-            response = client.get(url)
-            response.raise_for_status()
-            timings.append(time.perf_counter() - start)
-    if not timings:
-        return 0.0
-    return statistics.quantiles(timings, n=20, method="inclusive")[18]
-
-
-def _estimate_transitions(flavor: str, complexity: int) -> int:
-    # Coarse cross-engine comparable estimate (run + each task lifecycle).
-    if flavor == "simple":
-        task_count = 2
-    else:
-        task_count = complexity + 1
-    return 3 + (task_count * 3)
-
-
-def _ensure_frontend_built(frontend_dir: Path, npm_cmd: list[str]) -> tuple[bool, str]:
-    dist_index = frontend_dir / "dist" / "index.html"
-    if dist_index.exists():
-        return True, ""
-    proc = subprocess.run(
-        [*npm_cmd, "run", "build"],
-        cwd=str(frontend_dir),
-        capture_output=True,
-        text=True,
-        timeout=600,
-    )
-    if proc.returncode != 0:
-        tail = (proc.stderr or proc.stdout or "")[-500:]
-        return False, tail
-    return dist_index.exists(), ""
-
-
-def _resolve_npm_command() -> list[str] | None:
-    npm = shutil.which("npm")
-    if npm:
-        return [npm]
-    windows_fallback = Path(r"C:\Program Files\nodejs\npm.cmd")
-    if windows_fallback.exists():
-        return [str(windows_fallback)]
-    return None
-
-
-def _run_ironflow_inproc(flavor: str, complexity: int, iteration: int) -> PerfSample:
-    tmpdir = tempfile.mkdtemp(prefix="ironflow-perf-")
-    old_cwd = Path.cwd()
-    try:
-        os.chdir(tmpdir)
-        sys.path.insert(0, str(ROOT / "python-shim" / "src"))
-        from prefect_compat import InMemoryControlPlane, flow, set_control_plane, task, wait
-        from prefect_compat.task_runners import ThreadPoolTaskRunner
-
-        plane = InMemoryControlPlane()
-        start_boot = time.perf_counter()
-        set_control_plane(plane)
-        startup = time.perf_counter() - start_boot
-
-        @task
-        def inc(x: int) -> int:
-            return x + 1
-
-        @task
-        def dbl(x: int) -> int:
-            return x * 2
-
-        @task
-        def passthrough(x: int) -> int:
-            return x
-
-        @flow
-        def simple(n: int) -> int:
-            first = inc.submit(n)
-            second = dbl.submit(first, wait_for=[first])
-            return second.result()
-
-        @flow(task_runner=ThreadPoolTaskRunner())
-        def wide(n: int) -> int:
-            first = inc.submit(n)
-            mapped_futs = dbl.map(range(n), wait_for=[first])
-            wait(mapped_futs)
-            return sum(f.result() for f in mapped_futs)
-
-        @flow
-        def long_chain(n: int) -> int:
-            f = passthrough.submit(0)
-            for _ in range(n):
-                f = inc.submit(f, wait_for=[f])
-            return f.result()
-
-        flow_map: dict[str, Callable[[int], int]] = {
-            "simple": simple,
-            "wide": wide,
-            "long_chain": long_chain,
-            # Backwards-compatible aliases.
-            "mapped": wide,
-            "chained": long_chain,
-        }
-        flow_fn = flow_map.get(flavor)
-        if flow_fn is None:
-            raise ValueError(f"Unsupported flavor: {flavor}")
-        t0 = time.perf_counter()
-        _ = flow_fn(complexity)
-        runtime = time.perf_counter() - t0
-        events = len(plane.events())
-    finally:
-        os.chdir(old_cwd)
-
-    return PerfSample(
-        scenario="ironflow_inproc",
-        engine="ironflow",
-        backend_enabled=False,
-        ui_enabled=False,
-        flavor=flavor,
-        complexity=complexity,
-        iteration=iteration,
-        backend_startup_seconds=startup,
-        ui_startup_seconds=0.0,
-        runtime_seconds=runtime,
-        transition_events=events,
-        transitions_per_second=(events / runtime) if runtime > 0 else 0.0,
-        api_p95_seconds=0.0,
-        ui_probe_seconds=0.0,
-    )
-
-
-def _run_ironflow_service_mode(
-    flavor: str,
-    complexity: int,
-    iteration: int,
-    with_ui: bool,
-    backend_port: int,
-    frontend_port: int,
-) -> PerfSample:
-    env = os.environ.copy()
-    python_path_parts = [str(ROOT / "python-shim" / "src")]
-    if env.get("PYTHONPATH"):
-        python_path_parts.append(env["PYTHONPATH"])
-    env["PYTHONPATH"] = os.pathsep.join(python_path_parts)
-
-    notes: list[str] = []
-    with tempfile.TemporaryDirectory() as tmpdir:
-        env["IRONFLOW_HISTORY_PATH"] = str(Path(tmpdir) / "history.jsonl")
-
-        backend_cmd = [
-            sys.executable,
-            "-m",
-            "uvicorn",
-            "prefect_compat.server:app",
-            "--host",
-            "127.0.0.1",
-            "--port",
-            str(backend_port),
-        ]
-        backend_start = time.perf_counter()
-        backend = subprocess.Popen(
-            backend_cmd,
-            cwd=str(ROOT),
-            env=env,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        ui = None
-        ui_startup = 0.0
-        api_p95 = 0.0
-        ui_probe = 0.0
-        runtime = 0.0
-        events = 0
-        try:
-            _wait_for_url(f"http://127.0.0.1:{backend_port}/health", timeout_s=60)
-            backend_startup = time.perf_counter() - backend_start
-
-            if with_ui:
-                npm_cmd = _resolve_npm_command()
-                if npm_cmd is None:
-                    notes.append("npm unavailable: skipping UI startup and probe")
-                else:
-                    frontend_dir = ROOT / "frontend"
-                    ok_build, build_err = _ensure_frontend_built(frontend_dir, npm_cmd)
-                    if not ok_build:
-                        notes.append(f"frontend build failed (vite preview requires dist): {build_err[:200]}")
-                    else:
-                        ui_env = dict(env, PORT=str(frontend_port))
-                        ui_start = time.perf_counter()
-                        ui = subprocess.Popen(
-                            [
-                                *npm_cmd,
-                                "run",
-                                "preview",
-                                "--",
-                                "--host",
-                                "127.0.0.1",
-                                "--port",
-                                str(frontend_port),
-                                "--strictPort",
-                            ],
-                            cwd=str(frontend_dir),
-                            env=ui_env,
-                            stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL,
-                        )
-                        _wait_for_url(f"http://127.0.0.1:{frontend_port}/runs", timeout_s=120)
-                        ui_startup = time.perf_counter() - ui_start
-                        ui_probe = _probe_latency(f"http://127.0.0.1:{frontend_port}/runs", calls=5)
-
-            try:
-                with httpx.Client(timeout=300.0) as client:
-                    before = client.get(f"http://127.0.0.1:{backend_port}/history/summary").json().get("events", 0)
-                    response = client.post(
-                        f"http://127.0.0.1:{backend_port}/benchmark/run",
-                        json={"flavor": flavor, "complexity": complexity},
-                    )
-                    response.raise_for_status()
-                    body = response.json()
-                    after = client.get(f"http://127.0.0.1:{backend_port}/history/summary").json().get("events", 0)
-                events = max(after - before, 0)
-                runtime = float(body["runtime_seconds"])
-                api_p95 = _probe_latency(f"http://127.0.0.1:{backend_port}/api/flow-runs?limit=50")
-            except Exception as exc:
-                notes.append(f"benchmark request failed: {exc}")
-
-            return PerfSample(
-                scenario="ironflow_backend_ui" if with_ui else "ironflow_backend",
-                engine="ironflow",
-                backend_enabled=True,
-                ui_enabled=with_ui,
-                flavor=flavor,
-                complexity=complexity,
-                iteration=iteration,
-                backend_startup_seconds=backend_startup,
-                ui_startup_seconds=ui_startup,
-                runtime_seconds=runtime,
-                transition_events=events,
-                transitions_per_second=(events / runtime) if runtime > 0 else 0.0,
-                api_p95_seconds=api_p95,
-                ui_probe_seconds=ui_probe,
-                notes="; ".join(notes),
-            )
-        except Exception as exc:
-            notes.append(f"service scenario failed: {exc}")
-            return PerfSample(
-                scenario="ironflow_backend_ui" if with_ui else "ironflow_backend",
-                engine="ironflow",
-                backend_enabled=True,
-                ui_enabled=with_ui,
-                flavor=flavor,
-                complexity=complexity,
-                iteration=iteration,
-                backend_startup_seconds=0.0,
-                ui_startup_seconds=0.0,
-                runtime_seconds=0.0,
-                transition_events=0,
-                transitions_per_second=0.0,
-                api_p95_seconds=0.0,
-                ui_probe_seconds=0.0,
-                notes="; ".join(notes),
-            )
-        finally:
-            if ui is not None:
-                ui.terminate()
-                try:
-                    ui.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    ui.kill()
-            backend.terminate()
-            try:
-                backend.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                backend.kill()
-
-
-def _run_prefect_inproc(flavor: str, complexity: int, iteration: int) -> PerfSample:
-    os.environ.setdefault("PREFECT_LOGGING_LEVEL", "ERROR")
-    try:
-        from prefect import flow, task  # type: ignore
-    except Exception as exc:
-        return PerfSample(
-            scenario="prefect_inproc",
-            engine="prefect",
-            backend_enabled=False,
-            ui_enabled=False,
-            flavor=flavor,
-            complexity=complexity,
-            iteration=iteration,
-            backend_startup_seconds=0.0,
-            ui_startup_seconds=0.0,
-            runtime_seconds=0.0,
-            transition_events=0,
-            transitions_per_second=0.0,
-            api_p95_seconds=0.0,
-            ui_probe_seconds=0.0,
-            notes=f"prefect import unavailable: {exc}",
-        )
-
-    @task
-    def inc(x: int) -> int:
-        return x + 1
-
-    @task
-    def dbl(x: int) -> int:
-        return x * 2
-
-    @task
-    def passthrough(x: int) -> int:
-        return x
-
-    @flow
-    def simple(n: int) -> int:
-        first = inc.submit(n)
-        second = dbl.submit(first, wait_for=[first])
-        return second.result()
-
-    @flow
-    def wide(n: int) -> int:
-        first = inc.submit(n)
-        mapped_futs = dbl.map(range(n), wait_for=[first])
-        return sum(f.result() for f in mapped_futs)
-
-    @flow
-    def long_chain(n: int) -> int:
-        f = passthrough.submit(0)
-        for _ in range(n):
-            f = inc.submit(f, wait_for=[f])
-        return f.result()
-
-    flow_map: dict[str, Callable[[int], int]] = {
-        "simple": simple,
-        "wide": wide,
-        "long_chain": long_chain,
-        # Backwards-compatible aliases.
-        "mapped": wide,
-        "chained": long_chain,
-    }
-    flow_fn = flow_map.get(flavor)
-    if flow_fn is None:
-        raise ValueError(f"Unsupported flavor: {flavor}")
-    t0 = time.perf_counter()
-    _ = flow_fn(complexity)
-    runtime = time.perf_counter() - t0
-    transitions = _estimate_transitions(flavor, complexity)
-    return PerfSample(
-        scenario="prefect_inproc",
-        engine="prefect",
-        backend_enabled=False,
-        ui_enabled=False,
-        flavor=flavor,
-        complexity=complexity,
-        iteration=iteration,
-        backend_startup_seconds=0.0,
-        ui_startup_seconds=0.0,
-        runtime_seconds=runtime,
-        transition_events=transitions,
-        transitions_per_second=(transitions / runtime) if runtime > 0 else 0.0,
-        api_p95_seconds=0.0,
-        ui_probe_seconds=0.0,
-    )
-
-
-def _run_prefect_server_mode(
-    flavor: str,
-    complexity: int,
-    iteration: int,
-    port: int,
-    with_ui_probe: bool,
-) -> PerfSample:
-    os.environ.setdefault("PREFECT_LOGGING_LEVEL", "ERROR")
-    try:
-        from prefect import flow, task  # type: ignore
-    except Exception as exc:
-        return PerfSample(
-            scenario="prefect_server_ui" if with_ui_probe else "prefect_server",
-            engine="prefect",
-            backend_enabled=True,
-            ui_enabled=with_ui_probe,
-            flavor=flavor,
-            complexity=complexity,
-            iteration=iteration,
-            backend_startup_seconds=0.0,
-            ui_startup_seconds=0.0,
-            runtime_seconds=0.0,
-            transition_events=0,
-            transitions_per_second=0.0,
-            api_p95_seconds=0.0,
-            ui_probe_seconds=0.0,
-            notes=f"prefect import unavailable: {exc}",
-        )
-
-    env = os.environ.copy()
-    env["PREFECT_API_URL"] = f"http://127.0.0.1:{port}/api"
-    server_cmd = ["prefect", "server", "start", "--host", "127.0.0.1", "--port", str(port)]
-    start = time.perf_counter()
-    try:
-        server = subprocess.Popen(
-            server_cmd,
-            cwd=str(ROOT),
-            env=env,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-    except Exception as exc:
-        return PerfSample(
-            scenario="prefect_server_ui" if with_ui_probe else "prefect_server",
-            engine="prefect",
-            backend_enabled=True,
-            ui_enabled=with_ui_probe,
-            flavor=flavor,
-            complexity=complexity,
-            iteration=iteration,
-            backend_startup_seconds=0.0,
-            ui_startup_seconds=0.0,
-            runtime_seconds=0.0,
-            transition_events=0,
-            transitions_per_second=0.0,
-            api_p95_seconds=0.0,
-            ui_probe_seconds=0.0,
-            notes=f"prefect server command unavailable: {exc}",
-        )
-
-    try:
-        _wait_for_url(f"http://127.0.0.1:{port}/api/health", timeout_s=120)
-        startup = time.perf_counter() - start
-        ui_probe = 0.0
-        if with_ui_probe:
-            ui_probe = _probe_latency(f"http://127.0.0.1:{port}/", calls=5)
-
-        @task
-        def inc(x: int) -> int:
-            return x + 1
-
-        @task
-        def dbl(x: int) -> int:
-            return x * 2
-
-        @task
-        def passthrough(x: int) -> int:
-            return x
-
-        @flow
-        def simple(n: int) -> int:
-            first = inc.submit(n)
-            second = dbl.submit(first, wait_for=[first])
-            return second.result()
-
-        @flow
-        def wide(n: int) -> int:
-            first = inc.submit(n)
-            mapped_futs = dbl.map(range(n), wait_for=[first])
-            return sum(f.result() for f in mapped_futs)
-
-        @flow
-        def long_chain(n: int) -> int:
-            f = passthrough.submit(0)
-            for _ in range(n):
-                f = inc.submit(f, wait_for=[f])
-            return f.result()
-
-        flow_map: dict[str, Callable[[int], int]] = {
-            "simple": simple,
-            "wide": wide,
-            "long_chain": long_chain,
-            # Backwards-compatible aliases.
-            "mapped": wide,
-            "chained": long_chain,
-        }
-        flow_fn = flow_map.get(flavor)
-        if flow_fn is None:
-            raise ValueError(f"Unsupported flavor: {flavor}")
-        t0 = time.perf_counter()
-        _ = flow_fn(complexity)
-        runtime = time.perf_counter() - t0
-        transitions = _estimate_transitions(flavor, complexity)
-        api_p95 = _probe_latency(f"http://127.0.0.1:{port}/api/health", calls=5)
-        return PerfSample(
-            scenario="prefect_server_ui" if with_ui_probe else "prefect_server",
-            engine="prefect",
-            backend_enabled=True,
-            ui_enabled=with_ui_probe,
-            flavor=flavor,
-            complexity=complexity,
-            iteration=iteration,
-            backend_startup_seconds=startup,
-            ui_startup_seconds=0.0,
-            runtime_seconds=runtime,
-            transition_events=transitions,
-            transitions_per_second=(transitions / runtime) if runtime > 0 else 0.0,
-            api_p95_seconds=api_p95,
-            ui_probe_seconds=ui_probe,
-        )
-    except Exception as exc:
-        return PerfSample(
-            scenario="prefect_server_ui" if with_ui_probe else "prefect_server",
-            engine="prefect",
-            backend_enabled=True,
-            ui_enabled=with_ui_probe,
-            flavor=flavor,
-            complexity=complexity,
-            iteration=iteration,
-            backend_startup_seconds=0.0,
-            ui_startup_seconds=0.0,
-            runtime_seconds=0.0,
-            transition_events=0,
-            transitions_per_second=0.0,
-            api_p95_seconds=0.0,
-            ui_probe_seconds=0.0,
-            notes=f"prefect server benchmark failed: {exc}",
-        )
-    finally:
-        server.terminate()
-        try:
-            server.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            server.kill()
-
-
-def _aggregate(samples: list[PerfSample]) -> list[dict[str, object]]:
-    grouped: dict[tuple[str, str, int], list[PerfSample]] = {}
-    for sample in samples:
-        grouped.setdefault((sample.scenario, sample.flavor, sample.complexity), []).append(sample)
-
-    rows: list[dict[str, object]] = []
-    for (scenario, flavor, complexity), bucket in sorted(grouped.items()):
-        runtime_values = [s.runtime_seconds for s in bucket if s.runtime_seconds > 0]
-        throughput_values = [s.transitions_per_second for s in bucket if s.transitions_per_second > 0]
-        api_values = [s.api_p95_seconds for s in bucket if s.api_p95_seconds > 0]
-        ui_values = [s.ui_probe_seconds for s in bucket if s.ui_probe_seconds > 0]
-        startup_values = [s.backend_startup_seconds for s in bucket if s.backend_startup_seconds > 0]
-        rows.append(
-            {
-                "scenario": scenario,
-                "flavor": flavor,
-                "complexity": complexity,
-                "runs": len(bucket),
-                "runtime_median_s": statistics.median(runtime_values) if runtime_values else 0.0,
-                "runtime_p95_s": statistics.quantiles(runtime_values, n=20, method="inclusive")[18]
-                if len(runtime_values) > 1
-                else (runtime_values[0] if runtime_values else 0.0),
-                "throughput_median_tps": statistics.median(throughput_values) if throughput_values else 0.0,
-                "backend_startup_median_s": statistics.median(startup_values) if startup_values else 0.0,
-                "api_p95_median_s": statistics.median(api_values) if api_values else 0.0,
-                "ui_probe_median_s": statistics.median(ui_values) if ui_values else 0.0,
-                "notes": "; ".join(sorted({s.notes for s in bucket if s.notes})),
-            }
-        )
-    return rows
-
-
-def _build_markdown(rows: list[dict[str, object]], out_json: Path) -> str:
-    now = time.strftime("%Y-%m-%d %H:%M:%S")
-    lines = [
-        "# Performance Matrix: IronFlow vs Prefect",
-        "",
-        f"Generated at: `{now}`",
-        f"Raw samples: `{out_json.as_posix()}`",
-        "",
-        "## Scenarios",
-        "",
-        "- `ironflow_inproc`: no backend, no UI",
-        "- `ironflow_backend`: backend only (`uvicorn`)",
-        "- `ironflow_backend_ui`: backend + Vite UI",
-        "- `prefect_inproc`: direct flow execution without external server",
-        "- `prefect_server`: Prefect server/API",
-        "- `prefect_server_ui`: Prefect server/API + UI probe",
-        "",
-        "## Workload Shapes",
-        "",
-        "- `simple`: two-task dependency (`inc -> dbl`)",
-        "- `wide`: one gate task plus fan-out mapped tasks",
-        "- `long_chain`: strict serial dependency chain",
-        "",
-        "## Aggregated Results",
-        "",
-        "| Scenario | Flavor | N | Runtime median (s) | Runtime p95 (s) | Throughput median (events/s) | Backend startup median (s) | API p95 median (s) | UI probe median (s) | Notes |",
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |",
-    ]
-    for row in rows:
-        lines.append(
-            f"| {row['scenario']} | {row['flavor']}:{row['complexity']} | {row['runs']} | "
-            f"{row['runtime_median_s']:.4f} | {row['runtime_p95_s']:.4f} | {row['throughput_median_tps']:.2f} | "
-            f"{row['backend_startup_median_s']:.4f} | {row['api_p95_median_s']:.4f} | {row['ui_probe_median_s']:.4f} | "
-            f"{row['notes'] or '-'} |"
-        )
-    lines.extend(
-        [
-            "",
-            "## Speedup Highlights",
-            "",
-        ]
-    )
-    lines.extend(_build_speedup_section(rows))
-    lines.extend(
-        [
-            "",
-            "## Interpretation Guide",
-            "",
-            "- Compare `runtime_median_s` for flow execution overhead.",
-            "- Compare `backend_startup_median_s` for cold-start costs.",
-            "- Compare `api_p95_median_s` and `ui_probe_median_s` for service/UI responsiveness.",
-            "- If a row has notes, treat that scenario as partial or skipped.",
-        ]
-    )
-    return "\n".join(lines) + "\n"
-
-
-def _build_speedup_section(rows: list[dict[str, object]]) -> list[str]:
-    lines = [
-        "| Mode | Flavor | Runtime winner | Runtime speedup | Throughput winner | Throughput speedup |",
-        "| --- | --- | --- | ---: | --- | ---: |",
-    ]
-
-    mode_pairs = [
-        ("inproc", "ironflow_inproc", "prefect_inproc"),
-        ("backend", "ironflow_backend", "prefect_server"),
-        ("backend+ui", "ironflow_backend_ui", "prefect_server_ui"),
-    ]
-
-    row_index: dict[tuple[str, str], dict[str, object]] = {}
-    for row in rows:
-        row_index[(str(row["scenario"]), str(row["flavor"]))] = row
-
-    for mode_name, ironflow_scenario, prefect_scenario in mode_pairs:
-        all_flavors = sorted(
-            {
-                flavor
-                for (scenario, flavor) in row_index
-                if scenario in {ironflow_scenario, prefect_scenario}
-            }
-        )
-        for flavor in all_flavors:
-            ironflow_row = row_index.get((ironflow_scenario, flavor))
-            prefect_row = row_index.get((prefect_scenario, flavor))
-            if ironflow_row is None or prefect_row is None:
-                lines.append(f"| {mode_name} | {flavor} | n/a | n/a | n/a | n/a |")
-                continue
-
-            ironflow_runtime = float(ironflow_row["runtime_median_s"])
-            prefect_runtime = float(prefect_row["runtime_median_s"])
-            ironflow_tps = float(ironflow_row["throughput_median_tps"])
-            prefect_tps = float(prefect_row["throughput_median_tps"])
-
-            runtime_winner = "n/a"
-            runtime_speedup = "n/a"
-            if ironflow_runtime > 0 and prefect_runtime > 0:
-                if ironflow_runtime < prefect_runtime:
-                    runtime_winner = "ironflow"
-                    runtime_speedup = f"{(prefect_runtime / ironflow_runtime):.2f}x"
-                elif prefect_runtime < ironflow_runtime:
-                    runtime_winner = "prefect"
-                    runtime_speedup = f"{(ironflow_runtime / prefect_runtime):.2f}x"
-                else:
-                    runtime_winner = "tie"
-                    runtime_speedup = "1.00x"
-
-            throughput_winner = "n/a"
-            throughput_speedup = "n/a"
-            if ironflow_tps > 0 and prefect_tps > 0:
-                if ironflow_tps > prefect_tps:
-                    throughput_winner = "ironflow"
-                    throughput_speedup = f"{(ironflow_tps / prefect_tps):.2f}x"
-                elif prefect_tps > ironflow_tps:
-                    throughput_winner = "prefect"
-                    throughput_speedup = f"{(prefect_tps / ironflow_tps):.2f}x"
-                else:
-                    throughput_winner = "tie"
-                    throughput_speedup = "1.00x"
-
-            lines.append(
-                f"| {mode_name} | {flavor} | {runtime_winner} | {runtime_speedup} | "
-                f"{throughput_winner} | {throughput_speedup} |"
-            )
-
-    return lines
-
-
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Run comprehensive performance matrix across inproc/backend/UI modes."
-    )
-    parser.add_argument("--iterations", type=int, default=5, help="Repetitions per scenario/workload.")
-    parser.add_argument(
-        "--workloads",
-        default="simple:1,wide:100,wide:500,long_chain:100,long_chain:500",
-        help="Comma-separated workload list in flavor:complexity format.",
-    )
-    parser.add_argument(
-        "--scenarios",
-        default="ironflow_inproc,ironflow_backend,ironflow_backend_ui,prefect_inproc,prefect_server,prefect_server_ui",
-        help="Comma-separated scenario subset.",
-    )
-    parser.add_argument(
-        "--out-json",
-        default=str(ROOT / "docs" / "perf_matrix_results.json"),
-        help="Path to write raw sample output.",
-    )
-    parser.add_argument(
-        "--out-md",
-        default=str(ROOT / "docs" / "perf_matrix_summary.md"),
-        help="Path to write markdown summary.",
-    )
-    return parser.parse_args()
-
-
-def main() -> None:
-    args = parse_args()
-    workloads: list[tuple[str, int]] = []
-    for token in args.workloads.split(","):
-        flavor, complexity = token.split(":")
-        workloads.append((flavor.strip(), int(complexity.strip())))
-
-    scenarios = {value.strip() for value in args.scenarios.split(",") if value.strip()}
-    samples: list[PerfSample] = []
-    next_port = 4300
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        os.environ["IRONFLOW_HISTORY_PATH"] = str(Path(tmpdir) / "bench_history.jsonl")
-        for iteration in range(1, args.iterations + 1):
-            for flavor, complexity in workloads:
-                if "ironflow_inproc" in scenarios:
-                    samples.append(_run_ironflow_inproc(flavor, complexity, iteration))
-                if "ironflow_backend" in scenarios:
-                    next_port += 2
-                    samples.append(
-                        _run_ironflow_service_mode(
-                            flavor=flavor,
-                            complexity=complexity,
-                            iteration=iteration,
-                            with_ui=False,
-                            backend_port=next_port,
-                            frontend_port=next_port + 1,
-                        )
-                    )
-                if "ironflow_backend_ui" in scenarios:
-                    next_port += 2
-                    samples.append(
-                        _run_ironflow_service_mode(
-                            flavor=flavor,
-                            complexity=complexity,
-                            iteration=iteration,
-                            with_ui=True,
-                            backend_port=next_port,
-                            frontend_port=next_port + 1,
-                        )
-                    )
-                if "prefect_inproc" in scenarios:
-                    samples.append(_run_prefect_inproc(flavor, complexity, iteration))
-                if "prefect_server" in scenarios:
-                    next_port += 1
-                    samples.append(
-                        _run_prefect_server_mode(
-                            flavor=flavor,
-                            complexity=complexity,
-                            iteration=iteration,
-                            port=next_port,
-                            with_ui_probe=False,
-                        )
-                    )
-                if "prefect_server_ui" in scenarios:
-                    next_port += 1
-                    samples.append(
-                        _run_prefect_server_mode(
-                            flavor=flavor,
-                            complexity=complexity,
-                            iteration=iteration,
-                            port=next_port,
-                            with_ui_probe=True,
-                        )
-                    )
-
-    out_json = Path(args.out_json)
-    out_json.parent.mkdir(parents=True, exist_ok=True)
-    out_json.write_text(json.dumps([asdict(sample) for sample in samples], indent=2), encoding="utf-8")
-
-    rows = _aggregate(samples)
-    out_md = Path(args.out_md)
-    out_md.parent.mkdir(parents=True, exist_ok=True)
-    out_md.write_text(_build_markdown(rows, out_json), encoding="utf-8")
-
-    print(f"Wrote {len(samples)} samples to {out_json}")
-    print(f"Wrote markdown summary to {out_md}")
-
-
-if __name__ == "__main__":
-    main()
