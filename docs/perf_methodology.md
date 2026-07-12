@@ -175,9 +175,9 @@ Agents and contributors must preserve this contract when touching `runtime.py` o
 
 ### Task runners vs control plane
 
-- `ThreadPoolTaskRunner` / `ProcessPoolTaskRunner` parallelize **user task bodies** in `map()` / `submit()`.
+- `ThreadPoolTaskRunner` / `ProcessPoolTaskRunner` parallelize **user task bodies** in **`map()`** only (not `submit()` — see **[How to choose a task runner](how-to/choose-task-runners.md)**).
 - `map()` registers task runs on the caller thread, runs bodies in the runner pool, then records completions — control-plane mutations are not contended across worker threads.
-- Every `submit()` still records transitions through the serialized control plane. Do not expect task-runner threads to speed up transition-heavy benchmarks unless the workload is dominated by user Python in `map()`.
+- Every `submit()` runs synchronously in the MVP and records transitions through the serialized control plane. Do not expect task-runner threads to speed up transition-heavy benchmarks unless the workload is dominated by user Python in `map()`.
 
 ### Batch APIs
 
