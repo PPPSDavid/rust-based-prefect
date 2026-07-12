@@ -128,14 +128,23 @@ git checkout v0.1.2   # replace with current release tag, or omit to stay on mai
 
 ## 3. Python environment
 
-**Option A — Conda (recommended, matches maintainers’ stack)**
+**Option A — uv (recommended; matches CI / Cursor Cloud)**
+
+```bash
+# Install uv: https://docs.astral.sh/uv/getting-started/installation/
+uv sync --group dev
+```
+
+Uses the root workspace and committed `uv.lock`. Prefer `uv run pytest …` afterward.
+
+**Option B — Conda (optional full desktop stack)**
 
 ```bash
 mamba env create -f environment.yml    # or: conda env create -f environment.yml
 conda activate ironflow-dev
 ```
 
-**Option B — `venv` + pip (no conda)**
+**Option C — `venv` + pip (transitional, no uv)**
 
 ```bash
 python -m venv .venv
@@ -144,7 +153,7 @@ python -m venv .venv
 python -m pip install -r requirements-ci.txt
 ```
 
-`requirements-ci.txt` lists the Python packages needed to run tests and the shim; it does not install Prefect unless you add it yourself (the conda env pulls Prefect for benchmarks via `environment.yml`).
+`requirements-ci.txt` mirrors `[dependency-groups].dev` in the root `pyproject.toml` for pip-only environments; it does not install Prefect unless you add it yourself (the conda env pulls Prefect for benchmarks via `environment.yml`).
 
 ## 4. Build the Rust engine (source checkout)
 

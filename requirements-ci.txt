@@ -1,3 +1,8 @@
+# DEPRECATED for primary installs: prefer `uv sync --frozen --group dev`
+# (see root pyproject.toml [dependency-groups].dev and committed uv.lock).
+# Kept for transitional pip-only environments. Ranges should stay aligned with
+# [dependency-groups].dev in the root pyproject.toml.
+#
 # CI and local "full test" installs (see README). Mirrors environment.yml intent without conda.
 pytest>=8,<9
 pydantic>=2,<3

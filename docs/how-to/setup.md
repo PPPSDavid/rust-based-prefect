@@ -18,14 +18,23 @@ git checkout v0.1.2   # optional: replace with current tag
 
 ## 2. Python environment
 
-**Conda (recommended; matches maintainers’ stack)**
+**uv (recommended; matches CI / Cursor Cloud)**
+
+```bash
+# Install uv: https://docs.astral.sh/uv/getting-started/installation/
+uv sync --group dev
+```
+
+Then use `uv run pytest …`, `uv run ruff check .`, etc.
+
+**Conda (optional; maintainers’ full desktop stack)**
 
 ```bash
 mamba env create -f environment.yml    # or: conda env create -f environment.yml
 conda activate ironflow-dev
 ```
 
-**`venv` + pip (no conda)**
+**`venv` + pip (transitional, no uv)**
 
 ```bash
 python -m venv .venv
@@ -34,7 +43,7 @@ python -m venv .venv
 python -m pip install -r requirements-ci.txt
 ```
 
-Use **Python 3.11+** (`environment.yml` may pin 3.12).
+Use **Python 3.11+** (`.python-version` / `environment.yml` may pin 3.12).
 
 ## 3. Build the Rust engine
 

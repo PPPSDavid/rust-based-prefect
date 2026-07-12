@@ -4,13 +4,24 @@
 
 ---
 
+## Dev hub vs release channel
+
+| Role | Tooling | Notes |
+| --- | --- | --- |
+| **Dev / CI / Cloud hub** | **uv** workspace + committed `uv.lock` (`uv sync --frozen --group dev`) | Primary contributor path. |
+| **Production release channel** | **PyPI** wheels (`ironflow-prefect-compat`) | Consumers install with **`pip`** or **`uv pip`** — same artifacts. |
+| **Optional desktop env** | **conda/mamba** (`environment.yml`) | Convenience for Rust+Python together; not a second release channel. |
+| **Future (optional)** | **conda-forge** feedstock | Separate effort; still optional. |
+
+Do **not** treat pip, uv, and conda as co-equal *publish* paths. One production channel (PyPI); uv for reproducible hub installs; conda optional for local full-stack.
+
 ## Current story
 
 | Path | When to use |
 | --- | --- |
 | **Production PyPI** | Default **`pip install ironflow-prefect-compat`** when wheels are published (see **`RELEASING.md`**). |
 | **TestPyPI wheels** | Validation installs with **`pip install`** + dual index (see [INSTALL.md](INSTALL.md)); ships **`ironflow_engine`** when a wheel exists for your **platform + CPython 3.11 or 3.12**. |
-| **GitHub clone + `cargo build`** | Full repo: benchmarks, scripts, optional UI, kernel development. |
+| **GitHub clone + `uv sync` + `cargo build`** | Full repo: benchmarks, scripts, optional UI, kernel development (preferred contributor path). |
 | **`pip install git+…#subdirectory=python-shim`** | Python-only integration without TestPyPI; native kernel only if the build ran **`cargo`** or you set **`IRONFLOW_RUST_LIB`**. |
 
 IronFlow is **Rust + Python**. For **end users on supported platforms**, **`pip install ironflow-prefect-compat`** / **`uv pip install ironflow-prefect-compat`** is the same style of install as other wheel-published packages—the complexity below is **why CI ships per-platform wheels** and why unsupported ABIs fall back to **sdist** / source builds.
@@ -81,7 +92,7 @@ python -m pip install \
 | --- | --- | --- |
 | TestPyPI validation | `pip install` with **TestPyPI** + **pypi.org** extra index (see [INSTALL.md](INSTALL.md)) | Prebuilt **`ironflow_engine`** when a wheel matches **platform + CPython 3.11 or 3.12**. |
 | Python API from Git, no local clone of your app | `pip install "git+...@vX.Y.Z#subdirectory=python-shim"` | Native kernel if **`cargo`** ran at build time, else **`IRONFLOW_RUST_LIB`** or local **`cargo build`**. |
-| Full stack, no index | Clone + `environment.yml` + `cargo build` | Current path for kernel + benchmarks + UI. |
+| Full stack, no index | Clone + `uv sync --group dev` (or `environment.yml` / `requirements-ci.txt`) + `cargo build` | Preferred contributor path for kernel + benchmarks + UI. |
 | Production **PyPI** | `pip install ironflow-prefect-compat` | Requires a maintainer **Publish to PyPI** run and **trusted publisher** on **pypi.org** (see **`RELEASING.md`**). |
 
 ## Summary

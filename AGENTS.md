@@ -116,12 +116,13 @@ When ownership areas shift, new hotspots appear, or validation commands change, 
 
 Run before declaring completion:
 
-1. `python -m ruff check .` and `python -m ty check` (configuration in root `pyproject.toml`; install `requirements-ci.txt` first)
-2. `python -m pytest python-shim/tests static-planner/tests benchmarks/tests` (from repo root; `pytest.ini` adds `python-shim/src`, `static-planner/src`, and `.` to `PYTHONPATH`)
-3. `cargo test --manifest-path rust-engine/Cargo.toml`
-4. After any significant change/refactor/new feature, run a deterministic perf check to guard against regressions:
-   - Fast local gate: `python benchmarks/perf_matrix.py run --preset lite --repetitions 1 --warmups 0 --jobs 2`
-   - If a baseline exists: `python benchmarks/perf_matrix.py compare --baseline <baseline.json> --candidate <candidate.json>` — only valid when both runs share the same **benchmark mode** (`metadata.matrix_compare_key`, e.g. `preset:lite` vs `preset:full`). If modes differ, the tool skips comparison and exits `3` (exit `2` = metric regression, `1` = bad input file such as a non–perf-matrix JSON).
+1. Prefer `uv sync --frozen --group dev` once (root workspace + committed `uv.lock`). Transitional fallback: `pip install -r requirements-ci.txt`.
+2. `uv run ruff check .` and `uv run ty check` (configuration in root `pyproject.toml`); or `python -m ruff` / `python -m ty` after the sync/venv is active.
+3. `uv run pytest python-shim/tests static-planner/tests benchmarks/tests` (from repo root; `pytest.ini` adds `python-shim/src`, `static-planner/src`, and `.` to `PYTHONPATH`). `python -m pytest …` is fine once `.venv` is on `PATH`.
+4. `cargo test --manifest-path rust-engine/Cargo.toml`
+5. After any significant change/refactor/new feature, run a deterministic perf check to guard against regressions:
+   - Fast local gate: `uv run python benchmarks/perf_matrix.py run --preset lite --repetitions 1 --warmups 0 --jobs 2`
+   - If a baseline exists: `uv run python benchmarks/perf_matrix.py compare --baseline <baseline.json> --candidate <candidate.json>` — only valid when both runs share the same **benchmark mode** (`metadata.matrix_compare_key`, e.g. `preset:lite` vs `preset:full`). If modes differ, the tool skips comparison and exits `3` (exit `2` = metric regression, `1` = bad input file such as a non–perf-matrix JSON).
 
 ## Performance: `perf_matrix.py` (read this before using or changing benchmarks)
 
@@ -253,10 +254,10 @@ This repo commits `.cursor/environment.json` with:
 
 That **update/install** script (idempotent) runs on each new agent boot:
 
-1. `python3 -m pip install --user --break-system-packages -r requirements-ci.txt`
+1. Ensure **uv**, then `IRONFLOW_SKIP_NATIVE_BUILD=1 uv sync --frozen --group dev` (committed `uv.lock`; puts `.venv/bin` ahead on `PATH`)
 2. `npm --prefix frontend ci`
 3. `cargo build --manifest-path rust-engine/Cargo.toml`
-4. `bash scripts/setup_code_review_graph.sh` (installs CRG, builds `.code-review-graph/`, verifies MCP tool calls)
+4. `bash scripts/setup_code_review_graph.sh` (installs CRG via pip/`requirements-agent.txt`, builds `.code-review-graph/`, verifies MCP tool calls)
 
 You do **not** need to hand-edit the Cloud dashboard Install/Update box for CRG
 once this file is on the branch the agent checks out (usually after merge to
@@ -269,12 +270,12 @@ Standard commands live in `README.md` (Quickstart) and **Expected Validation** a
 
 Non-obvious caveats for this environment:
 
-- **Prefer `python3`** (and `python3 -m …`). The cloud-install script tries to
-  symlink `python` → `python3` when missing. There is no conda on Cloud. `pip`
-  targets the system interpreter with `--break-system-packages` (PEP 668), and
-  console scripts land in `~/.local/bin` (not always on `PATH`) — invoke tools as
-  modules, e.g. `python3 -m pytest`, `python3 -m uvicorn`,
-  `python3 -m code_review_graph status`.
+- **Prefer `uv run …` or the synced `.venv`** for app/test tools (`pytest`, `ruff`, `ty`, `uvicorn`).
+  `uv sync --frozen --group dev` is the primary install path. Transitional:
+  `pip install -r requirements-ci.txt` still works. The cloud-install script tries to
+  symlink `python` → `python3` when missing. There is no conda on Cloud. CRG and
+  other agent extras may still use `pip` with `--break-system-packages` into
+  `~/.local` — invoke those as modules, e.g. `python3 -m code_review_graph status`.
 - **code-review-graph on Cloud:** use the core package only (see
   `requirements-agent.txt`). Do **not** require `code-review-graph[embeddings]`
   here — structural graph tools work without embeddings. Optional GPU/local
@@ -285,12 +286,13 @@ Non-obvious caveats for this environment:
   `http://127.0.0.1:8000` and the frontend hardcodes that origin (`frontend/src/api.ts`); backend CORS
   only allows the `4173` origins, so run both together.
 - **Running the stack:** start the backend with
-  `python3 -m uvicorn python-shim.src.prefect_compat.server:app --host 127.0.0.1 --port 8000`
+  `uv run python -m uvicorn python-shim.src.prefect_compat.server:app --host 127.0.0.1 --port 8000`
+  (or `python3 -m uvicorn …` when `.venv` is on `PATH`)
   and the UI with `npm --prefix frontend run dev` (or both via `python3 scripts/ironflow_server.py start`).
   Seed demo runs for the UI with `python3 scripts/ui_e2e_seed.py` (needs the backend up). The local
   worker + scheduler run as daemon threads inside the API process (toggle via `IRONFLOW_ENABLE_LOCAL_WORKER`
   / `IRONFLOW_ENABLE_SCHEDULER`).
-- **Python lint:** CI runs `python -m ruff check .` and `python -m ty check` (see root `pyproject.toml`). Install `requirements-ci.txt` before running locally.
+- **Python lint:** CI runs `uv run ruff check .` and `uv run ty check` (see root `pyproject.toml`). Prefer `uv sync --frozen --group dev` before running locally.
 - **Persistence is local files** under `data/` (JSONL history + a stdlib-SQLite read model); there is no
   external database/broker to start. `data/` is git-ignored, but `benchmarks/perf_matrix.py run` overwrites
   tracked `docs/perf_matrix_results.json` / `docs/perf_matrix_summary.md` — revert those unless a benchmark

@@ -12,8 +12,20 @@ cd "$ROOT"
 
 echo "[cloud-install] repo=$ROOT"
 
-echo "[cloud-install] Python deps (requirements-ci.txt) ..."
-python3 -m pip install --user --break-system-packages -r requirements-ci.txt
+# Ensure ~/.local/bin is visible for uv and console scripts during this script.
+export PATH="${HOME}/.local/bin:${PATH}"
+
+echo "[cloud-install] Ensuring uv ..."
+if ! command -v uv >/dev/null 2>&1; then
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  export PATH="${HOME}/.local/bin:${PATH}"
+fi
+
+echo "[cloud-install] Python deps (uv sync --frozen) ..."
+# App/test deps come from the committed uv.lock + [dependency-groups].dev.
+# Workspace packages stay on pytest.ini pythonpath; skip native build during sync.
+IRONFLOW_SKIP_NATIVE_BUILD=1 uv sync --frozen --group dev
+export PATH="${ROOT}/.venv/bin:${PATH}"
 
 echo "[cloud-install] Frontend deps ..."
 npm --prefix frontend ci
@@ -22,10 +34,9 @@ echo "[cloud-install] Rust engine ..."
 cargo build --manifest-path rust-engine/Cargo.toml
 
 echo "[cloud-install] code-review-graph (install + build) ..."
-# Ensure ~/.local/bin is visible for console scripts during this script.
-export PATH="${HOME}/.local/bin:${PATH}"
 # Soft-fail verify: a CRG MCP regression must not brick the whole Cloud boot
 # (agents still need pytest/cargo/frontend). Setup still builds the graph.
+# CRG remains a separate pip install via requirements-agent.txt.
 export CRG_SKIP_VERIFY="${CRG_SKIP_VERIFY:-1}"
 bash scripts/setup_code_review_graph.sh
 if [[ "${CRG_SKIP_VERIFY}" == "1" ]]; then
