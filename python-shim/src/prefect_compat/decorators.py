@@ -7,9 +7,13 @@ import textwrap
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from functools import wraps
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Callable, Generic, Iterable, Sequence, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Generic, Iterable, Sequence, TypeVar, cast, overload
 from uuid import UUID, uuid4
+
+if TYPE_CHECKING:
+    from .subflows import SubflowFuture
 
 from .hooks import TransitionContext, TransitionHookSpec, compile_transition_hooks, dispatch_transition_hooks
 from .runtime import InMemoryControlPlane, RunState, SetStateResult, TaskRunRecord
@@ -49,7 +53,7 @@ class TaskFuture(Generic[T]):
         return self.value
 
 
-def wait(futures: Sequence["TaskFuture[Any] | SubflowFuture[Any]"]) -> list[Any]:  # noqa: F821
+def wait(futures: Sequence["TaskFuture[Any] | SubflowFuture[Any]"]) -> list[Any]:
     return [future.result() for future in futures]
 
 
@@ -67,14 +71,14 @@ class TaskWrapper:
         transition_hooks: tuple[TransitionHookSpec, ...] | None = None,
     ) -> None:
         self.fn = fn
-        self.name = name or fn.__name__
+        self.name = name or getattr(fn, "__name__", "<task>")
         self._transition_hooks = transition_hooks
         wraps(fn)(self)
 
     def __call__(self, *args: Any, **kwargs: Any) -> T:
         resolved_args = [_resolve(v) for v in args]
         resolved_kwargs = {k: _resolve(v) for k, v in kwargs.items()}
-        return self.fn(*resolved_args, **resolved_kwargs)
+        return cast(T, self.fn(*resolved_args, **resolved_kwargs))
 
     def submit(
         self,
@@ -160,7 +164,7 @@ class TaskWrapper:
         if runner is None:
             runner = default_task_runner_from_env()
         vals = list(values)
-        wf: list[TaskFuture[Any]] | None = list(wait_for) if wait_for else None
+        wf: list[TaskFuture[Any] | SubflowFuture[Any]] | None = list(wait_for) if wait_for else None
         if isinstance(runner, ProcessPoolTaskRunner):
             return self._map_process_pool(vals, wf, runner)
         if isinstance(runner, ThreadPoolTaskRunner) and len(vals) > 1 and runner.resolve_max_workers() > 1:
@@ -260,7 +264,7 @@ class TaskWrapper:
     def _map_thread_pool(
         self,
         vals: list[Any],
-        wait_for: list[TaskFuture[Any]] | None,
+        wait_for: list[TaskFuture[Any] | SubflowFuture[Any]] | None,
         runner: ThreadPoolTaskRunner,
     ) -> list[TaskFuture[T]]:
         """Map with task bodies in a thread pool; control-plane work stays on the caller thread."""
@@ -283,7 +287,7 @@ class TaskWrapper:
     def _map_process_pool(
         self,
         vals: list[Any],
-        wait_for: list[TaskFuture[Any]] | None,
+        wait_for: list[TaskFuture[Any] | SubflowFuture[Any]] | None,
         runner: ProcessPoolTaskRunner,
     ) -> list[TaskFuture[T]]:
         """Map via child processes; task body must be picklable (single positional arg per value)."""
@@ -303,12 +307,30 @@ class TaskWrapper:
         return self._finalize_map_task_runs(metas, outs)
 
 
+@overload
+def task(
+    fn: Callable[..., T],
+    *,
+    name: str | None = None,
+    transition_hooks: Sequence[TransitionHookSpec] | None = None,
+) -> TaskWrapper: ...
+
+
+@overload
+def task(
+    fn: None = None,
+    *,
+    name: str | None = None,
+    transition_hooks: Sequence[TransitionHookSpec] | None = None,
+) -> Callable[[Callable[..., T]], TaskWrapper]: ...
+
+
 def task(
     fn: Callable[..., T] | None = None,
     *,
     name: str | None = None,
     transition_hooks: Sequence[TransitionHookSpec] | None = None,
-) -> Callable[..., Any]:
+) -> TaskWrapper | Callable[[Callable[..., T]], TaskWrapper]:
     def decorate(f: Callable[..., T]) -> TaskWrapper:
         compiled = compile_transition_hooks(transition_hooks)
         return TaskWrapper(f, name=name, transition_hooks=compiled)
@@ -326,7 +348,7 @@ def flow(
     transition_hooks: Sequence[TransitionHookSpec] | None = None,
 ) -> Callable[..., Any]:
     def decorate(f: Callable[..., T]) -> Callable[..., T]:
-        flow_name = name or f.__name__
+        flow_name = name or getattr(f, "__name__", "<flow>")
         resolved_runner = task_runner if task_runner is not None else default_task_runner_from_env()
         compiled_flow_hooks = compile_transition_hooks(transition_hooks)
 
@@ -538,7 +560,7 @@ def _task_symbols_for_flow(flow_fn: Callable[..., Any]) -> dict[str, str]:
     try:
         unwrapped = inspect.unwrap(flow_fn)
         module = inspect.getmodule(unwrapped)
-        namespaces: list[dict[str, Any]] = []
+        namespaces: list[Mapping[str, Any]] = []
         if module is not None:
             namespaces.append(vars(module))
         closure = inspect.getclosurevars(unwrapped)

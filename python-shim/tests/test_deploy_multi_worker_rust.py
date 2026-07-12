@@ -12,9 +12,11 @@ from prefect_compat.runtime import InMemoryControlPlane as Plane
 from prefect_compat.worker import run_worker_loop
 
 try:
-    from prefect_compat.runtime import RustFsmBridge
+    from prefect_compat.runtime import RustFsmBridge as _RustFsmBridge
 except ImportError:
-    RustFsmBridge = None  # type: ignore[misc, assignment]
+    _RustFsmBridge = None
+
+RustFsmBridge: type | None = _RustFsmBridge
 
 pytestmark = pytest.mark.skipif(RustFsmBridge is None, reason="Rust FSM bridge not available")
 
@@ -54,7 +56,7 @@ def test_multi_worker_recursive_deploy_chain_rust_bound(tmp_path: Path) -> None:
     """Three workers + depth-3 recursive deploy chain must not corrupt SQLite."""
     plane = _plane(tmp_path)
     if not plane._rust_db_bound:
-        pytest.skip("Rust bind_db not active in this build")
+        pytest.skip(reason="Rust bind_db not active in this build")
 
     set_control_plane(plane)
     registry: dict = {}
@@ -105,7 +107,7 @@ def test_multi_worker_recursive_deploy_chain_rust_bound(tmp_path: Path) -> None:
 def test_worker_heartbeat_uses_rust_only_when_bound(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     plane = _plane(tmp_path)
     if not plane._rust_db_bound:
-        pytest.skip("Rust bind_db not active in this build")
+        pytest.skip(reason="Rust bind_db not active in this build")
 
     calls: list[str] = []
     orig_dispatch = Plane._rust_deployment_dispatch

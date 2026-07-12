@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib
 import sys
 from pathlib import Path
+from types import ModuleType
 from unittest.mock import MagicMock
 
 import pytest
@@ -12,7 +13,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-def _reload_rust_bridge(monkeypatch: pytest.MonkeyPatch, **env: str | None) -> object:
+def _reload_rust_bridge(monkeypatch: pytest.MonkeyPatch, **env: str | None) -> ModuleType:
     monkeypatch.delenv("IRONFLOW_RUST_LIB", raising=False)
     for k, v in env.items():
         if v is None:

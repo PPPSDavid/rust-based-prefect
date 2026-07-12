@@ -1,3 +1,6 @@
+[tool.ty.rules]
+deprecated = "ignore"
+
 [tool.ty.environment]
 extra-paths = ["python-shim/src", "static-planner/src"]
 
@@ -8,4 +11,11 @@ allowed-unresolved-imports = [
     "mcp.**",
     "torch",
     "sentence_transformers.**",
+    "prefect",
+    "setuptools.**",
+    "pydantic.**",
+    "fastapi.**",
+    "starlette.**",
+    "httpx",
+    "pytest",
 ]

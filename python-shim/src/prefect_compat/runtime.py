@@ -13,11 +13,18 @@ from threading import RLock
 from typing import Any
 from uuid import UUID, uuid4
 
+_RustQueryBridge: Any = None
+_RustFsmBridge: Any = None
 try:
-    from .rust_bridge import RustFsmBridge, RustQueryBridge
+    from .rust_bridge import RustFsmBridge as _RustFsmBridge_cls, RustQueryBridge as _RustQueryBridge_cls
+
+    _RustQueryBridge = _RustQueryBridge_cls
+    _RustFsmBridge = _RustFsmBridge_cls
 except Exception:  # pragma: no cover - best-effort optional accelerator
-    RustQueryBridge = None  # type: ignore[assignment]
-    RustFsmBridge = None  # type: ignore[assignment]
+    pass
+
+RustQueryBridge: Any = _RustQueryBridge
+RustFsmBridge: Any = _RustFsmBridge
 
 
 DEFAULT_WORK_POOL_ID = "default-process-pool"
@@ -123,6 +130,7 @@ class InMemoryControlPlane:
         self._rust_fsm_handle = 0
         self._rust_native_persistence = True
         self._rust_db_bound = False
+        self._test_plane_ref: InMemoryControlPlane | None = None
         if RustQueryBridge is not None:
             try:
                 self._rust_bridge = RustQueryBridge()
@@ -2296,7 +2304,7 @@ class InMemoryControlPlane:
                 [DEFAULT_WORK_POOL_ID, "default-process-pool", "process", 0, now, now],
             )
             self._sqlite_conn.execute(
-                f"UPDATE deployments SET work_pool_id = ? WHERE work_pool_id IS NULL",
+                "UPDATE deployments SET work_pool_id = ? WHERE work_pool_id IS NULL",
                 [DEFAULT_WORK_POOL_ID],
             )
 

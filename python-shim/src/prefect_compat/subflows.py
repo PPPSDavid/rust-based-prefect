@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Generic, Sequence, TypeVar
+from typing import Any, Generic, Sequence, TypeVar, cast
 from uuid import UUID
 
 from .decorators import (
@@ -12,7 +12,6 @@ from .decorators import (
     TaskFuture,
     wait,
 )
-from .runtime import RunState
 
 T = TypeVar("T")
 _UNSET = object()
@@ -34,7 +33,7 @@ class SubflowFuture(Generic[T]):
 
     def result(self) -> T:
         if self._value is not _UNSET:
-            return self._value  # type: ignore[return-value]
+            return cast(T, self._value)
 
         dep_token = _ACTIVE_DEPLOYMENT_RUN.set(None)
         try:
@@ -55,7 +54,7 @@ class SubflowFuture(Generic[T]):
                 self._value = _control_plane().get_flow_result(UUID(str(flow_run_id)))
             else:
                 self._value = None
-            return self._value  # type: ignore[return-value]
+            return cast(T, self._value)
         if status == "CANCELLED":
             raise RuntimeError(f"subflow deployment run {self.deployment_run_id} was cancelled")
         err = terminal.get("error") or f"subflow deployment run {self.deployment_run_id} failed"

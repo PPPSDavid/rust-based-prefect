@@ -120,7 +120,9 @@ def test_serve_deploys_runs_pull_steps_and_worker_loop(tmp_path: Path, monkeypat
     assert pull_calls[0] == pull_steps
     assert len(worker_calls) == 1
     assert worker_calls[0]["worker_name"] == "test-serve-worker"
-    assert "demo" in worker_calls[0]["flow_registry"]
+    flow_registry = worker_calls[0]["flow_registry"]
+    assert isinstance(flow_registry, dict)
+    assert "demo" in flow_registry
 
     deployment = client.get("/api/deployments/by-name/api-serve").json()
     assert deployment["name"] == "api-serve"

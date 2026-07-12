@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from email.message import Message
 from typing import Any
 from urllib.error import HTTPError
 from urllib.parse import quote
@@ -27,7 +28,7 @@ class _UrllibResponse:
                 url="",
                 code=self.status_code,
                 msg=self._body.decode("utf-8", errors="replace"),
-                hdrs=None,
+                hdrs=Message(),
                 fp=None,
             )
 

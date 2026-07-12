@@ -31,7 +31,7 @@ def _swap_plane(tmp_path: Path) -> None:
 
 def test_resolve_flow_callable_builtin() -> None:
     fn = resolve_flow_callable("simple_flow", None, FLOW_REGISTRY)
-    assert fn.__name__ == "simple_flow"
+    assert getattr(fn, "__name__", "") == "simple_flow"
 
 
 def test_execute_claimed_run_completes(tmp_path: Path) -> None:

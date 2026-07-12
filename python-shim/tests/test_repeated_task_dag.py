@@ -113,6 +113,8 @@ def test_distinct_wrappers_same_function_are_separate_tasks(tmp_path: Path) -> N
         return [a.result(), b.result()]
 
     assert ping_flow() == ["pong", "pong"]
-    dag = plane.get_flow_run_dag(plane.latest_flow().run_id, mode="logical")
+    latest = plane.latest_flow()
+    assert latest is not None
+    dag = plane.get_flow_run_dag(latest.run_id, mode="logical")
     labels = [node["label"] for node in dag["nodes"]]
     assert labels == ["ping-start-0", "ping-end-0"]

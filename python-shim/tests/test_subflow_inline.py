@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from prefect_compat import InMemoryControlPlane, deployment_ref, flow, set_control_plane, task
-from prefect_compat.cancellation import FlowRunCancelled, assert_flow_not_cancelled, sleep_cancelable
+from prefect_compat.cancellation import FlowRunCancelled, sleep_cancelable
 from prefect_compat.runtime import RunState
 from prefect_compat.worker import run_worker_loop
 
