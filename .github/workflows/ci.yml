@@ -11,6 +11,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  python-lint:
+    name: Python lint (ruff + ty)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install lint dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements-ci.txt
+      - name: Ruff check
+        run: python -m ruff check .
+      - name: ty check
+        run: python -m ty check
+
   version:
     name: Version sync
     runs-on: ubuntu-latest

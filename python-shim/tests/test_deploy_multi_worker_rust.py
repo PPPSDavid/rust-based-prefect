@@ -12,11 +12,15 @@ from prefect_compat.runtime import InMemoryControlPlane as Plane
 from prefect_compat.worker import run_worker_loop
 
 try:
-    from prefect_compat.runtime import RustFsmBridge
+    from prefect_compat.runtime import RustFsmBridge as _RustFsmBridge
 except ImportError:
-    RustFsmBridge = None  # type: ignore[misc, assignment]
+    _RustFsmBridge = None
 
-pytestmark = pytest.mark.skipif(RustFsmBridge is None, reason="Rust FSM bridge not available")
+RustFsmBridge: type | None = _RustFsmBridge
+
+pytestmark = pytest.mark.skipif(
+    RustFsmBridge is None, reason="Rust FSM bridge not available"
+)
 
 
 def _plane(tmp_path: Path) -> InMemoryControlPlane:
@@ -54,7 +58,7 @@ def test_multi_worker_recursive_deploy_chain_rust_bound(tmp_path: Path) -> None:
     """Three workers + depth-3 recursive deploy chain must not corrupt SQLite."""
     plane = _plane(tmp_path)
     if not plane._rust_db_bound:
-        pytest.skip("Rust bind_db not active in this build")
+        pytest.skip("Rust bind_db not active in this build")  # ty: ignore[too-many-positional-arguments]
 
     set_control_plane(plane)
     registry: dict = {}
@@ -95,17 +99,25 @@ def test_multi_worker_recursive_deploy_chain_rust_bound(tmp_path: Path) -> None:
     )
     assert len(dep_rows) >= 9
     for row in dep_rows:
-        assert str(row["status"]) in {"COMPLETED", "SCHEDULED", "CLAIMED", "RUNNING", "CANCELLED"}
+        assert str(row["status"]) in {
+            "COMPLETED",
+            "SCHEDULED",
+            "CLAIMED",
+            "RUNNING",
+            "CANCELLED",
+        }
         for col in ("requested_parameters", "resolved_parameters"):
             val = row[col]
             if val is not None and str(val).strip():
                 assert str(val).startswith("{")
 
 
-def test_worker_heartbeat_uses_rust_only_when_bound(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_worker_heartbeat_uses_rust_only_when_bound(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     plane = _plane(tmp_path)
     if not plane._rust_db_bound:
-        pytest.skip("Rust bind_db not active in this build")
+        pytest.skip("Rust bind_db not active in this build")  # ty: ignore[too-many-positional-arguments]
 
     calls: list[str] = []
     orig_dispatch = Plane._rust_deployment_dispatch

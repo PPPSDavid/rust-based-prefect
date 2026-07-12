@@ -92,9 +92,13 @@ async def _run_mcp_checks() -> tuple[list[str], dict[str, Any]]:
             if "detect_changes" in names and "detect_changes_tool" in names:
                 _warn("both detect_changes and detect_changes_tool registered")
             elif "detect_changes" in names:
-                issues.append("MCP exposes detect_changes without _tool suffix; docs may be wrong")
+                issues.append(
+                    "MCP exposes detect_changes without _tool suffix; docs may be wrong"
+                )
 
-            async def call(tool: str, arguments: dict[str, Any]) -> tuple[Any, bool, str]:
+            async def call(
+                tool: str, arguments: dict[str, Any]
+            ) -> tuple[Any, bool, str]:
                 result = await session.call_tool(tool, arguments)
                 texts = [getattr(c, "text", str(c)) for c in result.content]
                 blob = "\n".join(texts)
@@ -107,9 +111,21 @@ async def _run_mcp_checks() -> tuple[list[str], dict[str, Any]]:
 
             # 1) stats — prove non-empty graph
             parsed, is_err, blob = await call("list_graph_stats_tool", {})
-            nodes = int((parsed or {}).get("total_nodes") or 0) if isinstance(parsed, dict) else 0
-            edges = int((parsed or {}).get("total_edges") or 0) if isinstance(parsed, dict) else 0
-            emb = int((parsed or {}).get("embeddings_count") or 0) if isinstance(parsed, dict) else 0
+            nodes = (
+                int((parsed or {}).get("total_nodes") or 0)
+                if isinstance(parsed, dict)
+                else 0
+            )
+            edges = (
+                int((parsed or {}).get("total_edges") or 0)
+                if isinstance(parsed, dict)
+                else 0
+            )
+            emb = (
+                int((parsed or {}).get("embeddings_count") or 0)
+                if isinstance(parsed, dict)
+                else 0
+            )
             ok = (not is_err) and isinstance(parsed, dict) and nodes > 50 and edges > 50
             report["checks"]["list_graph_stats"] = {
                 "ok": ok,
@@ -118,7 +134,9 @@ async def _run_mcp_checks() -> tuple[list[str], dict[str, Any]]:
                 "embeddings": emb,
             }
             if ok:
-                _ok(f"list_graph_stats_tool nodes={nodes} edges={edges} embeddings={emb}")
+                _ok(
+                    f"list_graph_stats_tool nodes={nodes} edges={edges} embeddings={emb}"
+                )
                 if emb == 0:
                     _warn(
                         "embeddings_count=0 (expected on Cloud core install; "
@@ -130,14 +148,18 @@ async def _run_mcp_checks() -> tuple[list[str], dict[str, Any]]:
 
             # 2) architecture
             parsed, is_err, blob = await call("get_architecture_overview_tool", {})
-            communities = (parsed or {}).get("communities") if isinstance(parsed, dict) else None
+            communities = (
+                (parsed or {}).get("communities") if isinstance(parsed, dict) else None
+            )
             ok = (not is_err) and isinstance(parsed, dict) and bool(communities)
             report["checks"]["architecture"] = {
                 "ok": ok,
                 "community_count": len(communities or []),
             }
             if ok:
-                _ok(f"get_architecture_overview_tool communities={len(communities or [])}")
+                _ok(
+                    f"get_architecture_overview_tool communities={len(communities or [])}"
+                )
             else:
                 issues.append("get_architecture_overview_tool empty/error")
                 _fail(f"architecture is_err={is_err} preview={blob[:160]}")
@@ -147,7 +169,9 @@ async def _run_mcp_checks() -> tuple[list[str], dict[str, Any]]:
                 "semantic_search_nodes_tool",
                 {"query": "TransitionHookSpec"},
             )
-            results = (parsed or {}).get("results") if isinstance(parsed, dict) else None
+            results = (
+                (parsed or {}).get("results") if isinstance(parsed, dict) else None
+            )
             ok = (not is_err) and isinstance(results, list) and len(results) > 0
             top = results[0] if results else {}
             report["checks"]["semantic_search"] = {
@@ -161,7 +185,9 @@ async def _run_mcp_checks() -> tuple[list[str], dict[str, Any]]:
                     f"{len(results)} top={top.get('name')} file={top.get('file_path')}"
                 )
             else:
-                issues.append("semantic_search_nodes_tool returned no hits for TransitionHookSpec")
+                issues.append(
+                    "semantic_search_nodes_tool returned no hits for TransitionHookSpec"
+                )
                 _fail(f"search is_err={is_err} preview={blob[:160]}")
 
             # 4) query_graph callees
@@ -172,13 +198,20 @@ async def _run_mcp_checks() -> tuple[list[str], dict[str, Any]]:
                     "target": str(ROOT / "scripts" / "agent_preflight.py") + "::main",
                 },
             )
-            ok = (not is_err) and isinstance(parsed, dict) and parsed.get("status") in (
-                "ok",
-                "ambiguous",
+            ok = (
+                (not is_err)
+                and isinstance(parsed, dict)
+                and parsed.get("status")
+                in (
+                    "ok",
+                    "ambiguous",
+                )
             )
             report["checks"]["query_graph"] = {
                 "ok": ok,
-                "status": (parsed or {}).get("status") if isinstance(parsed, dict) else None,
+                "status": (parsed or {}).get("status")
+                if isinstance(parsed, dict)
+                else None,
             }
             if ok:
                 _ok(f"query_graph_tool status={parsed.get('status')}")
@@ -196,8 +229,17 @@ async def _run_mcp_checks() -> tuple[list[str], dict[str, Any]]:
                     ]
                 },
             )
-            total = int((parsed or {}).get("total_impacted") or 0) if isinstance(parsed, dict) else 0
-            ok = (not is_err) and isinstance(parsed, dict) and parsed.get("status") == "ok" and total > 0
+            total = (
+                int((parsed or {}).get("total_impacted") or 0)
+                if isinstance(parsed, dict)
+                else 0
+            )
+            ok = (
+                (not is_err)
+                and isinstance(parsed, dict)
+                and parsed.get("status") == "ok"
+                and total > 0
+            )
             report["checks"]["impact_radius"] = {"ok": ok, "total_impacted": total}
             if ok:
                 _ok(f"get_impact_radius_tool total_impacted={total}")
@@ -207,13 +249,19 @@ async def _run_mcp_checks() -> tuple[list[str], dict[str, Any]]:
 
             # 6) detect_changes should see *something* on a dirty worktree OR still return ok
             parsed, is_err, blob = await call("detect_changes_tool", {})
-            ok = (not is_err) and isinstance(parsed, dict) and parsed.get("status") == "ok"
+            ok = (
+                (not is_err)
+                and isinstance(parsed, dict)
+                and parsed.get("status") == "ok"
+            )
             report["checks"]["detect_changes"] = {
                 "ok": ok,
                 "changed_files": len((parsed or {}).get("changed_files") or [])
                 if isinstance(parsed, dict)
                 else 0,
-                "risk_score": (parsed or {}).get("risk_score") if isinstance(parsed, dict) else None,
+                "risk_score": (parsed or {}).get("risk_score")
+                if isinstance(parsed, dict)
+                else None,
             }
             if ok:
                 _ok(
@@ -240,7 +288,9 @@ async def _run_mcp_checks() -> tuple[list[str], dict[str, Any]]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--json", action="store_true", help="Print machine-readable report JSON")
+    parser.add_argument(
+        "--json", action="store_true", help="Print machine-readable report JSON"
+    )
     args = parser.parse_args()
 
     # Preflight import / DB before spending time on MCP.
@@ -259,7 +309,9 @@ def main() -> int:
 
     issues, report = asyncio.run(_run_mcp_checks())
     if args.json:
-        print(json.dumps({"ok": not issues, "issues": issues, "report": report}, indent=2))
+        print(
+            json.dumps({"ok": not issues, "issues": issues, "report": report}, indent=2)
+        )
 
     if issues:
         print("\nVerification FAILED:")
@@ -267,7 +319,9 @@ def main() -> int:
             print(f"  - {item}")
         return 2
 
-    print("\nVerification PASSED — MCP launcher answers real tool calls with non-empty graph data.")
+    print(
+        "\nVerification PASSED — MCP launcher answers real tool calls with non-empty graph data."
+    )
     return 0
 
 

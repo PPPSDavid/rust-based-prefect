@@ -75,7 +75,9 @@ def _resolve_deployments(
         if spec.name == name:
             return [spec]
     available = ", ".join(spec.name for spec in manifest.deployments)
-    raise ValueError(f"Deployment {name!r} not found in {manifest_path}. Available: {available}")
+    raise ValueError(
+        f"Deployment {name!r} not found in {manifest_path}. Available: {available}"
+    )
 
 
 def _print_deploy_result(spec: DeploymentSpec, result: dict[str, Any]) -> None:
@@ -110,8 +112,10 @@ def cmd_init(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
 
-    template_text = resources.files("prefect_compat.cli.templates").joinpath(template_name).read_text(
-        encoding="utf-8"
+    template_text = (
+        resources.files("prefect_compat.cli.templates")
+        .joinpath(template_name)
+        .read_text(encoding="utf-8")
     )
     manifest_path.write_text(template_text, encoding="utf-8")
     print(f"created: {manifest_path}")
@@ -208,7 +212,10 @@ def cmd_serve(args: argparse.Namespace) -> int:
         return 1
 
     if args.all:
-        print("Error: serve supports one deployment; omit --all and pass --name.", file=sys.stderr)
+        print(
+            "Error: serve supports one deployment; omit --all and pass --name.",
+            file=sys.stderr,
+        )
         return 1
 
     try:
@@ -296,7 +303,9 @@ def cmd_worker_start(args: argparse.Namespace) -> int:
     api_url = args.api_url or _default_api_url()
     if manifest_path is not None:
         try:
-            specs = _resolve_deployments(manifest_path, name=args.name, deploy_all=False)
+            specs = _resolve_deployments(
+                manifest_path, name=args.name, deploy_all=False
+            )
             work_pool_id = _resolve_work_pool_id(
                 DeployClient(api_url),
                 specs[0],
@@ -426,7 +435,11 @@ def _build_parser() -> argparse.ArgumentParser:
             ]
         ),
     )
-    serve_parser.add_argument("--file", default=DEFAULT_MANIFEST, help=f"Manifest path (default: {DEFAULT_MANIFEST}).")
+    serve_parser.add_argument(
+        "--file",
+        default=DEFAULT_MANIFEST,
+        help=f"Manifest path (default: {DEFAULT_MANIFEST}).",
+    )
     serve_parser.add_argument("--name", help="Deployment name to serve.")
     serve_parser.add_argument(
         "--api-url",

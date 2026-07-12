@@ -63,7 +63,9 @@ def test_deploy_upsert_creates_then_updates(tmp_path: Path) -> None:
     assert updated["deployment"]["default_parameters"] == {"n": 99}
 
 
-def test_serve_deploys_runs_pull_steps_and_worker_loop(tmp_path: Path, monkeypatch) -> None:
+def test_serve_deploys_runs_pull_steps_and_worker_loop(
+    tmp_path: Path, monkeypatch
+) -> None:
     _swap_plane(tmp_path)
     client = TestClient(app)
     stop_event = threading.Event()
@@ -93,7 +95,9 @@ def test_serve_deploys_runs_pull_steps_and_worker_loop(tmp_path: Path, monkeypat
         pull_calls.append(steps)
         return {}
 
-    monkeypatch.setattr("prefect_compat.deploy.api.run_worker_loop", fake_run_worker_loop)
+    monkeypatch.setattr(
+        "prefect_compat.deploy.api.run_worker_loop", fake_run_worker_loop
+    )
     monkeypatch.setattr("prefect_compat.deploy.api.run_pull_steps", fake_run_pull_steps)
 
     @flow
@@ -120,7 +124,9 @@ def test_serve_deploys_runs_pull_steps_and_worker_loop(tmp_path: Path, monkeypat
     assert pull_calls[0] == pull_steps
     assert len(worker_calls) == 1
     assert worker_calls[0]["worker_name"] == "test-serve-worker"
-    assert "demo" in worker_calls[0]["flow_registry"]
+    flow_registry = worker_calls[0]["flow_registry"]
+    assert isinstance(flow_registry, dict)
+    assert "demo" in flow_registry
 
     deployment = client.get("/api/deployments/by-name/api-serve").json()
     assert deployment["name"] == "api-serve"

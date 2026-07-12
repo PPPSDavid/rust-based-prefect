@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib
 import sys
 from pathlib import Path
+from types import ModuleType
 from unittest.mock import MagicMock
 
 import pytest
@@ -12,7 +13,9 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-def _reload_rust_bridge(monkeypatch: pytest.MonkeyPatch, **env: str | None) -> object:
+def _reload_rust_bridge(
+    monkeypatch: pytest.MonkeyPatch, **env: str | None
+) -> ModuleType:
     monkeypatch.delenv("IRONFLOW_RUST_LIB", raising=False)
     for k, v in env.items():
         if v is None:
@@ -34,11 +37,15 @@ def test_find_repo_root_when_under_checkout(monkeypatch: pytest.MonkeyPatch) -> 
 
 def test_find_repo_root_none_when_not_in_repo(monkeypatch: pytest.MonkeyPatch) -> None:
     rb = _reload_rust_bridge(monkeypatch)
-    monkeypatch.setattr(rb, "__file__", "/tmp/fake-site-packages/prefect_compat/rust_bridge.py")
+    monkeypatch.setattr(
+        rb, "__file__", "/tmp/fake-site-packages/prefect_compat/rust_bridge.py"
+    )
     assert rb._find_repo_root_with_rust() is None
 
 
-def test_ironflow_rust_lib_missing_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_ironflow_rust_lib_missing_raises(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     missing = tmp_path / "missing.so"
     rb = _reload_rust_bridge(monkeypatch, IRONFLOW_RUST_LIB=str(missing))
     with pytest.raises(RuntimeError, match="IRONFLOW_RUST_LIB"):
@@ -72,7 +79,9 @@ def test_packaged_resource_exists_true(monkeypatch: pytest.MonkeyPatch) -> None:
     assert rb._packaged_resource_exists() is True
 
 
-def test_packaged_resource_exists_false_when_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_packaged_resource_exists_false_when_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from importlib import resources
 
     rb = _reload_rust_bridge(monkeypatch)

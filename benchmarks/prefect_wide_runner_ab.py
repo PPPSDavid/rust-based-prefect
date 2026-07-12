@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import statistics
 import time
-from typing import Callable
+from collections.abc import Callable
 
 
 def _timed(label: str, fn: Callable[[], object], repeats: int = 3) -> None:
@@ -27,7 +27,7 @@ def _timed(label: str, fn: Callable[[], object], repeats: int = 3) -> None:
 
 def main() -> None:
     try:
-        from prefect import flow, task  # type: ignore
+        from prefect import flow, task
     except Exception as exc:  # pragma: no cover
         raise SystemExit(f"prefect not importable: {exc}") from exc
 
@@ -35,7 +35,7 @@ def main() -> None:
         from prefect.task_runners import SequentialTaskRunner, ThreadPoolTaskRunner  # type: ignore
     except Exception:
         try:
-            from prefect import SequentialTaskRunner, ThreadPoolTaskRunner  # type: ignore
+            from prefect import SequentialTaskRunner, ThreadPoolTaskRunner
         except Exception as exc:  # pragma: no cover
             raise SystemExit(f"Could not import Prefect task runners: {exc}") from exc
 

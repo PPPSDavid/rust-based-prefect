@@ -10,11 +10,17 @@ import argparse
 import json
 import os
 import threading
-import time
 from pathlib import Path
+from typing import cast
 
-from prefect_compat import InMemoryControlPlane, deployment_ref, flow, set_control_plane, task
-from prefect_compat.runtime import RunState
+from prefect_compat import (
+    InMemoryControlPlane,
+    deployment_ref,
+    flow,
+    set_control_plane,
+    task,
+)
+from prefect_compat.decorators import TaskWrapper
 from prefect_compat.worker import run_worker_loop
 
 
@@ -35,7 +41,7 @@ def seed(history_path: Path) -> dict[str, str]:
 
     @flow
     def leaf_flow(n: int) -> int:
-        return leaf_task.submit(n).result()
+        return cast(TaskWrapper[int], leaf_task).submit(n).result()
 
     @flow
     def child_inline(n: int) -> int:
@@ -96,25 +102,37 @@ def seed(history_path: Path) -> dict[str, str]:
         worker.join(timeout=10)
 
     runs = {
-        "parent_inline": next(f for f in plane._flows.values() if f.name == "parent_inline"),
-        "parent_deploy": next(f for f in plane._flows.values() if f.name == "parent_deploy"),
-        "parent_mixed": next(f for f in plane._flows.values() if f.name == "parent_mixed"),
-        "child_inline": next(f for f in plane._flows.values() if f.name == "child_inline"),
+        "parent_inline": next(
+            f for f in plane._flows.values() if f.name == "parent_inline"
+        ),
+        "parent_deploy": next(
+            f for f in plane._flows.values() if f.name == "parent_deploy"
+        ),
+        "parent_mixed": next(
+            f for f in plane._flows.values() if f.name == "parent_mixed"
+        ),
+        "child_inline": next(
+            f for f in plane._flows.values() if f.name == "child_inline"
+        ),
     }
     out = {k: str(v.run_id) for k, v in runs.items()}
     for name, rid in out.items():
-        detail = plane.get_flow_run_detail(runs[name].run_id)
+        detail = plane.get_flow_run_detail(runs[name].run_id) or {}
         dag = plane.get_flow_run_dag(runs[name].run_id, mode="logical")
         kinds = sorted({n.get("kind", "task") for n in dag["nodes"]})
-        print(f"{name}: run_id={rid} state={detail['state']} dag_kinds={kinds}")
+        print(f"{name}: run_id={rid} state={detail.get('state')} dag_kinds={kinds}")
     return out
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Seed subflow demo runs for UI inspection.")
+    parser = argparse.ArgumentParser(
+        description="Seed subflow demo runs for UI inspection."
+    )
     parser.add_argument(
         "--history-path",
-        default=os.getenv("IRONFLOW_HISTORY_PATH", str(Path("data") / "ironflow_history.jsonl")),
+        default=os.getenv(
+            "IRONFLOW_HISTORY_PATH", str(Path("data") / "ironflow_history.jsonl")
+        ),
     )
     args = parser.parse_args()
     history = Path(args.history_path)
@@ -122,7 +140,9 @@ def main() -> int:
         history.unlink()
     ids = seed(history)
     print(json.dumps({"seeded_runs": ids}, indent=2))
-    print("Start server + UI, then open run detail → DAG tab for each parent run above.")
+    print(
+        "Start server + UI, then open run detail → DAG tab for each parent run above."
+    )
     return 0
 
 

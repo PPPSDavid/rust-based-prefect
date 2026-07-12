@@ -142,7 +142,9 @@ def test_bootstrap_native_check_runs_minimal_flow(monkeypatch, capsys):
     assert "[ok] Native check passed" in out
 
 
-def test_bootstrap_native_check_fails_without_native_or_ironflow_lib(monkeypatch, capsys):
+def test_bootstrap_native_check_fails_without_native_or_ironflow_lib(
+    monkeypatch, capsys
+):
     rb = importlib.import_module("prefect_compat.rust_bridge")
     monkeypatch.setattr(rb, "native_library_available", lambda: False)
     monkeypatch.delenv("IRONFLOW_RUST_LIB", raising=False)
@@ -160,7 +162,9 @@ def test_bootstrap_native_check_mutually_exclusive_with_check_only():
         bootstrap.main(["--native-check", "--check-only"])
 
 
-def test_bootstrap_native_check_passes_when_ironflow_lib_set_despite_native_false(monkeypatch, capsys):
+def test_bootstrap_native_check_passes_when_ironflow_lib_set_despite_native_false(
+    monkeypatch, capsys
+):
     rb = importlib.import_module("prefect_compat.rust_bridge")
     monkeypatch.setattr(rb, "native_library_available", lambda: False)
     monkeypatch.setenv("IRONFLOW_RUST_LIB", "/tmp/ironflow_engine_dummy.so")

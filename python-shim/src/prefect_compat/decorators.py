@@ -7,16 +7,33 @@ import textwrap
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from functools import wraps
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Callable, Generic, Iterable, Sequence, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast, overload
+from collections.abc import Callable, Iterable, Sequence
 from uuid import UUID, uuid4
 
-from .hooks import TransitionContext, TransitionHookSpec, compile_transition_hooks, dispatch_transition_hooks
+if TYPE_CHECKING:
+    from .subflows import SubflowFuture
+
+from .hooks import (
+    TransitionContext,
+    TransitionHookSpec,
+    compile_transition_hooks,
+    dispatch_transition_hooks,
+)
 from .runtime import InMemoryControlPlane, RunState, SetStateResult, TaskRunRecord
-from .task_runners import MapTaskRunner, ProcessPoolTaskRunner, ThreadPoolTaskRunner, default_task_runner_from_env
+from .task_runners import (
+    MapTaskRunner,
+    ProcessPoolTaskRunner,
+    ThreadPoolTaskRunner,
+    default_task_runner_from_env,
+)
 
 # Reused when ``transition_hooks`` is set (avoids per-submit list literals on the hot path).
-_TASK_HOOK_START_EDGES: tuple[tuple[RunState, RunState, str, dict[str, Any] | None], ...] = (
+_TASK_HOOK_START_EDGES: tuple[
+    tuple[RunState, RunState, str, dict[str, Any] | None], ...
+] = (
     (RunState.SCHEDULED, RunState.PENDING, "task_pending", None),
     (RunState.PENDING, RunState.RUNNING, "task_running", None),
 )
@@ -28,9 +45,9 @@ T = TypeVar("T")
 
 _CONTROL_PLANE = InMemoryControlPlane()
 
-_ACTIVE_TASK_RUNNER: contextvars.ContextVar[MapTaskRunner | ProcessPoolTaskRunner | None] = contextvars.ContextVar(
-    "ironflow_active_task_runner", default=None
-)
+_ACTIVE_TASK_RUNNER: contextvars.ContextVar[
+    MapTaskRunner | ProcessPoolTaskRunner | None
+] = contextvars.ContextVar("ironflow_active_task_runner", default=None)
 _ACTIVE_FLOW_RUN: contextvars.ContextVar[UUID | None] = contextvars.ContextVar(
     "ironflow_active_flow_run", default=None
 )
@@ -49,7 +66,7 @@ class TaskFuture(Generic[T]):
         return self.value
 
 
-def wait(futures: Sequence["TaskFuture[Any] | SubflowFuture[Any]"]) -> list[Any]:  # noqa: F821
+def wait(futures: Sequence[TaskFuture[Any] | SubflowFuture[Any]]) -> list[Any]:
     return [future.result() for future in futures]
 
 
@@ -67,19 +84,19 @@ class TaskWrapper:
         transition_hooks: tuple[TransitionHookSpec, ...] | None = None,
     ) -> None:
         self.fn = fn
-        self.name = name or fn.__name__
+        self.name = name or getattr(fn, "__name__", "<task>")
         self._transition_hooks = transition_hooks
         wraps(fn)(self)
 
     def __call__(self, *args: Any, **kwargs: Any) -> T:
         resolved_args = [_resolve(v) for v in args]
         resolved_kwargs = {k: _resolve(v) for k, v in kwargs.items()}
-        return self.fn(*resolved_args, **resolved_kwargs)
+        return cast(T, self.fn(*resolved_args, **resolved_kwargs))
 
     def submit(
         self,
         *args: Any,
-        wait_for: Sequence["TaskFuture[Any] | SubflowFuture[Any]"] | None = None,
+        wait_for: Sequence[TaskFuture[Any] | SubflowFuture[Any]] | None = None,
         **kwargs: Any,
     ) -> TaskFuture[T]:
         if wait_for:
@@ -88,7 +105,9 @@ class TaskWrapper:
         flow_run_id = _ACTIVE_FLOW_RUN.get()
         task_run = None
         if flow_run_id is not None:
-            planned_node_id = _CONTROL_PLANE.next_planned_node_id(flow_run_id, self.name)
+            planned_node_id = _CONTROL_PLANE.next_planned_node_id(
+                flow_run_id, self.name
+            )
             task_run = _CONTROL_PLANE.create_task_run(
                 flow_run_id, self.name, planned_node_id=planned_node_id
             )
@@ -101,7 +120,9 @@ class TaskWrapper:
             )
             th = self._transition_hooks
             if th:
-                _emit_task_transition_edges(th, task_run, self.name, _TASK_HOOK_START_EDGES)
+                _emit_task_transition_edges(
+                    th, task_run, self.name, _TASK_HOOK_START_EDGES
+                )
 
         try:
             result = self(*args, **kwargs)
@@ -123,7 +144,9 @@ class TaskWrapper:
             return TaskFuture(
                 result,
                 task_run_id=str(task_run.task_run_id) if task_run is not None else None,
-                planned_node_id=task_run.planned_node_id if task_run is not None else None,
+                planned_node_id=task_run.planned_node_id
+                if task_run is not None
+                else None,
             )
         except Exception as exc:
             from .cancellation import FlowRunCancelled
@@ -138,7 +161,9 @@ class TaskWrapper:
                     st = None
                 if st == RunState.RUNNING:
                     _CONTROL_PLANE.record_task_event(
-                        task_run.task_run_id, "task_failed", {"task_name": self.name, "error": str(exc)}
+                        task_run.task_run_id,
+                        "task_failed",
+                        {"task_name": self.name, "error": str(exc)},
                     )
                     th = self._transition_hooks
                     if th:
@@ -154,16 +179,24 @@ class TaskWrapper:
             raise
 
     def map(
-        self, values: Iterable[Any], wait_for: Sequence["TaskFuture[Any] | SubflowFuture[Any]"] | None = None
+        self,
+        values: Iterable[Any],
+        wait_for: Sequence[TaskFuture[Any] | SubflowFuture[Any]] | None = None,
     ) -> list[TaskFuture[T]]:
         runner = _ACTIVE_TASK_RUNNER.get()
         if runner is None:
             runner = default_task_runner_from_env()
         vals = list(values)
-        wf: list[TaskFuture[Any]] | None = list(wait_for) if wait_for else None
+        wf: list[TaskFuture[Any] | SubflowFuture[Any]] | None = (
+            list(wait_for) if wait_for else None
+        )
         if isinstance(runner, ProcessPoolTaskRunner):
             return self._map_process_pool(vals, wf, runner)
-        if isinstance(runner, ThreadPoolTaskRunner) and len(vals) > 1 and runner.resolve_max_workers() > 1:
+        if (
+            isinstance(runner, ThreadPoolTaskRunner)
+            and len(vals) > 1
+            and runner.resolve_max_workers() > 1
+        ):
             return self._map_thread_pool(vals, wf, runner)
         assert isinstance(runner, MapTaskRunner)
         return runner.map_values(
@@ -174,7 +207,9 @@ class TaskWrapper:
             lambda v: self.submit(v, wait_for=None),
         )
 
-    def _prepare_map_task_runs(self, vals: list[Any]) -> list[tuple[TaskRunRecord | None, Any]]:
+    def _prepare_map_task_runs(
+        self, vals: list[Any]
+    ) -> list[tuple[TaskRunRecord | None, Any]]:
         flow_run_id = _ACTIVE_FLOW_RUN.get()
         metas: list[tuple[TaskRunRecord | None, Any]] = []
         planned_node_id: str | None = None
@@ -182,7 +217,9 @@ class TaskWrapper:
             task_run = None
             if flow_run_id is not None:
                 if planned_node_id is None:
-                    planned_node_id = _CONTROL_PLANE.next_planned_node_id(flow_run_id, self.name)
+                    planned_node_id = _CONTROL_PLANE.next_planned_node_id(
+                        flow_run_id, self.name
+                    )
                 task_run = _CONTROL_PLANE.create_task_run(
                     flow_run_id, self.name, planned_node_id=planned_node_id
                 )
@@ -195,7 +232,9 @@ class TaskWrapper:
                 )
                 th = self._transition_hooks
                 if th:
-                    _emit_task_transition_edges(th, task_run, self.name, _TASK_HOOK_START_EDGES)
+                    _emit_task_transition_edges(
+                        th, task_run, self.name, _TASK_HOOK_START_EDGES
+                    )
             metas.append((task_run, v))
         return metas
 
@@ -222,8 +261,12 @@ class TaskWrapper:
             out.append(
                 TaskFuture(
                     raw,
-                    task_run_id=str(task_run.task_run_id) if task_run is not None else None,
-                    planned_node_id=task_run.planned_node_id if task_run is not None else None,
+                    task_run_id=str(task_run.task_run_id)
+                    if task_run is not None
+                    else None,
+                    planned_node_id=task_run.planned_node_id
+                    if task_run is not None
+                    else None,
                 )
             )
         return out
@@ -260,7 +303,7 @@ class TaskWrapper:
     def _map_thread_pool(
         self,
         vals: list[Any],
-        wait_for: list[TaskFuture[Any]] | None,
+        wait_for: list[TaskFuture[Any] | SubflowFuture[Any]] | None,
         runner: ThreadPoolTaskRunner,
     ) -> list[TaskFuture[T]]:
         """Map with task bodies in a thread pool; control-plane work stays on the caller thread."""
@@ -283,7 +326,7 @@ class TaskWrapper:
     def _map_process_pool(
         self,
         vals: list[Any],
-        wait_for: list[TaskFuture[Any]] | None,
+        wait_for: list[TaskFuture[Any] | SubflowFuture[Any]] | None,
         runner: ProcessPoolTaskRunner,
     ) -> list[TaskFuture[T]]:
         """Map via child processes; task body must be picklable (single positional arg per value)."""
@@ -303,12 +346,30 @@ class TaskWrapper:
         return self._finalize_map_task_runs(metas, outs)
 
 
+@overload
+def task(
+    fn: Callable[..., T],
+    *,
+    name: str | None = None,
+    transition_hooks: Sequence[TransitionHookSpec] | None = None,
+) -> TaskWrapper: ...
+
+
+@overload
+def task(
+    fn: None = None,
+    *,
+    name: str | None = None,
+    transition_hooks: Sequence[TransitionHookSpec] | None = None,
+) -> Callable[[Callable[..., T]], TaskWrapper]: ...
+
+
 def task(
     fn: Callable[..., T] | None = None,
     *,
     name: str | None = None,
     transition_hooks: Sequence[TransitionHookSpec] | None = None,
-) -> Callable[..., Any]:
+) -> TaskWrapper | Callable[[Callable[..., T]], TaskWrapper]:
     def decorate(f: Callable[..., T]) -> TaskWrapper:
         compiled = compile_transition_hooks(transition_hooks)
         return TaskWrapper(f, name=name, transition_hooks=compiled)
@@ -326,8 +387,10 @@ def flow(
     transition_hooks: Sequence[TransitionHookSpec] | None = None,
 ) -> Callable[..., Any]:
     def decorate(f: Callable[..., T]) -> Callable[..., T]:
-        flow_name = name or f.__name__
-        resolved_runner = task_runner if task_runner is not None else default_task_runner_from_env()
+        flow_name = name or getattr(f, "__name__", "<flow>")
+        resolved_runner = (
+            task_runner if task_runner is not None else default_task_runner_from_env()
+        )
         compiled_flow_hooks = compile_transition_hooks(transition_hooks)
 
         @wraps(f)
@@ -347,9 +410,13 @@ def flow(
                     dep_run = _CONTROL_PLANE.get_deployment_run(dep_run_id)
                     if dep_run:
                         if dep_run.get("parent_flow_run_id"):
-                            parent_flow_run_id = UUID(str(dep_run["parent_flow_run_id"]))
+                            parent_flow_run_id = UUID(
+                                str(dep_run["parent_flow_run_id"])
+                            )
                         if dep_run.get("parent_task_run_id"):
-                            parent_task_run_id = UUID(str(dep_run["parent_task_run_id"]))
+                            parent_task_run_id = UUID(
+                                str(dep_run["parent_task_run_id"])
+                            )
                         execution_mode = "deployment"
                 elif parent_active_flow_run is not None:
                     parent_flow_run_id = parent_active_flow_run
@@ -362,7 +429,9 @@ def flow(
                 )
                 _ACTIVE_FLOW_RUN.set(record.run_id)
                 if dep_run_id is not None:
-                    _CONTROL_PLANE.attach_flow_run_to_deployment_run(dep_run_id, record.run_id)
+                    _CONTROL_PLANE.attach_flow_run_to_deployment_run(
+                        dep_run_id, record.run_id
+                    )
                 manifest_info = _compile_forecast_for_flow(f, flow_name)
                 _CONTROL_PLANE.save_flow_manifest(
                     run_id=record.run_id,
@@ -376,7 +445,9 @@ def flow(
                     (RunState.PENDING, uuid4(), "propose", 0),
                     (RunState.RUNNING, uuid4(), "start", 1),
                 ]
-                batch_results = _CONTROL_PLANE.set_flow_states_batch(record.run_id, start_transitions)
+                batch_results = _CONTROL_PLANE.set_flow_states_batch(
+                    record.run_id, start_transitions
+                )
                 if fh:
                     _emit_flow_hooks_for_batch(
                         fh,
@@ -389,33 +460,59 @@ def flow(
                     result = f(*args, **kwargs)
                     current = _CONTROL_PLANE.get_flow(record.run_id)
                     if current.state == RunState.CANCELLED:
-                        raise FlowRunCancelled(f"flow run {record.run_id} was cancelled")
+                        raise FlowRunCancelled(
+                            f"flow run {record.run_id} was cancelled"
+                        )
                     prev = current.state
                     done = _CONTROL_PLANE.set_flow_state(
-                        record.run_id, RunState.COMPLETED, uuid4(), "complete", expected_version=current.version
+                        record.run_id,
+                        RunState.COMPLETED,
+                        uuid4(),
+                        "complete",
+                        expected_version=current.version,
                     )
                     if fh and done.status == "applied":
-                        _emit_flow_transition(fh, record.run_id, prev, RunState.COMPLETED, "complete")
+                        _emit_flow_transition(
+                            fh, record.run_id, prev, RunState.COMPLETED, "complete"
+                        )
                     _CONTROL_PLANE.set_flow_result(record.run_id, result)
                     return result
                 except FlowRunCancelled:
-                    if _CONTROL_PLANE.get_flow(record.run_id).state != RunState.CANCELLED:
+                    if (
+                        _CONTROL_PLANE.get_flow(record.run_id).state
+                        != RunState.CANCELLED
+                    ):
                         prev = _CONTROL_PLANE.get_flow(record.run_id).state
                         cancelled = _CONTROL_PLANE.set_flow_state(
-                            record.run_id, RunState.CANCELLED, uuid4(), "cancel", expected_version=2
+                            record.run_id,
+                            RunState.CANCELLED,
+                            uuid4(),
+                            "cancel",
+                            expected_version=2,
                         )
                         if fh and cancelled.status == "applied":
-                            _emit_flow_transition(fh, record.run_id, prev, RunState.CANCELLED, "cancel")
+                            _emit_flow_transition(
+                                fh, record.run_id, prev, RunState.CANCELLED, "cancel"
+                            )
                     raise
                 except Exception:
-                    if _CONTROL_PLANE.get_flow(record.run_id).state == RunState.CANCELLED:
+                    if (
+                        _CONTROL_PLANE.get_flow(record.run_id).state
+                        == RunState.CANCELLED
+                    ):
                         raise
                     prev = _CONTROL_PLANE.get_flow(record.run_id).state
                     failed = _CONTROL_PLANE.set_flow_state(
-                        record.run_id, RunState.FAILED, uuid4(), "fail", expected_version=2
+                        record.run_id,
+                        RunState.FAILED,
+                        uuid4(),
+                        "fail",
+                        expected_version=2,
                     )
                     if fh and failed.status == "applied":
-                        _emit_flow_transition(fh, record.run_id, prev, RunState.FAILED, "fail")
+                        _emit_flow_transition(
+                            fh, record.run_id, prev, RunState.FAILED, "fail"
+                        )
                     raise
             finally:
                 _ACTIVE_FLOW_RUN.reset(flow_token)
@@ -521,7 +618,9 @@ def _resolve(value: Any) -> Any:
     return value
 
 
-def _compile_forecast_for_flow(flow_fn: Callable[..., Any], flow_name: str) -> dict[str, Any]:
+def _compile_forecast_for_flow(
+    flow_fn: Callable[..., Any], flow_name: str
+) -> dict[str, Any]:
     cache_key = id(flow_fn)
     cached = _FORECAST_BY_FLOW_FN.get(cache_key)
     if cached is not None and cached.get("flow_name") == flow_name:
@@ -538,7 +637,7 @@ def _task_symbols_for_flow(flow_fn: Callable[..., Any]) -> dict[str, str]:
     try:
         unwrapped = inspect.unwrap(flow_fn)
         module = inspect.getmodule(unwrapped)
-        namespaces: list[dict[str, Any]] = []
+        namespaces: list[Mapping[str, Any]] = []
         if module is not None:
             namespaces.append(vars(module))
         closure = inspect.getclosurevars(unwrapped)
@@ -555,7 +654,9 @@ def _task_symbols_for_flow(flow_fn: Callable[..., Any]) -> dict[str, str]:
     return symbols
 
 
-def _compile_forecast_for_flow_uncached(flow_fn: Callable[..., Any], flow_name: str) -> dict[str, Any]:
+def _compile_forecast_for_flow_uncached(
+    flow_fn: Callable[..., Any], flow_name: str
+) -> dict[str, Any]:
     try:
         from static_planner import compile_and_forecast
     except Exception:
@@ -568,7 +669,9 @@ def _compile_forecast_for_flow_uncached(flow_fn: Callable[..., Any], flow_name: 
             return {
                 "manifest": {},
                 "forecast": {},
-                "warnings": ["Static planner not available; runtime fallback DAG will be used."],
+                "warnings": [
+                    "Static planner not available; runtime fallback DAG will be used."
+                ],
                 "fallback_required": True,
                 "source": "runtime",
             }
@@ -576,7 +679,9 @@ def _compile_forecast_for_flow_uncached(flow_fn: Callable[..., Any], flow_name: 
     try:
         source = textwrap.dedent(inspect.getsource(flow_fn))
         task_names = _task_symbols_for_flow(flow_fn)
-        result = compile_and_forecast(source, flow_name=flow_name, task_names=task_names)
+        result = compile_and_forecast(
+            source, flow_name=flow_name, task_names=task_names
+        )
         diagnostics = result.get("diagnostics", {})
         return {
             "manifest": result.get("manifest", {}),

@@ -150,4 +150,3 @@ def test_doctor_reports_backend_frontend_keys(capsys) -> None:
         assert "remediation" in payload
         assert isinstance(payload["remediation"], list)
         assert payload["remediation"]
-

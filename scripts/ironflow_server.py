@@ -43,7 +43,7 @@ def _start_backend(repo_root: Path, host: str, port: int) -> subprocess.Popen[st
         "--port",
         str(port),
     ]
-    return subprocess.Popen(cmd, cwd=repo_root)
+    return subprocess.Popen(cmd, cwd=repo_root, text=True)
 
 
 def _start_frontend(repo_root: Path, frontend_port: int) -> subprocess.Popen[str]:
@@ -57,7 +57,9 @@ def _start_frontend(repo_root: Path, frontend_port: int) -> subprocess.Popen[str
 
     subprocess.run([*npm_cmd, "install"], cwd=frontend_dir, check=True)
     env = dict(os.environ, PORT=str(frontend_port))
-    return subprocess.Popen([*npm_cmd, "run", "dev"], cwd=frontend_dir, env=env)
+    return subprocess.Popen(
+        [*npm_cmd, "run", "dev"], cwd=frontend_dir, env=env, text=True
+    )
 
 
 def _backend_status(repo_root: Path) -> str:
@@ -125,16 +127,24 @@ def _remediation(repo_root: Path, snapshot: dict[str, str]) -> list[str]:
     if front == "node-missing":
         hints.append("Install Node.js LTS (includes npm) and reopen your shell.")
     elif front == "npm-missing":
-        hints.append("npm not found on PATH. If Node is installed, ensure npm.cmd is on PATH.")
+        hints.append(
+            "npm not found on PATH. If Node is installed, ensure npm.cmd is on PATH."
+        )
     elif front == "package-json-missing":
-        hints.append("frontend/package.json missing — verify you have a full repo checkout.")
+        hints.append(
+            "frontend/package.json missing — verify you have a full repo checkout."
+        )
 
     if rust == "env-path-missing":
-        hints.append("IRONFLOW_RUST_LIB points to a missing file — fix the path or unset it.")
+        hints.append(
+            "IRONFLOW_RUST_LIB points to a missing file — fix the path or unset it."
+        )
     elif rust == "cargo-missing":
         hints.append("Install Rust via https://rustup.rs and reopen your shell.")
     elif rust == "not-built":
-        hints.append("Build rust-engine: cargo build --manifest-path rust-engine/Cargo.toml")
+        hints.append(
+            "Build rust-engine: cargo build --manifest-path rust-engine/Cargo.toml"
+        )
 
     if not hints:
         return []

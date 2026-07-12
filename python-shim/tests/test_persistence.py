@@ -11,9 +11,15 @@ def test_history_persists_across_restart(tmp_path: Path):
     history = tmp_path / "history.jsonl"
     plane = InMemoryControlPlane(history_path=str(history))
     run = plane.create_flow_run("persisted-flow")
-    plane.set_flow_state(run.run_id, RunState.PENDING, uuid4(), "propose", expected_version=0)
-    plane.set_flow_state(run.run_id, RunState.RUNNING, uuid4(), "start", expected_version=1)
-    plane.set_flow_state(run.run_id, RunState.COMPLETED, uuid4(), "complete", expected_version=2)
+    plane.set_flow_state(
+        run.run_id, RunState.PENDING, uuid4(), "propose", expected_version=0
+    )
+    plane.set_flow_state(
+        run.run_id, RunState.RUNNING, uuid4(), "start", expected_version=1
+    )
+    plane.set_flow_state(
+        run.run_id, RunState.COMPLETED, uuid4(), "complete", expected_version=2
+    )
 
     reloaded = InMemoryControlPlane(history_path=str(history))
     loaded_run = reloaded.get_flow(run.run_id)
@@ -27,9 +33,15 @@ def test_sqlite_read_model_is_rebuilt_from_history_if_missing(tmp_path: Path):
     history = tmp_path / "history.jsonl"
     plane = InMemoryControlPlane(history_path=str(history))
     run = plane.create_flow_run("persisted-flow")
-    plane.set_flow_state(run.run_id, RunState.PENDING, uuid4(), "propose", expected_version=0)
-    plane.set_flow_state(run.run_id, RunState.RUNNING, uuid4(), "start", expected_version=1)
-    plane.set_flow_state(run.run_id, RunState.COMPLETED, uuid4(), "complete", expected_version=2)
+    plane.set_flow_state(
+        run.run_id, RunState.PENDING, uuid4(), "propose", expected_version=0
+    )
+    plane.set_flow_state(
+        run.run_id, RunState.RUNNING, uuid4(), "start", expected_version=1
+    )
+    plane.set_flow_state(
+        run.run_id, RunState.COMPLETED, uuid4(), "complete", expected_version=2
+    )
 
     db_path = history.with_suffix(".db")
     assert db_path.exists()

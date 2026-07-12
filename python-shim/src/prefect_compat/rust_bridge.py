@@ -220,7 +220,9 @@ class RustFsmBridge:
             raise RuntimeError("unexpected Rust control response")
         return out
 
-    def deployment_scheduler_start(self, handle: int, interval_ms: int, stale_after_seconds: int) -> bool:
+    def deployment_scheduler_start(
+        self, handle: int, interval_ms: int, stale_after_seconds: int
+    ) -> bool:
         fn = getattr(self._lib, "ironflow_deployment_scheduler_start", None)
         if fn is None:
             return False

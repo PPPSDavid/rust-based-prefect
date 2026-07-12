@@ -8,8 +8,14 @@ from pathlib import Path
 
 import pytest
 
-from prefect_compat import InMemoryControlPlane, deployment_ref, flow, set_control_plane, task
-from prefect_compat.cancellation import FlowRunCancelled, assert_flow_not_cancelled, sleep_cancelable
+from prefect_compat import (
+    InMemoryControlPlane,
+    deployment_ref,
+    flow,
+    set_control_plane,
+    task,
+)
+from prefect_compat.cancellation import FlowRunCancelled, sleep_cancelable
 from prefect_compat.runtime import RunState
 from prefect_compat.worker import run_worker_loop
 
@@ -59,8 +65,14 @@ def test_inline_subflow_tasks_attach_to_child_run(tmp_path: Path) -> None:
 
     assert parent() == 11
     child_runs = [f for f in plane._flows.values() if f.name == "child"]
-    child_tasks = [t for t in plane._tasks.values() if t.flow_run_id == child_runs[0].run_id]
-    parent_tasks = [t for t in plane._tasks.values() if t.task_name == "inc" and t.flow_run_id != child_runs[0].run_id]
+    child_tasks = [
+        t for t in plane._tasks.values() if t.flow_run_id == child_runs[0].run_id
+    ]
+    parent_tasks = [
+        t
+        for t in plane._tasks.values()
+        if t.task_name == "inc" and t.flow_run_id != child_runs[0].run_id
+    ]
     assert len(child_tasks) == 1
     assert child_tasks[0].task_name == "inc"
     assert len(parent_tasks) == 0

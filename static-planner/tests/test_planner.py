@@ -39,12 +39,19 @@ def wide_flow(n: int) -> int:
 
     assert diagnostics.fallback_required is False
     assert len(manifest["nodes"]) == 2
-    assert any(n["task_name"] == "inc" and n["op_type"] == "submit" for n in manifest["nodes"])
-    assert any(n["task_name"] == "dbl" and n["op_type"] == "map" for n in manifest["nodes"])
+    assert any(
+        n["task_name"] == "inc" and n["op_type"] == "submit" for n in manifest["nodes"]
+    )
+    assert any(
+        n["task_name"] == "dbl" and n["op_type"] == "map" for n in manifest["nodes"]
+    )
     map_node = next(n for n in manifest["nodes"] if n["op_type"] == "map")
     inc_node = next(n for n in manifest["nodes"] if n["task_name"] == "inc")
     assert inc_node["node_id"] in map_node["deps"]
-    assert any(e["from"] == inc_node["node_id"] and e["to"] == map_node["node_id"] for e in manifest["edges"])
+    assert any(
+        e["from"] == inc_node["node_id"] and e["to"] == map_node["node_id"]
+        for e in manifest["edges"]
+    )
 
 
 def test_compile_wait_for_dependency():

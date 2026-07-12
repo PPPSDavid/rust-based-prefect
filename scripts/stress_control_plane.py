@@ -14,8 +14,12 @@ def run_stress(total_runs: int = 1000) -> dict:
 
     for i in range(total_runs):
         flow = plane.create_flow_run(f"load-{i}")
-        plane.set_flow_state(flow.run_id, RunState.PENDING, uuid4(), "propose", expected_version=0)
-        plane.set_flow_state(flow.run_id, RunState.RUNNING, uuid4(), "start", expected_version=1)
+        plane.set_flow_state(
+            flow.run_id, RunState.PENDING, uuid4(), "propose", expected_version=0
+        )
+        plane.set_flow_state(
+            flow.run_id, RunState.RUNNING, uuid4(), "start", expected_version=1
+        )
         plane.set_flow_state(
             flow.run_id, RunState.COMPLETED, uuid4(), "complete", expected_version=2
         )

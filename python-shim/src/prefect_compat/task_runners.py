@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Any, Callable, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
+from collections.abc import Callable
 
 
 @runtime_checkable
@@ -18,8 +19,7 @@ class MapTaskRunner(Protocol):
         wait_for: list[Any] | None,
         wait_fn: Callable[..., Any],
         submit_fn: Callable[[Any], Any],
-    ) -> list[Any]:
-        ...
+    ) -> list[Any]: ...
 
 
 @dataclass

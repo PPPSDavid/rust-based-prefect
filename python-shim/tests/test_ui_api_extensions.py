@@ -74,7 +74,9 @@ def test_retry_flow_run_from_deployment(tmp_path: Path) -> None:
     client = TestClient(app)
     deployments = client.get("/api/deployments?limit=1").json()["items"]
     dep_id = deployments[0]["id"]
-    triggered = client.post(f"/api/deployments/{dep_id}/run", json={"parameters": {"n": 2}})
+    triggered = client.post(
+        f"/api/deployments/{dep_id}/run", json={"parameters": {"n": 2}}
+    )
     assert triggered.status_code == 200
     dep_run = triggered.json()
     flow_run = control_plane.create_flow_run("mapped_flow")
@@ -93,7 +95,9 @@ def test_work_pools_and_workers_endpoints(tmp_path: Path) -> None:
     pools = client.get("/api/work-pools")
     assert pools.status_code == 200
     assert any(p["id"] == "default-process-pool" for p in pools.json()["items"])
-    created = client.post("/api/work-pools", json={"name": "test-pool", "type": "process"})
+    created = client.post(
+        "/api/work-pools", json={"name": "test-pool", "type": "process"}
+    )
     assert created.status_code == 200
     pool_id = created.json()["id"]
     heartbeat = client.post(

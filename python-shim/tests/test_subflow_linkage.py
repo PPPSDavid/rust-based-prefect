@@ -37,8 +37,12 @@ def test_create_linked_flow_run_inline(tmp_path: Path) -> None:
 def test_nested_flow_run_depth_and_root(tmp_path: Path) -> None:
     plane = _plane(tmp_path)
     root = plane.create_flow_run("root")
-    mid = plane.create_flow_run("mid", parent_flow_run_id=root.run_id, execution_mode="inline")
-    leaf = plane.create_flow_run("leaf", parent_flow_run_id=mid.run_id, execution_mode="deployment")
+    mid = plane.create_flow_run(
+        "mid", parent_flow_run_id=root.run_id, execution_mode="inline"
+    )
+    leaf = plane.create_flow_run(
+        "leaf", parent_flow_run_id=mid.run_id, execution_mode="deployment"
+    )
     assert leaf.depth == 2
     assert leaf.root_flow_run_id == root.run_id
     assert mid.depth == 1
@@ -79,7 +83,9 @@ def test_subflow_task_run_kind_and_child_refs(tmp_path: Path) -> None:
 def test_trigger_deployment_run_parent_linkage(tmp_path: Path) -> None:
     plane = _plane(tmp_path)
     parent_flow = plane.create_flow_run("parent")
-    parent_task = plane.create_task_run(parent_flow.run_id, "launch_child", kind="subflow")
+    parent_task = plane.create_task_run(
+        parent_flow.run_id, "launch_child", kind="subflow"
+    )
     dep = plane.create_deployment(
         name="child-deploy",
         flow_name="child_flow",

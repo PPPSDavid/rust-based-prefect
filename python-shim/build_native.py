@@ -69,7 +69,9 @@ def maybe_build_and_stage_native_library() -> None:
     )
     built = _release_artifact_path()
     if built is None or not built.is_file():
-        raise RuntimeError(f"ironflow: cargo build finished but artifact missing: {built}")
+        raise RuntimeError(
+            f"ironflow: cargo build finished but artifact missing: {built}"
+        )
 
     _NATIVE_DEST.mkdir(parents=True, exist_ok=True)
     dest = _NATIVE_DEST / name

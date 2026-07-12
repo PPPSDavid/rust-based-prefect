@@ -16,7 +16,9 @@ class CompileDiagnostics:
 
 def _flow_statements(tree: ast.Module, flow_name: str) -> list[ast.stmt]:
     """Return statements to analyze: a single @flow body, a named function, or module-level code."""
-    func_defs = [n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+    func_defs = [
+        n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+    ]
     if len(func_defs) == 1:
         return func_defs[0].body
     for func in func_defs:
@@ -66,7 +68,11 @@ def compile_flow_source(
         nonlocal fallback_required
         if isinstance(stmt, ast.Assign):
             call = _locate_task_call(stmt.value)
-            if call is not None and len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name):
+            if (
+                call is not None
+                and len(stmt.targets) == 1
+                and isinstance(stmt.targets[0], ast.Name)
+            ):
                 var_name = stmt.targets[0].id
                 maybe = _extract_task_call(call, bound_nodes)
                 if maybe is not None:
@@ -107,7 +113,9 @@ def compile_flow_source(
         visit_stmt(stmt)
 
     graph = GraphIR(flow_name=flow_name, nodes=nodes)
-    return graph, CompileDiagnostics(warnings=warnings, fallback_required=fallback_required)
+    return graph, CompileDiagnostics(
+        warnings=warnings, fallback_required=fallback_required
+    )
 
 
 def compile_and_forecast(
@@ -138,7 +146,9 @@ def _deployment_ref_name(call: ast.Call) -> str | None:
     return None
 
 
-def _extract_task_call(call: ast.Call, bound_nodes: dict[str, str]) -> dict[str, Any] | None:
+def _extract_task_call(
+    call: ast.Call, bound_nodes: dict[str, str]
+) -> dict[str, Any] | None:
     if not isinstance(call.func, ast.Attribute):
         return None
     attr = call.func.attr
@@ -193,7 +203,11 @@ def _bounded_range(node: ast.AST) -> int | None:
         return None
     if not isinstance(node.func, ast.Name) or node.func.id != "range":
         return None
-    if len(node.args) == 1 and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, int):
+    if (
+        len(node.args) == 1
+        and isinstance(node.args[0], ast.Constant)
+        and isinstance(node.args[0].value, int)
+    ):
         value = node.args[0].value
         return value if value >= 0 else None
     return None

@@ -85,7 +85,9 @@ def _conda_env_exists(conda: str, env_name: str) -> bool:
         return False
     envs = data.get("envs") or []
     needle = os.sep + env_name
-    return any(str(p).rstrip("\\/").endswith(needle) or str(p).endswith(env_name) for p in envs)
+    return any(
+        str(p).rstrip("\\/").endswith(needle) or str(p).endswith(env_name) for p in envs
+    )
 
 
 def _should_use_conda() -> tuple[bool, str | None, str]:
@@ -102,7 +104,9 @@ def _should_use_conda() -> tuple[bool, str | None, str]:
         return False, None, env_name
     conda = _find_conda()
     if not conda:
-        sys.stderr.write("CRG_MCP_USE_CONDA=1 but conda was not found; using module serve.\n")
+        sys.stderr.write(
+            "CRG_MCP_USE_CONDA=1 but conda was not found; using module serve.\n"
+        )
         return False, None, env_name
     if not _conda_env_exists(conda, env_name):
         sys.stderr.write(

@@ -82,7 +82,9 @@ def test_all_subflow_profiles_run() -> None:
     for profile in _SUBFLOW_PROFILES:
         recipe = WorkloadRecipe(
             name=f"unit_{profile}",
-            flow_count=5 if profile == "fire_forget_burst" else (3 if profile == "deploy_wait_chain" else 2),
+            flow_count=5
+            if profile == "fire_forget_burst"
+            else (3 if profile == "deploy_wait_chain" else 2),
             tasks_per_flow=2 if profile == "query_dag_nested" else 1,
             task_events_per_task=1,
             read_ratio=0.0,

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Callable, Literal, Sequence
+from typing import Any, Literal
+from collections.abc import Callable, Sequence
 from uuid import UUID
 
 from .runtime import RunState

@@ -16,7 +16,7 @@ def _resolve_flow_fn(flow: Callable[..., Any]) -> Callable[..., Any]:
 
 def _entrypoint_from_flow(flow: Callable[..., Any]) -> str:
     fn = _resolve_flow_fn(flow)
-    return f"{fn.__module__}:{fn.__name__}"
+    return f"{fn.__module__}:{getattr(fn, '__name__', '<flow>')}"
 
 
 def deploy(
@@ -80,7 +80,7 @@ def serve(
     run_pull_steps(pull_steps or [])
 
     fn = _resolve_flow_fn(flow)
-    flow_registry = {fn.__name__: flow}
+    flow_registry = {getattr(fn, "__name__", "<flow>"): flow}
 
     from ..server import control_plane
 

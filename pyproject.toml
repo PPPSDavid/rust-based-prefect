@@ -1,0 +1,59 @@
+[project]
+name = "ironflow"
+version = "0.0.0"
+description = "IronFlow monorepo tooling configuration (ruff, ty)."
+requires-python = ">=3.11"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+extend-exclude = [
+    "frontend",
+    "rust-engine",
+    "data",
+    "node_modules",
+]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "UP"]
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+# Setuptools path bootstrap before local imports.
+"python-shim/setup.py" = ["E402"]
+# Intentional sys.path bootstrap before prefect_compat import.
+"benchmarks/perf_matrix.py" = ["E402"]
+
+[tool.ty.environment]
+extra-paths = ["python-shim/src", "static-planner/src"]
+python-version = "3.11"
+
+[tool.ty.rules]
+deprecated = "ignore"
+unused-ignore-comment = "error"
+unused-type-ignore-comment = "error"
+
+[tool.ty.analysis]
+# Optional deps not installed in the default CI Python environment.
+allowed-unresolved-imports = [
+    "code_review_graph.**",
+    "mcp.**",
+    "mkdocs_gen_files",
+    "prefect",
+    "sentence_transformers.**",
+    "torch",
+]
+
+[tool.ty.src]
+include = [
+    "benchmarks",
+    "docs/gen_llms.py",
+    "python-shim",
+    "scripts",
+    "static-planner",
+    "tools",
+]
+exclude = [
+    "python-shim/setup.py",
+    "python-shim/build_native.py",
+]

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Generic, Sequence, TypeVar
+from typing import Any, Generic, TypeVar, cast
+from collections.abc import Sequence
 from uuid import UUID
 
 from .decorators import (
@@ -12,7 +13,6 @@ from .decorators import (
     TaskFuture,
     wait,
 )
-from .runtime import RunState
 
 T = TypeVar("T")
 _UNSET = object()
@@ -34,7 +34,7 @@ class SubflowFuture(Generic[T]):
 
     def result(self) -> T:
         if self._value is not _UNSET:
-            return self._value  # type: ignore[return-value]
+            return cast(T, self._value)
 
         dep_token = _ACTIVE_DEPLOYMENT_RUN.set(None)
         try:
@@ -55,10 +55,15 @@ class SubflowFuture(Generic[T]):
                 self._value = _control_plane().get_flow_result(UUID(str(flow_run_id)))
             else:
                 self._value = None
-            return self._value  # type: ignore[return-value]
+            return cast(T, self._value)
         if status == "CANCELLED":
-            raise RuntimeError(f"subflow deployment run {self.deployment_run_id} was cancelled")
-        err = terminal.get("error") or f"subflow deployment run {self.deployment_run_id} failed"
+            raise RuntimeError(
+                f"subflow deployment run {self.deployment_run_id} was cancelled"
+            )
+        err = (
+            terminal.get("error")
+            or f"subflow deployment run {self.deployment_run_id} failed"
+        )
         raise RuntimeError(str(err))
 
 
@@ -73,7 +78,7 @@ class DeploymentSubflowHandle:
     def submit(
         self,
         *,
-        wait_for: Sequence[TaskFuture[Any] | "SubflowFuture[Any]"] | None = None,
+        wait_for: Sequence[TaskFuture[Any] | SubflowFuture[Any]] | None = None,
         **parameters: Any,
     ) -> SubflowFuture[Any]:
         if wait_for:
@@ -95,7 +100,9 @@ class DeploymentSubflowHandle:
             planned_node_id=planned_node_id,
             kind="subflow",
         )
-        plane.record_task_event(task_run.task_run_id, "task_pending", {"subflow": self.name})
+        plane.record_task_event(
+            task_run.task_run_id, "task_pending", {"subflow": self.name}
+        )
 
         parent_dep_run_id = _ACTIVE_DEPLOYMENT_RUN.get()
         dep_run = plane.trigger_deployment_run(

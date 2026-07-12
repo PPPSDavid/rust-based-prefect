@@ -41,7 +41,9 @@ def check_branch() -> list[str]:
     )
     branch = (proc.stdout or "").strip()
     if branch in ("main", "master"):
-        issues.append(f"on protected branch '{branch}' — create cursor/<desc>-SUFFIX first")
+        issues.append(
+            f"on protected branch '{branch}' — create cursor/<desc>-SUFFIX first"
+        )
         _fail(f"branch={branch}")
     else:
         _ok(f"branch={branch}")
@@ -66,7 +68,9 @@ def check_mcp_config() -> list[str]:
     args = server.get("args") or []
     blob = " ".join([command, *map(str, args)])
     if "powershell" in blob.lower() and "crg_mcp_serve.py" not in blob:
-        issues.append("mcp.json still Windows PowerShell-only; use tools/dev/crg_mcp_serve.py")
+        issues.append(
+            "mcp.json still Windows PowerShell-only; use tools/dev/crg_mcp_serve.py"
+        )
         _fail("mcp.json not cross-platform")
     elif "crg_mcp_serve.py" in blob or "code_review_graph" in blob:
         _ok("mcp.json points at portable CRG launcher")
@@ -104,7 +108,14 @@ def check_crg(strict: bool) -> list[str]:
 def check_perf_artifacts_dirty() -> list[str]:
     issues: list[str] = []
     proc = subprocess.run(
-        ["git", "status", "--porcelain", "--", "docs/perf_matrix_results.json", "docs/perf_matrix_summary.md"],
+        [
+            "git",
+            "status",
+            "--porcelain",
+            "--",
+            "docs/perf_matrix_results.json",
+            "docs/perf_matrix_summary.md",
+        ],
         cwd=ROOT,
         capture_output=True,
         text=True,

@@ -1,4 +1,5 @@
 """One-off profiler for ironflow inproc hot paths (plan: profile-hot-path)."""
+
 from __future__ import annotations
 
 import cProfile
@@ -18,20 +19,26 @@ def main() -> None:
     from prefect_compat import InMemoryControlPlane, flow, set_control_plane, task, wait
     from prefect_compat.task_runners import ThreadPoolTaskRunner
 
+    from benchmarks._task_cast import as_task_wrapper
+
     plane = InMemoryControlPlane()
     set_control_plane(plane)
 
     @task
-    def inc(x: int) -> int:
+    def _inc(x: int) -> int:
         return x + 1
 
     @task
-    def dbl(x: int) -> int:
+    def _dbl(x: int) -> int:
         return x * 2
 
     @task
-    def passthrough(x: int) -> int:
+    def _passthrough(x: int) -> int:
         return x
+
+    inc = as_task_wrapper(_inc)
+    dbl = as_task_wrapper(_dbl)
+    passthrough = as_task_wrapper(_passthrough)
 
     @flow(task_runner=ThreadPoolTaskRunner())
     def wide(n: int) -> int:

@@ -8,10 +8,9 @@ from uuid import UUID
 
 import pytest
 
-from prefect_compat import InMemoryControlPlane, flow, set_control_plane, task, wait
-from prefect_compat.decorators import _ACTIVE_FLOW_RUN
+from prefect_compat import InMemoryControlPlane, flow, set_control_plane, task
 from prefect_compat.runtime import RunState
-from prefect_compat.subflows import SubflowFuture, deployment_ref
+from prefect_compat.subflows import deployment_ref
 from prefect_compat.worker import run_local_deployment_once, run_worker_loop
 
 
@@ -19,7 +18,9 @@ def _plane(tmp_path: Path) -> InMemoryControlPlane:
     return InMemoryControlPlane(history_path=str(tmp_path / "subflow-p1.jsonl"))
 
 
-def _start_worker(plane: InMemoryControlPlane, registry: dict, pool_id: str = "default-process-pool"):
+def _start_worker(
+    plane: InMemoryControlPlane, registry: dict, pool_id: str = "default-process-pool"
+):
     stop = threading.Event()
     thread = threading.Thread(
         target=run_worker_loop,

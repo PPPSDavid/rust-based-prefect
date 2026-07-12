@@ -19,7 +19,9 @@ def _plane(tmp_path: Path) -> InMemoryControlPlane:
     return InMemoryControlPlane(history_path=str(tmp_path / "subflow-cancel.jsonl"))
 
 
-def _start_worker(plane: InMemoryControlPlane, registry: dict) -> tuple[threading.Event, threading.Thread]:
+def _start_worker(
+    plane: InMemoryControlPlane, registry: dict
+) -> tuple[threading.Event, threading.Thread]:
     stop = threading.Event()
     thread = threading.Thread(
         target=run_worker_loop,
@@ -89,7 +91,7 @@ def test_cancel_parent_cancels_running_deployment_subflow(tmp_path: Path) -> Non
     set_control_plane(plane)
     registry: dict = {}
     dep_run_id: list[str] = []
-    parent_run_id: list[UUID] = []
+    parent_run_id: list[UUID | None] = []
 
     @flow
     def child_flow() -> None:
@@ -117,7 +119,7 @@ def test_cancel_parent_cancels_running_deployment_subflow(tmp_path: Path) -> Non
 
     def cancel_parent() -> None:
         time.sleep(0.2)
-        if parent_run_id:
+        if parent_run_id and parent_run_id[0] is not None:
             plane.cancel_flow_run(parent_run_id[0])
 
     threading.Thread(target=cancel_parent, daemon=True).start()
@@ -136,7 +138,7 @@ def test_cancel_parent_cancels_running_deployment_subflow(tmp_path: Path) -> Non
 def test_cancel_nested_inline_grandchild(tmp_path: Path) -> None:
     plane = _plane(tmp_path)
     set_control_plane(plane)
-    parent_id: list[UUID] = []
+    parent_id: list[UUID | None] = []
 
     @flow
     def leaf() -> None:
@@ -155,7 +157,7 @@ def test_cancel_nested_inline_grandchild(tmp_path: Path) -> None:
 
     def cancel_root() -> None:
         time.sleep(0.15)
-        if parent_id:
+        if parent_id and parent_id[0] is not None:
             plane.cancel_flow_run(parent_id[0])
 
     threading.Thread(target=cancel_root, daemon=True).start()
@@ -173,7 +175,7 @@ def test_cancel_mirrors_surrogate_subflow_task(tmp_path: Path) -> None:
     set_control_plane(plane)
     registry: dict = {}
     task_id: list[str] = []
-    parent_id: list[UUID] = []
+    parent_id: list[UUID | None] = []
 
     @flow
     def child_flow() -> int:
@@ -202,7 +204,7 @@ def test_cancel_mirrors_surrogate_subflow_task(tmp_path: Path) -> None:
 
     def cancel_parent() -> None:
         time.sleep(0.2)
-        if parent_id:
+        if parent_id and parent_id[0] is not None:
             plane.cancel_flow_run(parent_id[0])
 
     threading.Thread(target=cancel_parent, daemon=True).start()
