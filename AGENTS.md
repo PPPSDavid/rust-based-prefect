@@ -275,10 +275,10 @@ Non-obvious caveats for this environment:
   modules, e.g. `python3 -m pytest`, `python3 -m uvicorn`,
   `python3 -m code_review_graph status`.
 - **code-review-graph on Cloud:** use the core package only (see
-  `requirements-agent.txt`). Do **not** require `code-review-graph[embeddings]` /
-  the Windows conda env `sts2-context-coach` here — structural graph tools work
-  without embeddings. Optional GPU embeddings remain a Windows desktop path
-  (`tools/dev/README.md`, `CRG_MCP_USE_CONDA=1`).
+  `requirements-agent.txt`). Do **not** require `code-review-graph[embeddings]`
+  here — structural graph tools work without embeddings. Optional GPU/local
+  embeddings remain a desktop opt-in (`tools/dev/README.md`, `CRG_MCP_USE_CONDA=1`
+  + `CRG_MCP_CONDA_ENV`).
 - **Vite dev server binds to IPv6 `localhost` (`::1`) only.** Open the UI at `http://localhost:4173`,
   **not** `http://127.0.0.1:4173` (the latter refuses the connection). The backend API is at
   `http://127.0.0.1:8000` and the frontend hardcodes that origin (`frontend/src/api.ts`); backend CORS

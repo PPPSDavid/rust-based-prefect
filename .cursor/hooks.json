@@ -1,12 +1,6 @@
 {
   "version": 1,
   "hooks": {
-    "afterFileEdit": [
-      {
-        "command": ".cursor/hooks/crg-after-edit.sh",
-        "timeout": 15
-      }
-    ],
     "sessionStart": [
       {
         "command": ".cursor/hooks/crg-session-start.sh",

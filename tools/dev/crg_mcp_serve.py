@@ -7,8 +7,8 @@ env exists, launch via ``conda run`` so GPU + ``[embeddings]`` still work
 (see ``crg_mcp_serve.ps1`` for the historical PowerShell path).
 
 Env knobs:
-  CRG_MCP_CONDA_ENV       Conda env name (default: sts2-context-coach)
-  CRG_MCP_USE_CONDA       Force conda path when set to 1
+  CRG_MCP_USE_CONDA=1     Opt into conda launch (Windows desktop embeddings)
+  CRG_MCP_CONDA_ENV       Required when USE_CONDA=1 (no silent personal default)
   CRG_APPLY_ST_CACHE_PATCH  Apply optional SentenceTransformer cache patch
   CRG_EMBEDDING_MODEL     Passed through when using embeddings
 """
@@ -89,22 +89,30 @@ def _conda_env_exists(conda: str, env_name: str) -> bool:
 
 
 def _should_use_conda() -> tuple[bool, str | None, str]:
-    env_name = (os.environ.get("CRG_MCP_CONDA_ENV") or "sts2-context-coach").strip()
+    """Conda path is opt-in only — never invent a personal env name."""
     force = os.environ.get("CRG_MCP_USE_CONDA", "").strip() == "1"
-    if os.name != "nt" and not force:
+    env_name = (os.environ.get("CRG_MCP_CONDA_ENV") or "").strip()
+    if not force:
+        return False, None, env_name
+    if not env_name:
+        sys.stderr.write(
+            "CRG_MCP_USE_CONDA=1 requires CRG_MCP_CONDA_ENV=<conda-env-name>\n"
+            "Falling back to python -m code_review_graph serve.\n"
+        )
         return False, None, env_name
     conda = _find_conda()
     if not conda:
+        sys.stderr.write("CRG_MCP_USE_CONDA=1 but conda was not found; using module serve.\n")
         return False, None, env_name
-    if force or _conda_env_exists(conda, env_name):
-        return True, conda, env_name
-    return False, conda, env_name
+    if not _conda_env_exists(conda, env_name):
+        sys.stderr.write(
+            f"CRG_MCP_USE_CONDA=1 but conda env {env_name!r} was not found; using module serve.\n"
+        )
+        return False, conda, env_name
+    return True, conda, env_name
 
 
 def _exec_conda_serve(conda: str, env_name: str) -> int:
-    # Preserve prior Windows MCP env defaults when using the conda path.
-    os.environ.setdefault("CRG_EMBEDDING_MODEL", "Qwen/Qwen3-Embedding-0.6B")
-    os.environ.setdefault("CRG_APPLY_ST_CACHE_PATCH", "1")
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
     cmd = [
         conda,

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Cursor afterFileEdit: incremental graph refresh (best-effort, never block edits).
+# Cursor afterFileEdit (OPTIONAL — not wired in .cursor/hooks.json by default).
+# Per-edit graph refresh is noisy; enable locally only if you want live updates.
 set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT" || exit 0

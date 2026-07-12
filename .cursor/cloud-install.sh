@@ -21,10 +21,19 @@ npm --prefix frontend ci
 echo "[cloud-install] Rust engine ..."
 cargo build --manifest-path rust-engine/Cargo.toml
 
-echo "[cloud-install] code-review-graph (install + build + verify) ..."
+echo "[cloud-install] code-review-graph (install + build) ..."
 # Ensure ~/.local/bin is visible for console scripts during this script.
 export PATH="${HOME}/.local/bin:${PATH}"
+# Soft-fail verify: a CRG MCP regression must not brick the whole Cloud boot
+# (agents still need pytest/cargo/frontend). Setup still builds the graph.
+export CRG_SKIP_VERIFY="${CRG_SKIP_VERIFY:-1}"
 bash scripts/setup_code_review_graph.sh
+if [[ "${CRG_SKIP_VERIFY}" == "1" ]]; then
+  echo "[cloud-install] Running CRG MCP verify (non-blocking) ..."
+  if ! python3 scripts/verify_code_review_graph.py; then
+    echo "[cloud-install] WARN: CRG verify failed — graph/MCP may be unhealthy; app deps are still installed." >&2
+  fi
+fi
 
 # Help agents that invoke `python` (docs often say python, Cloud may only have python3).
 if ! command -v python >/dev/null 2>&1; then

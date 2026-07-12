@@ -16,7 +16,7 @@ Append when a significant architecture / compatibility / perf choice is made
 ## Entries
 
 ### 2026-07-12 — Cloud CRG without embeddings by default
-- Context: Agents need a reliable knowledge graph on Cursor Cloud; Windows desktop used conda + Qwen embeddings.
+- Context: Agents need a reliable knowledge graph on Cursor Cloud; some desktop setups use conda + local embedding models.
 - Decision: Core `code-review-graph` on Cloud (`requirements-agent.txt`); embeddings optional. Structural MCP tools are the primary value; NL search quality is a separate opt-in.
 - Alternatives rejected: Always install `[embeddings]` (torch weight, slow boot); require conda on Cloud.
-- Consequences: `embeddings_count=0` is expected; document NL-search gaps; Windows keeps `CRG_MCP_USE_CONDA=1`.
+- Consequences: `embeddings_count=0` is expected; document NL-search gaps; desktop embeddings via explicit `CRG_MCP_USE_CONDA` + `CRG_MCP_CONDA_ENV`.

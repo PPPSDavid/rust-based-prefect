@@ -13,4 +13,4 @@ Helpers for Cursor / cloud agents working in this repo. Process contract remains
 | [../../tools/dev/README.md](../../tools/dev/README.md) | code-review-graph install / MCP |
 
 Project skills live under `.cursor/skills/` (compat, perf-gate, crg-setup, rust-hotpath).
-Repo hooks: `.cursor/hooks.json` (CRG refresh / session status / commit reminder).
+Repo hooks: `.cursor/hooks.json` (session graph status + commit reminder; no per-edit hook by default).

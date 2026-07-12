@@ -45,8 +45,9 @@ python3 -m code_review_graph build
 # default local model: all-MiniLM-L6-v2 (override with CRG_EMBEDDING_MODEL)
 ```
 
-Windows desktop already had a richer path (`Qwen/Qwen3-Embedding-0.6B` via
-conda); keep that with `CRG_MCP_USE_CONDA=1` if you want GPU embeddings there.
+Windows desktop already supported a richer path (conda + local embedding model);
+keep that with `CRG_MCP_USE_CONDA=1` and an explicit `CRG_MCP_CONDA_ENV` if you
+want GPU embeddings there.
 
 Verify with real stdio MCP tool calls (not just `status`):
 
@@ -68,22 +69,27 @@ dashboard environment per Cursor’s resolution order.
 After changing `.cursor/mcp.json` or `environment.json`, start a **new** agent
 session so Cursor reloads MCP / picks up install.
 
-## Windows desktop (optional embeddings)
+Windows desktop (optional embeddings)
 
-Historical path: `crg_mcp_serve.ps1` + conda env `sts2-context-coach` with
-`code-review-graph[embeddings]`.
-
-To keep that behavior with the new launcher, set in user MCP env or shell:
+Use the legacy PowerShell launcher or set explicit env vars (no repo-default
+conda env name — set your own):
 
 ```text
 CRG_MCP_USE_CONDA=1
-CRG_MCP_CONDA_ENV=sts2-context-coach
-CRG_APPLY_ST_CACHE_PATCH=1
-CRG_EMBEDDING_MODEL=Qwen/Qwen3-Embedding-0.6B
+CRG_MCP_CONDA_ENV=<your-env-with-code-review-graph[embeddings]>
+CRG_APPLY_ST_CACHE_PATCH=1   # optional
+CRG_EMBEDDING_MODEL=<model>  # optional; provider default otherwise
 ```
 
-Or point Cursor MCP `command` at `powershell.exe` + `crg_mcp_serve.ps1` as before.
+Or point Cursor MCP `command` at `powershell.exe` + `crg_mcp_serve.ps1` (requires
+`CRG_MCP_CONDA_ENV`).
 
+## Hooks
+
+Committed `.cursor/hooks.json` only runs **sessionStart** (graph status) and a
+**git commit** reminder for dirty `perf_matrix` docs. Per-edit graph refresh is
+intentionally **not** enabled by default (too noisy). Optional script:
+`.cursor/hooks/crg-after-edit.sh` — wire it locally if you want.
 ## Files
 
 | File | Role |
