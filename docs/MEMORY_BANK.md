@@ -1,46 +1,55 @@
 # Memory Bank
 
-This file is a compact context handoff for future sessions.
+Compact context handoff for future sessions. Process/validation contract: root `AGENTS.md`.
+Last updated: 2026-07-12.
 
 ## Project Snapshot
 
 - Name: Project IronFlow (`rust-based-prefect`)
-- Goal: Build a Prefect-compatible orchestration prototype with better determinism, performance, and static planning support.
-- Status: MVP scaffold complete; deployments (schedules, CLI/YAML Tier 1); **subflows M1+M2** on `main` (#34/#36) with user guide at `docs/how-to/subflows.md`.
+- Goal: Prefect-compatible orchestration with stronger determinism, performance, and static planning.
+- Status: Hybrid MVP in active use — deployments (schedules, CLI/YAML Tier 1); **subflows M1+M2** on `main` (#34/#36) with user guide at `docs/how-to/subflows.md`; transition hooks; agent tooling under `.cursor/` + `docs/agent/`.
 
 ## Core Architecture
 
 - `rust-engine/`: deterministic state-machine kernel and append-only event model.
-- `python-shim/`: Prefect-style ergonomics (`@flow`, `@task`, `submit`, `map`, `wait_for`, **`deployment_ref` / subflows**) with compatibility runtime.
+- `python-shim/`: Prefect-style ergonomics (`@flow`, `@task`, `submit`, `map`, `wait_for`, **`deployment_ref` / subflows**) with compatibility runtime + optional FastAPI server.
 - `static-planner/`: static graph IR + forecast for supported flow subset (`@flow` body, `submit`/`map`, repeated tasks, `@task(name=...)`, UI DAG logical/expanded).
-- `benchmarks/`: performance comparisons (`ironflow`, `ironflow_http`, `prefect` local).
+- `benchmarks/`: `perf_matrix.py` (control-plane matrix) and `compare_prefect_vs_ironflow.py` (A/B vs Prefect).
 
 ## Compatibility Baseline
 
-- Prefect target: `3.x`
-- Current scope: documented in `COMPATIBILITY.md`
-- Known boundary: not full Prefect parity; subset-first with mixed dynamic fallback.
+- Prefect target: `3.x` (subset-first). Source of truth: `COMPATIBILITY.md`.
+- Review loop before matrix changes: `docs/compatibility_review_workflow.md`.
+- Do not claim full Prefect parity without matrix + tests.
 
 ## Persistence Status
 
-- IronFlow uses dual local persistence in shim runtime:
+- Dual local persistence in shim runtime:
   - JSONL append history for durable event replay
   - SQLite read model for query/API/UI reads
-- History includes flow/task creation and lifecycle events; read model includes runs, logs, events, and artifacts.
-- Query hot paths can be Rust-backed through the optional Rust bridge.
+- Query / schedule / claim hot paths prefer Rust when the native bridge is loaded.
+
+## Agent tooling (code-review-graph)
+
+- Upstream: https://github.com/tirth8205/code-review-graph
+- Cloud/Linux default: `.cursor/environment.json` → `bash .cursor/cloud-install.sh` (includes CRG setup).
+- Manual: `bash scripts/setup_code_review_graph.sh` (core package, no embeddings) + `python3 scripts/verify_code_review_graph.py`.
+- MCP: `.cursor/mcp.json` → `python3 tools/dev/crg_mcp_serve.py` (tool ids use `*_tool` suffix).
+- Graph DB: `.code-review-graph/` (gitignored). Details: `tools/dev/README.md`.
 
 ## Performance Artifacts
 
 - Methodology: `docs/perf_methodology.md`
-- Latest output: `docs/perf_comparison.json`
-- Benchmark script: `benchmarks/compare_prefect_vs_ironflow.py`
+- Control-plane matrix: `python3 benchmarks/perf_matrix.py run --preset lite …` → `docs/perf_matrix_results.json`
+- Prefect A/B (different tool): `benchmarks/compare_prefect_vs_ironflow.py` → `docs/perf_comparison.json`
+- Do **not** pass `perf_comparison.json` to `perf_matrix.py compare`.
 
 ## Useful Commands
 
-- Python tests: `python -m pytest python-shim/tests static-planner/tests`
+- Python tests: `python3 -m pytest python-shim/tests static-planner/tests benchmarks/tests`
 - Rust tests: `cargo test --manifest-path rust-engine/Cargo.toml`
-- Compare performance: `python benchmarks/compare_prefect_vs_ironflow.py`
-- Generate forecast sample: `python scripts/run_forecast.py`
+- Perf gate: `python3 benchmarks/perf_matrix.py run --preset lite --repetitions 1 --warmups 0 --jobs 2`
+- CRG setup/verify: `bash scripts/setup_code_review_graph.sh`
 
 ## Run lifecycle: cancel / retry (current vs desired)
 
@@ -60,8 +69,9 @@ This file is a compact context handoff for future sessions.
 
 ## Next High-Value Work
 
-1. Move projection write hot paths from Python into Rust-backed implementation.
+1. Move remaining projection write hot paths from Python into Rust-backed implementation.
 2. Expand Prefect API compatibility matrix with concrete parity tests.
 3. Add migration/versioning path toward PostgreSQL for larger-scale persistence.
-4. Add CI gates and benchmark regression thresholds.
+4. Keep CI + `perf_matrix` regression thresholds healthy.
 5. **Task-level resume on flow-run retry** (skip recomputation of tasks that completed before cancel) — see section above.
+6. Optional: Cloud embeddings path if NL `semantic_search` becomes important; keep decision log current (`docs/agent/DECISION_LOG.md`).

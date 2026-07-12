@@ -1,4 +1,6 @@
 # Launches code-review-graph MCP via conda run (stdio preserved for Cursor).
+# Windows desktop / embeddings path. Prefer the cross-platform launcher on
+# Linux and Cursor Cloud: tools/dev/crg_mcp_serve.py (see tools/dev/README.md).
 # Mirrors sts2-context-coach: GPU PyTorch + code-review-graph[embeddings] live in that env.
 # Override env name: set user or process env CRG_MCP_CONDA_ENV (default sts2-context-coach).
 $ErrorActionPreference = 'Stop'

@@ -186,11 +186,18 @@ Apply this method to architecture trade-offs, compatibility choices, performance
 <!-- code-review-graph MCP tools -->
 ## MCP Tools: code-review-graph
 
-**IMPORTANT: This project has a knowledge graph. ALWAYS use the
-code-review-graph MCP tools BEFORE using Grep/Glob/Read to explore
-the codebase.** The graph is faster, cheaper (fewer tokens), and gives
-you structural context (callers, dependents, test coverage) that file
-scanning cannot.
+Upstream: [tirth8205/code-review-graph](https://github.com/tirth8205/code-review-graph).
+Repo wiring: `.cursor/mcp.json` → `tools/dev/crg_mcp_serve.py`; install/build via
+`bash scripts/setup_code_review_graph.sh` (see `tools/dev/README.md`).
+
+**IMPORTANT: When the code-review-graph MCP server is available, ALWAYS use its
+tools BEFORE Grep/Glob/Read to explore the codebase.** The graph is faster,
+cheaper (fewer tokens), and gives structural context (callers, dependents, test
+coverage) that file scanning cannot.
+
+If graph MCP tools are **missing** in this session (common when Cloud Update did
+not run the setup script, or MCP config changed mid-run), fall back to Grep/Glob
+and run `bash scripts/setup_code_review_graph.sh` so the **next** session loads MCP.
 
 ### When to use graph tools FIRST
 
@@ -217,37 +224,53 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 
 ### Workflow
 
-1. The graph auto-updates on file changes (via hooks).
+1. Ensure the graph exists (`code-review-graph status` or setup script above).
 2. Use `detect_changes` for code review.
 3. Use `get_affected_flows` to understand impact.
 4. Use `query_graph` pattern="tests_for" to check coverage.
 
 ## Cursor Cloud specific instructions
 
-The startup update script already refreshes all dependencies: it installs Python deps
-(`python3 -m pip install --break-system-packages -r requirements-ci.txt`, into the user
-site), runs `npm --prefix frontend ci`, and runs `cargo build --manifest-path rust-engine/Cargo.toml`
-so the native `libironflow_engine.so` is present. You should not need to reinstall anything
-to run tests or the app. Standard commands live in `README.md` (Quickstart) and **Expected Validation** above.
+The startup update script should refresh app dependencies **and** agent tooling:
+
+1. `python3 -m pip install --break-system-packages -r requirements-ci.txt` (user site)
+2. `npm --prefix frontend ci`
+3. `cargo build --manifest-path rust-engine/Cargo.toml` (native `libironflow_engine.so`)
+4. **`bash scripts/setup_code_review_graph.sh`** — installs `requirements-agent.txt`
+   (core `code-review-graph`, no torch embeddings) and builds/refreshes `.code-review-graph/`
+
+Add step 4 to the Cloud Environment **Install** and **Update** scripts in the
+[Cursor dashboard](https://cursor.com/dashboard/cloud-agents/environments) so every
+new session gets a working graph MCP. Changing `.cursor/mcp.json` only takes effect
+on a **new** agent session.
+
+After setup, you should not need to reinstall anything to run tests or the app.
+Standard commands live in `README.md` (Quickstart) and **Expected Validation** above.
 
 Non-obvious caveats for this environment:
 
-- **`python` maps to `python3`** via a `/usr/local/bin/python` symlink, and there is no conda.
-  Docs use `python`; either works. `pip` targets the system interpreter with `--break-system-packages`
-  (PEP 668), and console scripts land in `~/.local/bin` (not on `PATH`) — invoke tools as modules,
-  e.g. `python -m pytest`, `python -m uvicorn`, `python -m ruff`.
+- **Prefer `python3`** (and `python3 -m …`). Some images also ship a `python` symlink;
+  there is no conda on Cloud. `pip` targets the system interpreter with
+  `--break-system-packages` (PEP 668), and console scripts land in `~/.local/bin`
+  (not always on `PATH`) — invoke tools as modules, e.g. `python3 -m pytest`,
+  `python3 -m uvicorn`, `python3 -m code_review_graph status`.
+- **code-review-graph on Cloud:** use the core package only (see
+  `requirements-agent.txt`). Do **not** require `code-review-graph[embeddings]` /
+  the Windows conda env `sts2-context-coach` here — structural graph tools work
+  without embeddings. Optional GPU embeddings remain a Windows desktop path
+  (`tools/dev/README.md`, `CRG_MCP_USE_CONDA=1`).
 - **Vite dev server binds to IPv6 `localhost` (`::1`) only.** Open the UI at `http://localhost:4173`,
   **not** `http://127.0.0.1:4173` (the latter refuses the connection). The backend API is at
   `http://127.0.0.1:8000` and the frontend hardcodes that origin (`frontend/src/api.ts`); backend CORS
   only allows the `4173` origins, so run both together.
 - **Running the stack:** start the backend with
-  `python -m uvicorn python-shim.src.prefect_compat.server:app --host 127.0.0.1 --port 8000`
-  and the UI with `npm --prefix frontend run dev` (or both via `python scripts/ironflow_server.py start`).
-  Seed demo runs for the UI with `python scripts/ui_e2e_seed.py` (needs the backend up). The local
+  `python3 -m uvicorn python-shim.src.prefect_compat.server:app --host 127.0.0.1 --port 8000`
+  and the UI with `npm --prefix frontend run dev` (or both via `python3 scripts/ironflow_server.py start`).
+  Seed demo runs for the UI with `python3 scripts/ui_e2e_seed.py` (needs the backend up). The local
   worker + scheduler run as daemon threads inside the API process (toggle via `IRONFLOW_ENABLE_LOCAL_WORKER`
   / `IRONFLOW_ENABLE_SCHEDULER`).
 - **Lint is not a CI gate:** `ruff` is installed but the repo has no ruff config and CI never runs it, so
-  `python -m ruff check .` reports pre-existing default-rule style findings — do not treat those as failures
+  `python3 -m ruff check .` reports pre-existing default-rule style findings — do not treat those as failures
   or "fix" them as part of unrelated work.
 - **Persistence is local files** under `data/` (JSONL history + a stdlib-SQLite read model); there is no
   external database/broker to start. `data/` is git-ignored, but `benchmarks/perf_matrix.py run` overwrites
