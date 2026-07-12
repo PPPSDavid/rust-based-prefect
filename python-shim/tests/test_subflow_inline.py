@@ -198,8 +198,9 @@ def test_parent_cancel_propagates_to_inline_child(tmp_path: Path) -> None:
         deadline = time.monotonic() + 2.0
         while time.monotonic() < deadline:
             if parent_run_id and parent_run_id[0] is not None:
-                plane.cancel_flow_run(parent_run_id[0])
-                return
+                if any(f.name == "child" for f in plane._flows.values()):
+                    plane.cancel_flow_run(parent_run_id[0])
+                    return
             time.sleep(0.01)
 
     threading.Thread(target=cancel_soon, daemon=True).start()

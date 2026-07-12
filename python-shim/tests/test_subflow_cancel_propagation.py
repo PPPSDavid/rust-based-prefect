@@ -156,11 +156,14 @@ def test_cancel_nested_inline_grandchild(tmp_path: Path) -> None:
         mid()
 
     def cancel_root() -> None:
+        # Wait until the nested leaf run exists so cancel is not racing the
+        # initial PENDING→RUNNING transition (version conflict).
         deadline = time.monotonic() + 2.0
         while time.monotonic() < deadline:
             if parent_id and parent_id[0] is not None:
-                plane.cancel_flow_run(parent_id[0])
-                return
+                if any(f.name == "leaf" for f in plane._flows.values()):
+                    plane.cancel_flow_run(parent_id[0])
+                    return
             time.sleep(0.01)
 
     threading.Thread(target=cancel_root, daemon=True).start()
