@@ -67,7 +67,7 @@ class TaskFuture(Generic[T]):
         return self.value
 
 
-def wait(futures: Sequence["TaskFuture[Any] | SubflowFuture[Any] | GateFuture[Any]"]) -> list[Any]:
+def wait(futures: Sequence[TaskFuture[Any] | SubflowFuture[Any] | GateFuture[Any]]) -> list[Any]:
     return [future.result() for future in futures]
 
 
