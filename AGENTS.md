@@ -241,29 +241,39 @@ python3 scripts/verify_code_review_graph.py
 
 ## Cursor Cloud specific instructions
 
-The startup update script should refresh app dependencies **and** agent tooling:
+Cloud env resolution order (Cursor docs): **`.cursor/environment.json` in the
+repo** → personal dashboard environment → team environment.
 
-1. `python3 -m pip install --break-system-packages -r requirements-ci.txt` (user site)
+This repo commits `.cursor/environment.json` with:
+
+```json
+{ "install": "bash .cursor/cloud-install.sh" }
+```
+
+That **update/install** script (idempotent) runs on each new agent boot:
+
+1. `python3 -m pip install --user --break-system-packages -r requirements-ci.txt`
 2. `npm --prefix frontend ci`
-3. `cargo build --manifest-path rust-engine/Cargo.toml` (native `libironflow_engine.so`)
-4. **`bash scripts/setup_code_review_graph.sh`** — installs `requirements-agent.txt`
-   (core `code-review-graph`, no torch embeddings) and builds/refreshes `.code-review-graph/`
+3. `cargo build --manifest-path rust-engine/Cargo.toml`
+4. `bash scripts/setup_code_review_graph.sh` (installs CRG, builds `.code-review-graph/`, verifies MCP tool calls)
 
-Add step 4 to the Cloud Environment **Install** and **Update** scripts in the
-[Cursor dashboard](https://cursor.com/dashboard/cloud-agents/environments) so every
-new session gets a working graph MCP. Changing `.cursor/mcp.json` only takes effect
-on a **new** agent session.
+You do **not** need to hand-edit the Cloud dashboard Install/Update box for CRG
+once this file is on the branch the agent checks out (usually after merge to
+`main`). A personal dashboard environment created via “Set up agent” is separate
+and was how the original snapshot was made; repo `environment.json` overrides it
+when present.
 
 After setup, you should not need to reinstall anything to run tests or the app.
 Standard commands live in `README.md` (Quickstart) and **Expected Validation** above.
 
 Non-obvious caveats for this environment:
 
-- **Prefer `python3`** (and `python3 -m …`). Some images also ship a `python` symlink;
-  there is no conda on Cloud. `pip` targets the system interpreter with
-  `--break-system-packages` (PEP 668), and console scripts land in `~/.local/bin`
-  (not always on `PATH`) — invoke tools as modules, e.g. `python3 -m pytest`,
-  `python3 -m uvicorn`, `python3 -m code_review_graph status`.
+- **Prefer `python3`** (and `python3 -m …`). The cloud-install script tries to
+  symlink `python` → `python3` when missing. There is no conda on Cloud. `pip`
+  targets the system interpreter with `--break-system-packages` (PEP 668), and
+  console scripts land in `~/.local/bin` (not always on `PATH`) — invoke tools as
+  modules, e.g. `python3 -m pytest`, `python3 -m uvicorn`,
+  `python3 -m code_review_graph status`.
 - **code-review-graph on Cloud:** use the core package only (see
   `requirements-agent.txt`). Do **not** require `code-review-graph[embeddings]` /
   the Windows conda env `sts2-context-coach` here — structural graph tools work

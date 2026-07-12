@@ -22,13 +22,9 @@ Core package only (`requirements-agent.txt`). Do not install `[embeddings]` on C
 
 ## Make it every-session default
 
-Append to Cursor Cloud Environment **Install** and **Update**:
-
-```bash
-bash scripts/setup_code_review_graph.sh
-```
-
-MCP config changes require a **new** agent session.
+Repo `.cursor/environment.json` → `bash .cursor/cloud-install.sh` (includes this
+setup). That overrides personal dashboard env when present. Merge to the branch
+agents check out (`main`), then start a **new** session.
 
 ## If graph tools still missing mid-session
 

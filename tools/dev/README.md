@@ -60,18 +60,13 @@ without the optional `[embeddings]` extra. Setup runs verification by default
 
 ### Make it default every Cloud session
 
-In the Cursor Cloud Environment dashboard for this repo, append to **Install**
-and **Update** scripts:
+This repo commits `.cursor/environment.json` → `bash .cursor/cloud-install.sh`,
+which calls `scripts/setup_code_review_graph.sh` on every agent boot (after the
+branch checkout). That is the durable path — higher priority than a personal
+dashboard environment per Cursor’s resolution order.
 
-```bash
-bash scripts/setup_code_review_graph.sh
-```
-
-(alongside the existing `pip install -r requirements-ci.txt`, `npm ci`, and
-`cargo build` steps already described in `AGENTS.md`).
-
-After changing `.cursor/mcp.json`, start a **new** agent session so Cursor
-reloads MCP servers.
+After changing `.cursor/mcp.json` or `environment.json`, start a **new** agent
+session so Cursor reloads MCP / picks up install.
 
 ## Windows desktop (optional embeddings)
 
