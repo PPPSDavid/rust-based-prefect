@@ -82,4 +82,13 @@ fi
 
 echo "[crg-setup] Status:"
 "$PYTHON" -m code_review_graph status || true
+
+if [[ "${CRG_SKIP_VERIFY:-0}" != "1" ]]; then
+  echo "[crg-setup] Verifying MCP tool calls (set CRG_SKIP_VERIFY=1 to skip) ..."
+  if ! "$PYTHON" "$ROOT/scripts/verify_code_review_graph.py"; then
+    echo "[crg-setup] ERROR: graph/MCP verification failed — setup is NOT healthy." >&2
+    exit 2
+  fi
+fi
+
 echo "[crg-setup] Done. MCP entry: tools/dev/crg_mcp_serve.py (see .cursor/mcp.json)."

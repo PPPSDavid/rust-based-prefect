@@ -136,6 +136,16 @@ def main() -> int:
     issues.extend(check_crg(strict=args.strict_crg))
     issues.extend(check_perf_artifacts_dirty())
 
+    if args.verify_mcp:
+        print("--- MCP verify ---")
+        proc = subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "verify_code_review_graph.py")],
+            cwd=ROOT,
+            check=False,
+        )
+        if proc.returncode != 0:
+            issues.append("verify_code_review_graph.py failed")
+
     if issues:
         print("\nPreflight found issues:")
         for item in issues:

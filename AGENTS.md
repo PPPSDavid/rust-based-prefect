@@ -211,23 +211,33 @@ Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
 
 ### Key Tools
 
-| Tool | Use when |
+MCP tool ids in CRG 2.3.x use a `_tool` suffix. Calling the unsuffixed name
+(`detect_changes`) returns **Unknown tool** — that looks like a dead MCP setup.
+
+| MCP tool id | When to use |
 |------|----------|
-| `detect_changes` | Reviewing code changes — gives risk-scored analysis |
-| `get_review_context` | Need source snippets for review — token-efficient |
-| `get_impact_radius` | Understanding blast radius of a change |
-| `get_affected_flows` | Finding which execution paths are impacted |
-| `query_graph` | Tracing callers, callees, imports, tests, dependencies |
-| `semantic_search_nodes` | Finding functions/classes by name or keyword |
-| `get_architecture_overview` | Understanding high-level codebase structure |
+| `detect_changes_tool` | Reviewing code changes — risk-scored analysis |
+| `get_review_context_tool` | Need source snippets for review — token-efficient |
+| `get_impact_radius_tool` | Understanding blast radius of a change |
+| `get_affected_flows_tool` | Finding which execution paths are impacted |
+| `query_graph_tool` | Tracing callers, callees, imports, tests, dependencies |
+| `semantic_search_nodes_tool` | Finding functions/classes by name or keyword |
+| `get_architecture_overview_tool` | Understanding high-level codebase structure |
+| `list_graph_stats_tool` | Sanity-check graph is non-empty |
 | `refactor_tool` | Planning renames, finding dead code |
+
+Verify locally after setup (real stdio MCP calls, not just `status`):
+
+```bash
+python3 scripts/verify_code_review_graph.py
+```
 
 ### Workflow
 
-1. Ensure the graph exists (`code-review-graph status` or setup script above).
-2. Use `detect_changes` for code review.
-3. Use `get_affected_flows` to understand impact.
-4. Use `query_graph` pattern="tests_for" to check coverage.
+1. Ensure the graph exists (`python3 -m code_review_graph status` or setup script above).
+2. Use `detect_changes_tool` for code review.
+3. Use `get_affected_flows_tool` to understand impact.
+4. Use `query_graph_tool` with `pattern="tests_for"` to check coverage.
 
 ## Cursor Cloud specific instructions
 

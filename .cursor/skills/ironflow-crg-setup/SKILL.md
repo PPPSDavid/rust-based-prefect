@@ -11,12 +11,14 @@ Upstream: https://github.com/tirth8205/code-review-graph
 
 ```bash
 bash scripts/setup_code_review_graph.sh
-python3 -m code_review_graph status
+python3 scripts/verify_code_review_graph.py   # also run automatically by setup
 ```
 
 MCP entry is `.cursor/mcp.json` → `python3 ${workspaceFolder}/tools/dev/crg_mcp_serve.py`.
 
-Core package only (`requirements-agent.txt`). Do not install `[embeddings]` on Cloud unless explicitly requested (heavy torch).
+Core package only (`requirements-agent.txt`). Do not install `[embeddings]` on Cloud unless explicitly requested (heavy torch). Keyword/hybrid search still works with `embeddings_count=0`.
+
+**Tool ids:** use `detect_changes_tool`, `query_graph_tool`, … — not unsuffixed names.
 
 ## Make it every-session default
 

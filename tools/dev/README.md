@@ -18,8 +18,15 @@ python3 tools/dev/crg_mcp_serve.py
 
 configured in `.cursor/mcp.json`.
 
+Verify with real stdio MCP tool calls (not just `status`):
+
+```bash
+python3 scripts/verify_code_review_graph.py
+```
+
 Proven on Cursor Cloud: full graph build for this repo is typically under 2s
-without the optional `[embeddings]` extra.
+without the optional `[embeddings]` extra. Setup runs verification by default
+(`CRG_SKIP_VERIFY=1` to skip).
 
 ### Make it default every Cloud session
 

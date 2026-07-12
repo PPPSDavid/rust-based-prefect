@@ -1,6 +1,9 @@
 # Agent gotchas
 
 - **CRG MCP missing:** `.cursor/mcp.json` must use the Linux-friendly launcher (`tools/dev/crg_mcp_serve.py`). Old PowerShell-only config fails on Cloud. Run `bash scripts/setup_code_review_graph.sh`, then **new session**.
+- **CRG tool names:** MCP ids are `detect_changes_tool`, `query_graph_tool`, etc. Unsuffixed `detect_changes` is **Unknown tool**.
+- **False-healthy install:** `status` alone is not enough. Run `python3 scripts/verify_code_review_graph.py` (stdio MCP demo calls). Setup script runs this by default.
+- **Stale graph:** after large edits, `code-review-graph build` (or setup script) before trusting `detect_changes_tool` risk scores.
 - **Vite URL:** UI is `http://localhost:4173` (`::1`), not `127.0.0.1:4173`.
 - **perf_matrix artifacts:** `run` overwrites tracked `docs/perf_matrix_*.json/md` — revert unless intentional.
 - **Wrong compare input:** `docs/perf_comparison.json` is for the Prefect A/B script, not `perf_matrix.py compare`.
