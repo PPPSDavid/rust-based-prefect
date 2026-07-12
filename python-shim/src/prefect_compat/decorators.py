@@ -14,6 +14,7 @@ from collections.abc import Callable, Iterable, Sequence
 from uuid import UUID, uuid4
 
 if TYPE_CHECKING:
+    from .gates import GateFuture
     from .subflows import SubflowFuture
 
 from .hooks import (
@@ -66,7 +67,7 @@ class TaskFuture(Generic[T]):
         return self.value
 
 
-def wait(futures: Sequence[TaskFuture[Any] | SubflowFuture[Any]]) -> list[Any]:
+def wait(futures: Sequence["TaskFuture[Any] | SubflowFuture[Any] | GateFuture[Any]"]) -> list[Any]:
     return [future.result() for future in futures]
 
 
@@ -611,8 +612,11 @@ def _emit_task_single_hook_edge(
 def _resolve(value: Any) -> Any:
     if isinstance(value, TaskFuture):
         return value.result()
+    from .gates import GateFuture
     from .subflows import SubflowFuture
 
+    if isinstance(value, GateFuture):
+        return value.result()
     if isinstance(value, SubflowFuture):
         return value.result()
     return value

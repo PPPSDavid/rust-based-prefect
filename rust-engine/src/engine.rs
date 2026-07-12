@@ -10,6 +10,7 @@ pub enum RunState {
     Scheduled,
     Pending,
     Running,
+    Paused,
     Completed,
     Failed,
     Cancelled,
@@ -308,7 +309,11 @@ pub fn validate_transition(from: RunState, to: RunState) -> Result<(), EngineErr
             matches!(to, RunState::Pending | RunState::Cancelled)
         }
         RunState::Pending => matches!(to, RunState::Running | RunState::Cancelled),
-        RunState::Running => matches!(to, RunState::Completed | RunState::Failed | RunState::Cancelled),
+        RunState::Running => matches!(
+            to,
+            RunState::Completed | RunState::Failed | RunState::Cancelled | RunState::Paused
+        ),
+        RunState::Paused => matches!(to, RunState::Running | RunState::Cancelled),
         RunState::Completed | RunState::Failed | RunState::Cancelled => false,
     };
 

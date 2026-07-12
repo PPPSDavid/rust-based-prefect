@@ -159,6 +159,21 @@ def parent_deploy() -> int:
     assert manifest["nodes"][0]["op_type"] == "submit"
 
 
+def test_compile_gate_submit():
+    source = """
+prep = task_a.submit(1)
+g = gate(name="monthly")
+g.submit(after=None, wait_for=[prep])
+down = task_b.submit(prep, wait_for=[g])
+"""
+    graph, diagnostics = compile_flow_source(source, flow_name="gate_demo")
+    manifest = graph.as_manifest()
+    assert diagnostics.fallback_required is False
+    gate_nodes = [n for n in manifest["nodes"] if n.get("op_type") == "gate"]
+    assert len(gate_nodes) == 1
+    assert any(e["to"] == gate_nodes[0]["node_id"] for e in manifest["edges"])
+
+
 def test_conditional_falls_back():
     source = """
 if flag:

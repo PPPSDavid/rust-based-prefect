@@ -38,6 +38,7 @@ class RunState(StrEnum):
     SCHEDULED = "SCHEDULED"
     PENDING = "PENDING"
     RUNNING = "RUNNING"
+    PAUSED = "PAUSED"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
     CANCELLED = "CANCELLED"
@@ -74,6 +75,7 @@ class TaskRunRecord:
     kind: str = "task"
     child_flow_run_id: UUID | None = None
     child_deployment_run_id: UUID | None = None
+    gate_open_at: str | None = None
 
 
 @dataclass
@@ -394,10 +396,13 @@ class InMemoryControlPlane:
             "deployment_maintenance", {"stale_after_seconds": stale_after_seconds}
         )
         if rust is not None and rust.get("ok"):
-            return dict(rust.get("summary") or {})
+            summary = dict(rust.get("summary") or {})
+            summary.setdefault("gates_promoted", 0)
+            return summary
         with self._lock:
             reclaimed = self._reclaim_expired_claims_python()
             n_tick = self._tick_deployment_schedules_python()
+            gates = self._tick_gate_tasks_python()
             now = self._now()
             cutoff = (
                 datetime.now(UTC) - timedelta(seconds=max(1, stale_after_seconds))
@@ -407,7 +412,7 @@ class InMemoryControlPlane:
                 [now, cutoff],
             )
             reaped = int(cur.rowcount or 0)
-        return {"reclaimed": reclaimed, "triggered": n_tick, "reaped": reaped}
+        return {"reclaimed": reclaimed, "triggered": n_tick, "reaped": reaped, "gates_promoted": gates}
 
     def _tick_deployment_schedules_python(self) -> int:
         now = self._now()
@@ -615,6 +620,7 @@ class InMemoryControlPlane:
         kind: str = "task",
         child_flow_run_id: UUID | None = None,
         child_deployment_run_id: UUID | None = None,
+        gate_open_at: str | None = None,
     ) -> TaskRunRecord:
         task = TaskRunRecord(
             task_run_id=uuid4(),
@@ -626,6 +632,7 @@ class InMemoryControlPlane:
             kind=kind,
             child_flow_run_id=child_flow_run_id,
             child_deployment_run_id=child_deployment_run_id,
+            gate_open_at=gate_open_at,
         )
         with self._lock:
             self._tasks[task.task_run_id] = task
@@ -647,6 +654,7 @@ class InMemoryControlPlane:
                         "child_deployment_run_id": str(child_deployment_run_id)
                         if child_deployment_run_id
                         else None,
+                        "gate_open_at": gate_open_at,
                         "task": {
                             "id": str(task.task_run_id),
                             "flow_run_id": str(task.flow_run_id),
@@ -2098,6 +2106,148 @@ class InMemoryControlPlane:
             time.sleep(min(poll_seconds, max(0.0, deadline - time.monotonic())))
         raise TimeoutError(f"timed out waiting for deployment run {deployment_run_id}")
 
+    def pause_flow_for_gate(self, flow_run_id: UUID, gate_task_run_id: UUID) -> None:
+        flow = self.get_flow(flow_run_id)
+        if flow.state == RunState.RUNNING:
+            try:
+                self.set_flow_state(
+                    flow_run_id, RunState.PAUSED, uuid4(), "gate_wait"
+                )
+            except ValueError:
+                pass
+        self._persist_record(
+            {
+                "record_type": "gate_wait",
+                "flow_run_id": str(flow_run_id),
+                "gate_task_run_id": str(gate_task_run_id),
+            }
+        )
+
+    def resume_flow_from_gate(self, flow_run_id: UUID) -> None:
+        flow = self.get_flow(flow_run_id)
+        if flow.state == RunState.PAUSED:
+            try:
+                self.set_flow_state(
+                    flow_run_id, RunState.RUNNING, uuid4(), "gate_open"
+                )
+            except ValueError:
+                pass
+
+    def complete_gate_task(self, task_run_id: UUID) -> None:
+        task = self.get_task_run(task_run_id)
+        if task.state == RunState.COMPLETED:
+            return
+        if task.state == RunState.CANCELLED:
+            return
+        if task.state == RunState.SCHEDULED:
+            self.record_task_event(task_run_id, "task_pending", {"gate": True})
+        if self.get_task_run(task_run_id).state in {
+            RunState.SCHEDULED,
+            RunState.PENDING,
+        }:
+            self.record_task_event(
+                task_run_id, "task_running", {"gate": True, "opened_at": self._now()}
+            )
+            self.record_task_event(
+                task_run_id,
+                "task_completed",
+                {"gate": True, "opened_at": self._now()},
+            )
+
+    def cancel_gate_task(self, task_run_id: UUID) -> None:
+        task = self.get_task_run(task_run_id)
+        if task.state in {RunState.COMPLETED, RunState.CANCELLED, RunState.FAILED}:
+            return
+        if task.state == RunState.SCHEDULED:
+            self.record_task_event(task_run_id, "task_pending", {"gate": True})
+        if self.get_task_run(task_run_id).state in {
+            RunState.SCHEDULED,
+            RunState.PENDING,
+        }:
+            self.record_task_event(
+                task_run_id,
+                "task_running",
+                {"gate": True},
+            )
+            self.record_task_event(
+                task_run_id,
+                "task_cancelled",
+                {"gate": True, "error": "parent flow cancelled"},
+            )
+
+    def fail_gate_task(self, task_run_id: UUID, error: str) -> None:
+        task = self.get_task_run(task_run_id)
+        if task.state in {RunState.COMPLETED, RunState.FAILED, RunState.CANCELLED}:
+            return
+        if task.state == RunState.SCHEDULED:
+            self.record_task_event(task_run_id, "task_pending", {"gate": True})
+        if self.get_task_run(task_run_id).state in {
+            RunState.SCHEDULED,
+            RunState.PENDING,
+            RunState.RUNNING,
+        }:
+            self.record_task_event(
+                task_run_id,
+                "task_failed",
+                {"gate": True, "error": error},
+            )
+
+    def tick_gate_tasks(self) -> int:
+        """Promote due gate tasks (PENDING → COMPLETED). Prefers Rust hot path when bound."""
+        rust = self._rust_deployment_dispatch("task_tick_gate_tasks", {})
+        if rust is not None and rust.get("ok"):
+            promoted = int(rust.get("promoted", 0))
+            if promoted:
+                self._sync_gate_tasks_from_sqlite()
+                return promoted
+        return self._tick_gate_tasks_python()
+
+    def _tick_gate_tasks_python(self) -> int:
+        now = self._now()
+        now_dt = datetime.now(UTC)
+        due_ids: list[UUID] = []
+        rows = self._query_rows(
+            """
+            SELECT id FROM task_runs
+            WHERE kind = 'gate' AND state = 'PENDING'
+              AND gate_open_at IS NOT NULL AND gate_open_at <= ?
+            """,
+            [now],
+        )
+        due_ids.extend(UUID(str(row["id"])) for row in rows)
+        with self._lock:
+            for task in self._tasks.values():
+                if task.kind != "gate" or task.state != RunState.PENDING:
+                    continue
+                if not task.gate_open_at:
+                    continue
+                open_raw = task.gate_open_at.replace("Z", "+00:00")
+                open_at = datetime.fromisoformat(open_raw)
+                if open_at.tzinfo is None:
+                    open_at = open_at.replace(tzinfo=UTC)
+                if open_at <= now_dt and task.task_run_id not in due_ids:
+                    due_ids.append(task.task_run_id)
+        for task_id in due_ids:
+            self.complete_gate_task(task_id)
+        return len(due_ids)
+
+    def _sync_gate_tasks_from_sqlite(self) -> None:
+        """Refresh in-memory gate task states after Rust promotion tick."""
+        rows = self._query_rows(
+            "SELECT id, state, version FROM task_runs WHERE kind = 'gate'",
+            [],
+        )
+        for row in rows:
+            tid = UUID(str(row["id"]))
+            task = self._tasks.get(tid)
+            if task is None:
+                continue
+            try:
+                task.state = RunState(str(row["state"]))
+                task.version = int(row["version"])
+            except ValueError:
+                continue
+
     def trigger_deployment_run(
         self,
         deployment_id: UUID,
@@ -2305,7 +2455,12 @@ class InMemoryControlPlane:
         flow = self._flows.get(flow_run_id)
         if flow is None:
             return
-        if flow.state not in {RunState.SCHEDULED, RunState.PENDING, RunState.RUNNING}:
+        if flow.state not in {
+            RunState.SCHEDULED,
+            RunState.PENDING,
+            RunState.RUNNING,
+            RunState.PAUSED,
+        }:
             return
         try:
             self.set_flow_state(
@@ -2378,7 +2533,7 @@ class InMemoryControlPlane:
             with self._lock:
                 self._propagate_cancel_to_subflows(flow_run_id)
             return detail
-        if state not in {"SCHEDULED", "PENDING", "RUNNING"}:
+        if state not in {"SCHEDULED", "PENDING", "RUNNING", "PAUSED"}:
             raise ValueError(f"cannot cancel from state {state}")
 
         token = uuid4()
@@ -3218,6 +3373,12 @@ class InMemoryControlPlane:
             conn.execute(
                 "ALTER TABLE task_runs ADD COLUMN child_deployment_run_id TEXT"
             )
+        if "gate_open_at" not in col_names:
+            conn.execute("ALTER TABLE task_runs ADD COLUMN gate_open_at TEXT")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_task_runs_gate_due "
+            "ON task_runs(kind, state, gate_open_at)"
+        )
         dep_run_cols = {
             c["name"]
             for c in conn.execute("PRAGMA table_info(deployment_runs)").fetchall()
@@ -3277,8 +3438,8 @@ class InMemoryControlPlane:
         now = self._now()
         self._sqlite_conn.execute(
             "INSERT OR IGNORE INTO task_runs(id,flow_run_id,task_name,planned_node_id,state,version,created_at,updated_at,"
-            "kind,child_flow_run_id,child_deployment_run_id) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+            "kind,child_flow_run_id,child_deployment_run_id,gate_open_at) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
             [
                 str(task.task_run_id),
                 str(task.flow_run_id),
@@ -3293,6 +3454,7 @@ class InMemoryControlPlane:
                 str(task.child_deployment_run_id)
                 if task.child_deployment_run_id
                 else None,
+                task.gate_open_at,
             ],
         )
 
@@ -3417,7 +3579,7 @@ class InMemoryControlPlane:
                 "op_type": node.get("op_type"),
                 "planned_node_id": node_id,
                 "state": state,
-                "kind": "task",
+                "kind": "gate_task" if node.get("op_type") == "gate" else "task",
             }
             meta = meta_by_planned.get(node_id)
             task_name_meta = str(meta.get("task_name", "")) if meta is not None else ""
@@ -3435,6 +3597,15 @@ class InMemoryControlPlane:
                     )
                 if task_name_meta.startswith("subflow:"):
                     out_node["label"] = task_name_meta.removeprefix("subflow:")
+            elif meta is not None and (
+                str(meta.get("kind", "task")) == "gate"
+                or task_name_meta.startswith("gate:")
+            ):
+                out_node["kind"] = "gate_task"
+                if meta.get("gate_open_at"):
+                    out_node["gate_open_at"] = str(meta["gate_open_at"])
+                if task_name_meta.startswith("gate:"):
+                    out_node["label"] = task_name_meta.removeprefix("gate:")
             out_nodes.append(out_node)
 
         upstreams: dict[str, list[str]] = {}
@@ -3492,7 +3663,11 @@ class InMemoryControlPlane:
                 "task_name": task_name,
                 "planned_node_id": row.get("planned_node_id"),
                 "state": row["state"],
-                "kind": "subflow_task" if kind == "subflow" else "task",
+                "kind": "subflow_task"
+                if kind == "subflow"
+                else "gate_task"
+                if kind == "gate"
+                else "task",
             }
             if kind == "subflow":
                 if row.get("child_flow_run_id"):
@@ -3502,6 +3677,13 @@ class InMemoryControlPlane:
                 if task_name.startswith("subflow:"):
                     node["label"] = (
                         f"{task_name.removeprefix('subflow:')}:{str(row['id'])[:8]}"
+                    )
+            if kind == "gate":
+                if row.get("gate_open_at"):
+                    node["gate_open_at"] = str(row["gate_open_at"])
+                if task_name.startswith("gate:"):
+                    node["label"] = (
+                        f"{task_name.removeprefix('gate:')}:{str(row['id'])[:8]}"
                     )
             nodes.append(node)
         by_planned_runs: dict[str, list[str]] = {}
@@ -3527,7 +3709,7 @@ class InMemoryControlPlane:
         rows = self._query_rows(
             """
             SELECT id, task_name, planned_node_id, state, created_at, updated_at,
-                   kind, child_flow_run_id, child_deployment_run_id
+                   kind, child_flow_run_id, child_deployment_run_id, gate_open_at
             FROM task_runs
             WHERE flow_run_id = ?
             ORDER BY created_at ASC
@@ -3559,10 +3741,13 @@ class InMemoryControlPlane:
                     "child_deployment_run_id": str(task.child_deployment_run_id)
                     if task.child_deployment_run_id
                     else None,
+                    "gate_open_at": task.gate_open_at,
                 }
                 continue
             if task.kind != "task":
                 existing["kind"] = task.kind
+            if task.gate_open_at and not existing.get("gate_open_at"):
+                existing["gate_open_at"] = task.gate_open_at
             if task.child_flow_run_id and not existing.get("child_flow_run_id"):
                 existing["child_flow_run_id"] = str(task.child_flow_run_id)
             if task.child_deployment_run_id and not existing.get(
@@ -3589,6 +3774,7 @@ class InMemoryControlPlane:
             "child_deployment_run_id": row["child_deployment_run_id"]
             if "child_deployment_run_id" in keys
             else None,
+            "gate_open_at": row["gate_open_at"] if "gate_open_at" in keys else None,
         }
 
     def _resolve_subflow_child_flow_run_id(
@@ -4005,7 +4191,13 @@ def _legacy_is_valid_transition(from_state: RunState, to_state: RunState) -> boo
     allowed: dict[RunState, set[RunState]] = {
         RunState.SCHEDULED: {RunState.PENDING, RunState.CANCELLED},
         RunState.PENDING: {RunState.RUNNING, RunState.CANCELLED},
-        RunState.RUNNING: {RunState.COMPLETED, RunState.FAILED, RunState.CANCELLED},
+        RunState.RUNNING: {
+            RunState.COMPLETED,
+            RunState.FAILED,
+            RunState.CANCELLED,
+            RunState.PAUSED,
+        },
+        RunState.PAUSED: {RunState.RUNNING, RunState.CANCELLED},
         RunState.COMPLETED: set(),
         RunState.FAILED: set(),
         RunState.CANCELLED: set(),

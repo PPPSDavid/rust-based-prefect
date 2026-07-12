@@ -48,6 +48,7 @@ pub fn persist_task_create(
     kind: Option<&str>,
     child_flow_run_id: Option<&str>,
     child_deployment_run_id: Option<&str>,
+    gate_open_at: Option<&str>,
 ) -> Result<(), String> {
     let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
     persist_task_create_with_conn(
@@ -57,6 +58,7 @@ pub fn persist_task_create(
         kind,
         child_flow_run_id,
         child_deployment_run_id,
+        gate_open_at,
     )
 }
 
@@ -67,11 +69,12 @@ pub fn persist_task_create_with_conn(
     kind: Option<&str>,
     child_flow_run_id: Option<&str>,
     child_deployment_run_id: Option<&str>,
+    gate_open_at: Option<&str>,
 ) -> Result<(), String> {
     let ts = now_iso();
     conn.execute(
         "INSERT OR IGNORE INTO task_runs(id,flow_run_id,task_name,planned_node_id,state,version,created_at,updated_at,\
-         kind,child_flow_run_id,child_deployment_run_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+         kind,child_flow_run_id,child_deployment_run_id,gate_open_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
         params![
             task.id.to_string(),
             task.flow_run_id.to_string(),
@@ -84,6 +87,7 @@ pub fn persist_task_create_with_conn(
             kind.unwrap_or("task"),
             child_flow_run_id,
             child_deployment_run_id,
+            gate_open_at,
         ],
     )
     .map_err(|e| e.to_string())?;

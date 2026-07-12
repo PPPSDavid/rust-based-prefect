@@ -40,6 +40,7 @@ def compile_flow_source(
     counter = 0
     task_instance_counts: dict[str, int] = {}
 
+    gate_symbols: set[str] = set()
     name_lookup = task_names or {}
 
     def _resolve_task_name(symbol: str) -> str:
@@ -60,13 +61,21 @@ def compile_flow_source(
         )
 
     def _append_task_call(call: ast.Call) -> None:
-        maybe = _extract_task_call(call, bound_nodes)
+        maybe = _extract_task_call(call, bound_nodes, gate_symbols)
         if maybe is not None:
             nodes.append(_make_node(maybe["symbol"], maybe["op_type"], maybe["deps"]))
 
     def visit_stmt(stmt: ast.stmt) -> None:
         nonlocal fallback_required
         if isinstance(stmt, ast.Assign):
+            if (
+                len(stmt.targets) == 1
+                and isinstance(stmt.targets[0], ast.Name)
+                and isinstance(stmt.value, ast.Call)
+                and isinstance(stmt.value.func, ast.Name)
+                and stmt.value.func.id == "gate"
+            ):
+                gate_symbols.add(stmt.targets[0].id)
             call = _locate_task_call(stmt.value)
             if (
                 call is not None
@@ -74,7 +83,7 @@ def compile_flow_source(
                 and isinstance(stmt.targets[0], ast.Name)
             ):
                 var_name = stmt.targets[0].id
-                maybe = _extract_task_call(call, bound_nodes)
+                maybe = _extract_task_call(call, bound_nodes, gate_symbols)
                 if maybe is not None:
                     node = _make_node(maybe["symbol"], maybe["op_type"], maybe["deps"])
                     nodes.append(node)
@@ -147,7 +156,7 @@ def _deployment_ref_name(call: ast.Call) -> str | None:
 
 
 def _extract_task_call(
-    call: ast.Call, bound_nodes: dict[str, str]
+    call: ast.Call, bound_nodes: dict[str, str], gate_symbols: set[str] | None = None
 ) -> dict[str, Any] | None:
     if not isinstance(call.func, ast.Attribute):
         return None
@@ -156,12 +165,30 @@ def _extract_task_call(
         return None
 
     symbol = "unknown_task"
+    op_type = attr
     if isinstance(call.func.value, ast.Name):
         symbol = call.func.value.id
     elif isinstance(call.func.value, ast.Call):
         dep_name = _deployment_ref_name(call.func.value)
         if dep_name is not None:
             symbol = f"subflow:{dep_name}"
+        elif (
+            isinstance(call.func.value.func, ast.Name)
+            and call.func.value.func.id == "gate"
+        ):
+            gate_label = "gate"
+            for kw in call.func.value.keywords:
+                if kw.arg == "name" and isinstance(kw.value, ast.Constant):
+                    if isinstance(kw.value.value, str):
+                        gate_label = kw.value.value
+            if attr == "submit":
+                op_type = "gate"
+                symbol = f"gate:{gate_label}"
+
+    if gate_symbols and isinstance(call.func.value, ast.Name):
+        if call.func.value.id in gate_symbols and attr == "submit":
+            op_type = "gate"
+            symbol = f"gate:{call.func.value.id}"
 
     dep_ids: list[str] = []
     seen: set[str] = set()
@@ -186,7 +213,7 @@ def _extract_task_call(
                 if isinstance(elt, ast.Name):
                     add_dep(elt.id)
 
-    return {"symbol": symbol, "op_type": attr, "deps": dep_ids}
+    return {"symbol": symbol, "op_type": op_type, "deps": dep_ids}
 
 
 def _locate_task_call(node: ast.AST) -> ast.Call | None:

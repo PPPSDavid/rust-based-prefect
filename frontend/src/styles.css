@@ -408,7 +408,8 @@ a {
 }
 
 .dag-legend-inline,
-.dag-legend-subflow-task {
+.dag-legend-subflow-task,
+.dag-legend-gate-task {
   display: inline-block;
   width: 12px;
   height: 12px;
@@ -425,6 +426,15 @@ a {
 .dag-legend-subflow-task {
   background: #2a2418;
   border: 2px solid #c9a227;
+}
+
+.dag-legend-gate-task {
+  background: #182030;
+  border: 2px dashed #6a8fc9;
+}
+
+.dag-node-gate-task rect {
+  filter: drop-shadow(0 0 4px rgba(106, 143, 201, 0.25));
 }
 
 .dag-inline-expansions {

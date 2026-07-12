@@ -12,7 +12,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from starlette.responses import StreamingResponse
 
+from datetime import timedelta
+
 from .decorators import flow, set_control_plane, task, wait
+from .gates import gate
 from .runtime import InMemoryControlPlane
 from .worker import run_local_deployment_once, run_worker_loop
 from .task_runners import ThreadPoolTaskRunner
@@ -181,6 +184,14 @@ def sleep_seconds(seconds: float) -> None:
 
 
 @flow
+def gated_flow(n: int) -> int:
+    """Demo flow with a temporal gate between prep and downstream work."""
+    first = inc.submit(n)
+    gf = gate(name="demo-gate").submit(after=timedelta(seconds=0), wait_for=[first])
+    return dbl.submit(first, wait_for=[gf]).result()
+
+
+@flow
 def cancelable_flow(n: int, sleep_duration: float = 10.0) -> int:
     """Multi-task flow for cancel/retry UI tests: fast task, long sleep, downstream task."""
     first = inc.submit(n)
@@ -206,6 +217,7 @@ FLOW_REGISTRY = {
     "chained_flow": chained_flow,
     "failing_flow": failing_flow,
     "cancelable_flow": cancelable_flow,
+    "gated_flow": gated_flow,
 }
 
 
@@ -264,6 +276,7 @@ def benchmark_run(req: BenchmarkRequest) -> dict[str, float | int | str | bool |
         "wide": wide_flow,
         "long_chain": long_chain_flow,
         "failing": failing_flow,
+        "gated": gated_flow,
         # Backwards-compatible aliases for existing scripts.
         "mapped": wide_flow,
         "chained": long_chain_flow,
@@ -272,7 +285,7 @@ def benchmark_run(req: BenchmarkRequest) -> dict[str, float | int | str | bool |
     if flow_fn is None:
         raise HTTPException(
             status_code=400,
-            detail="Unsupported flavor. Use one of: simple, wide, long_chain, failing",
+            detail="Unsupported flavor. Use one of: simple, wide, long_chain, failing, gated",
         )
     start = time.perf_counter()
     error: str | None = None

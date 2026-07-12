@@ -14,6 +14,7 @@ const stateColor: Record<string, string> = {
   CANCELLED: "#7f4aa6",
   PENDING: "#59617d",
   SCHEDULED: "#59617d",
+  PAUSED: "#8a6d3b",
   NOT_REACHABLE: "#7a7f90"
 };
 
@@ -230,6 +231,9 @@ export function RunDagPanel({ dag, mode, onModeChange }: Props) {
         <span>
           <i className="dag-legend-subflow-task" /> deployment subflow
         </span>
+        <span>
+          <i className="dag-legend-gate-task" /> temporal gate
+        </span>
         {hasHighlight ? (
           <span className="dag-legend-highlight">
             <i /> Path highlight
@@ -276,7 +280,9 @@ export function RunDagPanel({ dag, mode, onModeChange }: Props) {
                   ? "dag-node dag-node-inline-subflow"
                   : kind === "subflow_task"
                     ? "dag-node dag-node-subflow-task"
-                    : "dag-node";
+                    : kind === "gate_task"
+                      ? "dag-node dag-node-gate-task"
+                      : "dag-node";
               const strokeColor =
                 kind === "inline_subflow"
                   ? isExpanded
@@ -284,7 +290,9 @@ export function RunDagPanel({ dag, mode, onModeChange }: Props) {
                     : "#5f9f6a"
                   : kind === "subflow_task"
                     ? "#c9a227"
-                    : isFocus
+                    : kind === "gate_task"
+                      ? "#6a8fc9"
+                      : isFocus
                       ? "#f0c674"
                       : onPath
                         ? "#7eb6ff"
@@ -303,10 +311,10 @@ export function RunDagPanel({ dag, mode, onModeChange }: Props) {
                     width={NODE_WIDTH}
                     height={NODE_HEIGHT}
                     rx={8}
-                    fill={dimmed ? "#141a2c" : kind === "inline_subflow" ? "#15261a" : "#1b2238"}
+                    fill={dimmed ? "#141a2c" : kind === "inline_subflow" ? "#15261a" : kind === "gate_task" ? "#182030" : "#1b2238"}
                     stroke={strokeColor}
                     strokeWidth={isFocus ? 3 : onPath ? 2.5 : 2}
-                    strokeDasharray={kind === "inline_subflow" ? "6 4" : undefined}
+                    strokeDasharray={kind === "inline_subflow" ? "6 4" : kind === "gate_task" ? "4 3" : undefined}
                     opacity={dimmed ? 0.35 : 1}
                   />
                   <text
@@ -323,7 +331,9 @@ export function RunDagPanel({ dag, mode, onModeChange }: Props) {
                     fill={dimmed ? "#56627a" : "#9db2d8"}
                     fontSize={11}
                   >
-                    {node.state}
+                    {kind === "gate_task" && meta && "gate_open_at" in meta && meta.gate_open_at
+                      ? `until ${String(meta.gate_open_at).slice(0, 16)}`
+                      : node.state}
                   </text>
                 </g>
               );
@@ -410,10 +420,11 @@ function InlineSubflowMiniDag({ dag }: { dag: FlowRunDag }) {
 function nodeKindPrefix(kind: DagNodeKind) {
   if (kind === "inline_subflow") return "⧉ ";
   if (kind === "subflow_task") return "↗ ";
+  if (kind === "gate_task") return "⏸ ";
   return "";
 }
 
-type DagNodeKind = "task" | "inline_subflow" | "subflow_task";
+type DagNodeKind = "task" | "inline_subflow" | "subflow_task" | "gate_task";
 
 function truncate(value: string, max: number) {
   return value.length <= max ? value : `${value.slice(0, max - 1)}…`;
