@@ -178,7 +178,7 @@ dev = [
 
 [[package]]
 name = "ironflow-prefect-compat"
-version = "0.1.2"
+version = "0.2.0"
 source = { editable = "python-shim" }
 dependencies = [
     { name = "pydantic" },
@@ -193,7 +193,7 @@ requires-dist = [
 
 [[package]]
 name = "ironflow-static-planner"
-version = "0.1.2"
+version = "0.2.0"
 source = { editable = "static-planner" }
 dependencies = [
     { name = "pydantic" },
