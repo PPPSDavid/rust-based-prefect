@@ -16,7 +16,7 @@ python3 scripts/verify_code_review_graph.py   # also run automatically by setup
 
 MCP entry is `.cursor/mcp.json` → `python3 ${workspaceFolder}/tools/dev/crg_mcp_serve.py`.
 
-Core package only (`requirements-agent.txt`). Do not install `[embeddings]` on Cloud unless explicitly requested (heavy torch). Keyword/hybrid search still works with `embeddings_count=0`.
+Core package only (`requirements-agent.txt`). Do not install `[embeddings]` on Cloud unless explicitly requested (heavy torch). Keyword/hybrid search still works with `embeddings_count=0` for identifier-like queries; natural-language conceptual search is weak without embeddings (upstream: embeddings are optional and only assist finding a starting node — see `tools/dev/README.md`).
 
 **Tool ids:** use `detect_changes_tool`, `query_graph_tool`, … — not unsuffixed names.
 

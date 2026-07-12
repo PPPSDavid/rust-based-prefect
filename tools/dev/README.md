@@ -18,6 +18,36 @@ python3 tools/dev/crg_mcp_serve.py
 
 configured in `.cursor/mcp.json`.
 
+### Do we need embeddings?
+
+**Not for the main agent workflows.** Upstream treats embeddings as
+**optional** ([USAGE § semantic search](https://github.com/tirth8205/code-review-graph/blob/main/docs/USAGE.md),
+[FAQ: Isn't this just RAG?](https://github.com/tirth8205/code-review-graph/blob/main/docs/FAQ.md)):
+vectors only help pick a *starting node* for hybrid search; blast radius,
+`query_graph_tool`, architecture, and `detect_changes_tool` use structural
+AST edges and work with `embeddings_count=0`.
+
+Without embeddings, `semantic_search_nodes_tool` falls back to FTS5/keyword:
+
+| Query style | Without embeddings (observed here) |
+| --- | --- |
+| Identifiers / symbol-ish (`TransitionHookSpec`) | Good hits |
+| Token overlap (`deployment schedule cron rust`) | Often OK |
+| Natural-language conceptual (`how does flow cancellation work`) | Often **0 hits** |
+
+For better conceptual search on Cloud, optionally install embeddings and embed
+once after build (heavier: torch + model download; slows session setup):
+
+```bash
+python3 -m pip install --user --break-system-packages 'code-review-graph[embeddings]'
+python3 -m code_review_graph build
+# then via MCP/CLI: embed_graph / embed_graph_tool
+# default local model: all-MiniLM-L6-v2 (override with CRG_EMBEDDING_MODEL)
+```
+
+Windows desktop already had a richer path (`Qwen/Qwen3-Embedding-0.6B` via
+conda); keep that with `CRG_MCP_USE_CONDA=1` if you want GPU embeddings there.
+
 Verify with real stdio MCP tool calls (not just `status`):
 
 ```bash
