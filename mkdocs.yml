@@ -68,7 +68,6 @@ nav:
       - "How to run the server and UI": how-to/server-and-ui.md
       - "How to deploy with the CLI and ironflow.yaml": how-to/deploy-with-cli.md
       - "How to create and update deployments": how-to/deployments.md
-      - "How to deploy with the CLI": how-to/deploy-with-cli.md
       - "How to compose flows with subflows": how-to/subflows.md
       - "How to port a flow from Prefect": how-to/port-from-prefect.md
   - Reference:
