@@ -9,6 +9,7 @@ Choose a path:
 | Install from PyPI (`pip` / `uv`), then run a demo flow | **[Get started → Installation](INSTALL.md)** · **[Quick start (demo flow)](QUICKSTART_DEMO.md)** |
 | Self-hosted API, workers, deployments | **[Self-hosted server](SELF_HOSTED_SERVER.md)** |
 | Understand flows, tasks, runners, and states | **[Concepts overview](concepts/index.md)** |
+| Nest flows (inline or deployment-backed subflows) | **[How to compose flows with subflows](how-to/subflows.md)** |
 | Do something specific (setup, server, porting) | **[How-to guides](how-to/index.md)** |
 | Supported features vs Prefect | **[Compatibility matrix](compatibility.md)** |
 | Performance expectations | **[Performance (vs Prefect)](PERFORMANCE_OVERVIEW.md)** |

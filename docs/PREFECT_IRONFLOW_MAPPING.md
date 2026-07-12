@@ -12,6 +12,7 @@ This project is **not** a drop-in replacement for Prefect Cloud or the full Pref
 | Prefect UI | Optional Vite/React app under `frontend/` when you want a local dashboard; run **DAG** tab with **Aggregated fan-out** / **Task runs** views, zoom-pan, and search (see **[DAG and forecast](concepts/dag-and-forecast.md)**). Not the Prefect Cloud UI. |
 | Deployments, work pools, workers | **Subset:** create/list/trigger deployments, optional **interval, cron, or limited RRule** schedules, local worker loop claiming `deployment_runs`. **UI HTTP subset:** cancel/retry flow runs, process work pools, worker visibility. Not production-parity with Prefect Cloud work pools; schedule/worker hot paths prefer **Rust** when `bind_db` is active. See `COMPATIBILITY.md`. |
 | `task.submit()` / futures | Supported for dependency chains within the MVP subset. |
+| Subflows / nested flows / `run_deployment` | **Two mechanisms (subset):** (1) **inline** — call `child_flow(...)` inside a parent `@flow` (blocking, same process, linked child run); (2) **deployment-backed** — `deployment_ref("name").submit(...).result()` with `SubflowFuture` and `wait_for`. Not full Prefect subflow / `run_deployment` API parity. Guide: **[How to compose flows with subflows](how-to/subflows.md)**. |
 | `task.map()` | Supported with moderate fan-out (see `COMPATIBILITY.md`). |
 | Retries, timeouts, cancellation | Enforced at the **control-plane** level for supported flows; semantics are workload-driven—see `COMPATIBILITY.md` for exact boundaries. |
 | Blocks, integrations, secrets | **Not** a focus of the MVP; many patterns are unsupported or stubbed. |
@@ -24,8 +25,8 @@ This project is **not** a drop-in replacement for Prefect Cloud or the full Pref
 
 1. **Clone** the repo, **checkout a [release tag](https://github.com/PPPSDavid/rust-based-prefect/releases)** (for example `v0.1.1`) when you want a stable baseline, then create the conda env from `environment.yml` (or install `requirements-ci.txt` in a venv). Alternatively install only `prefect_compat` with pip from git — see the root README *Using a numbered release*.
 2. **Port imports**: replace `prefect` flow/task imports with `prefect_compat` (and wire `set_control_plane` / `InMemoryControlPlane` as in tests under `python-shim/tests/`).
-3. **Stay inside the subset**: prefer `submit` chains, `map` with clear static shape, and control-plane features listed in `COMPATIBILITY.md`.
+3. **Stay inside the subset**: prefer `submit` chains, `map` with clear static shape, **supported subflows** ([how-to](how-to/subflows.md)), and control-plane features listed in `COMPATIBILITY.md`.
 4. **Validate**: run `python -m pytest python-shim/tests` and your own scripts locally; add a small script under `scripts/` if you want a repeatable smoke test.
-5. **Optional UI/API**: start `scripts/ironflow_server.py` to inspect runs that were persisted to disk.
+5. **Optional UI/API**: start `scripts/ironflow_server.py` to inspect runs that were persisted to disk — nested runs show parent/child links and DAG node kinds `inline_subflow` / `subflow_task`.
 
 When something behaves differently from Prefect, **`COMPATIBILITY.md`** is the source of truth for what is intentional versus not yet implemented.

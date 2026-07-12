@@ -6,12 +6,12 @@ This file is a compact context handoff for future sessions.
 
 - Name: Project IronFlow (`rust-based-prefect`)
 - Goal: Build a Prefect-compatible orchestration prototype with better determinism, performance, and static planning support.
-- Status: MVP scaffold complete, private GitHub repo created, baseline benchmarks and persistence prototype implemented; deployment schedules now support interval + cron (with Rust-first scheduler paths when available).
+- Status: MVP scaffold complete; deployments (schedules, CLI/YAML Tier 1); **subflows M1+M2** on `main` (#34/#36) with user guide at `docs/how-to/subflows.md`.
 
 ## Core Architecture
 
 - `rust-engine/`: deterministic state-machine kernel and append-only event model.
-- `python-shim/`: Prefect-style ergonomics (`@flow`, `@task`, `submit`, `map`, `wait_for`) with compatibility runtime.
+- `python-shim/`: Prefect-style ergonomics (`@flow`, `@task`, `submit`, `map`, `wait_for`, **`deployment_ref` / subflows**) with compatibility runtime.
 - `static-planner/`: static graph IR + forecast for supported flow subset (`@flow` body, `submit`/`map`, repeated tasks, `@task(name=...)`, UI DAG logical/expanded).
 - `benchmarks/`: performance comparisons (`ironflow`, `ironflow_http`, `prefect` local).
 
