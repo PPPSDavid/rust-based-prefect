@@ -89,14 +89,23 @@ Use **[Install from PyPI](#install-from-pypi)** above when you only need the **`
 
 ### 1. Environment
 
-**Conda (recommended; matches full stack):**
+**uv (recommended for contributors; CI/Cloud parity):**
+
+```bash
+# Install uv: https://docs.astral.sh/uv/getting-started/installation/
+uv sync --group dev
+```
+
+This uses the root workspace (`python-shim` + `static-planner`) and the committed `uv.lock`. Then build Rust as below. Prefer `uv run pytest …` / `uv run ruff …` afterward.
+
+**Conda (optional; full desktop stack including Prefect pin):**
 
 ```bash
 mamba env create -f environment.yml   # or: conda env create -f environment.yml
 conda activate ironflow-dev
 ```
 
-**pip only (CI parity, no conda):**
+**pip only (transitional, no uv):**
 
 ```bash
 python -m venv .venv
@@ -104,7 +113,7 @@ python -m venv .venv
 python -m pip install -r requirements-ci.txt
 ```
 
-Python **3.11+** is supported; `environment.yml` currently pins **3.12**. Published wheels on PyPI target **CPython 3.11 and 3.12** (see [COMPATIBILITY.md](COMPATIBILITY.md)); other versions may install from **sdist** or require a source checkout + `cargo build`.
+Python **3.11+** is supported; `.python-version` / `environment.yml` default to **3.12**. Published wheels on PyPI target **CPython 3.11 and 3.12** (see [COMPATIBILITY.md](COMPATIBILITY.md)); other versions may install from **sdist** or require a source checkout + `cargo build`.
 
 ### Install from PyPI (Python 3.11 / 3.12)
 

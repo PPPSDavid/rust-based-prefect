@@ -156,9 +156,15 @@ def test_cancel_nested_inline_grandchild(tmp_path: Path) -> None:
         mid()
 
     def cancel_root() -> None:
-        time.sleep(0.15)
-        if parent_id and parent_id[0] is not None:
-            plane.cancel_flow_run(parent_id[0])
+        # Wait until the nested leaf run exists so cancel is not racing the
+        # initial PENDING→RUNNING transition (version conflict).
+        deadline = time.monotonic() + 2.0
+        while time.monotonic() < deadline:
+            if parent_id and parent_id[0] is not None:
+                if any(f.name == "leaf" for f in plane._flows.values()):
+                    plane.cancel_flow_run(parent_id[0])
+                    return
+            time.sleep(0.01)
 
     threading.Thread(target=cancel_root, daemon=True).start()
     with pytest.raises(FlowRunCancelled):
@@ -203,18 +209,28 @@ def test_cancel_mirrors_surrogate_subflow_task(tmp_path: Path) -> None:
     stop, worker = _start_worker(plane, registry)
 
     def cancel_parent() -> None:
-        time.sleep(0.2)
-        if parent_id and parent_id[0] is not None:
-            plane.cancel_flow_run(parent_id[0])
+        # Wait until the surrogate subflow task exists, then cancel the parent.
+        deadline = time.monotonic() + 2.0
+        while time.monotonic() < deadline:
+            if parent_id and parent_id[0] is not None and task_id:
+                plane.cancel_flow_run(parent_id[0])
+                return
+            time.sleep(0.01)
 
     threading.Thread(target=cancel_parent, daemon=True).start()
     try:
         with pytest.raises(RuntimeError):
             parent_flow()
+
+        # Mirror onto the surrogate task can lag slightly; wait while the
+        # worker is still alive so cancel propagation can finish.
+        deadline = time.monotonic() + 5.0
+        task = plane.get_task_run(UUID(task_id[0]))
+        while time.monotonic() < deadline and task.state != RunState.CANCELLED:
+            time.sleep(0.05)
+            task = plane.get_task_run(UUID(task_id[0]))
+        assert task.kind == "subflow"
+        assert task.state == RunState.CANCELLED
     finally:
         stop.set()
         worker.join(timeout=5)
-
-    task = plane.get_task_run(UUID(task_id[0]))
-    assert task.kind == "subflow"
-    assert task.state == RunState.CANCELLED
