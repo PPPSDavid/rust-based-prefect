@@ -128,6 +128,11 @@ def main() -> int:
         action="store_true",
         help="Fail if code-review-graph or graph DB is missing",
     )
+    parser.add_argument(
+        "--verify-mcp",
+        action="store_true",
+        help="Also run scripts/verify_code_review_graph.py (stdio MCP demo calls)",
+    )
     args = parser.parse_args()
 
     issues: list[str] = []
