@@ -1,6 +1,7 @@
 # Launches code-review-graph MCP via conda run (stdio preserved for Cursor).
-# Mirrors sts2-context-coach: GPU PyTorch + code-review-graph[embeddings] live in that env.
-# Override env name: set user or process env CRG_MCP_CONDA_ENV (default sts2-context-coach).
+# Windows desktop / embeddings path. Prefer the cross-platform launcher on
+# Linux and Cursor Cloud: tools/dev/crg_mcp_serve.py (see tools/dev/README.md).
+# Requires CRG_MCP_CONDA_ENV (no hardcoded personal env name).
 $ErrorActionPreference = 'Stop'
 
 function Get-CondaExe {
@@ -34,7 +35,10 @@ Fix: install Miniconda/Anaconda, add ...\Scripts to your user PATH, or set user 
 }
 
 $condaExe = Get-CondaExe
-$envName = if ($env:CRG_MCP_CONDA_ENV) { $env:CRG_MCP_CONDA_ENV.Trim() } else { 'sts2-context-coach' }
+if (-not $env:CRG_MCP_CONDA_ENV -or -not $env:CRG_MCP_CONDA_ENV.Trim()) {
+    throw 'Set CRG_MCP_CONDA_ENV to your conda env that has code-review-graph[embeddings] (no repo default).'
+}
+$envName = $env:CRG_MCP_CONDA_ENV.Trim()
 $condaArgs = @(
     'run',
     '-n', $envName,

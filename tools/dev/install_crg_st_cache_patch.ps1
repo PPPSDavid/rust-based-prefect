@@ -1,15 +1,18 @@
 # Copy crg_st_model_cache.py + .pth bootstrap into a conda env's site-packages.
-# Default env: sts2-context-coach (same as sts2-context-coach repo). Override with -EnvName.
+# Requires -EnvName (no personal/default conda env name in-repo).
 param(
-    [string]$CondaBase = "",
-    [string]$EnvName = "sts2-context-coach"
+    [Parameter(Mandatory = $true)]
+    [string]$EnvName,
+    [string]$CondaBase = ""
 )
 $ErrorActionPreference = "Stop"
 $env:CONDA_NO_PLUGINS = "true"
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 if (-not $CondaBase) {
     $condaExe = (Get-Command conda -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
-    if (-not $condaExe) { $condaExe = "D:\miniconda\Scripts\conda.exe" }
+    if (-not $condaExe) {
+        throw "conda not found on PATH; pass -CondaBase <miniconda-root>"
+    }
     $CondaBase = (& $condaExe info --base).Trim()
 }
 $SitePackages = Join-Path $CondaBase "envs\$EnvName\Lib\site-packages"

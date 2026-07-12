@@ -1,0 +1,4 @@
+{
+  "name": "ironflow",
+  "install": "bash .cursor/cloud-install.sh"
+}

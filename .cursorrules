@@ -5,6 +5,12 @@ benchmark modes and compare rules, repo layout, and the three-expert consensus
 review protocol, read **`AGENTS.md`** (Ground Truth Files, Expected Validation,
 **Performance: perf_matrix.py**, and MCP Tools sections).
 
+Package-scoped notes: `rust-engine/AGENTS.md`, `python-shim/AGENTS.md`,
+`static-planner/AGENTS.md`, `benchmarks/AGENTS.md`, `frontend/AGENTS.md`.
+Agent helpers: `docs/agent/` (gotchas, golden paths, task template) and
+`.cursor/skills/`. Scoped rules: `.cursor/rules/benchmarks.mdc`,
+`python-shim.mdc`. Hooks: `.cursor/hooks.json` keeps CRG fresh.
+
 **Parallel agents:** each task must use its **own feature branch** off `main`
 (see **Multi-Agent Rules** and **Cloud / Cursor agents** in `AGENTS.md`). Never
 commit to `main` or share a branch between concurrent agents—avoids push/PR
@@ -12,4 +18,6 @@ races and conflicting histories.
 
 **Rule of thumb:** use graph tools (`query_graph`, `get_architecture_overview`,
 `detect_changes`, etc.) for exploration and impact analysis before relying on
-blind search across the tree.
+blind search across the tree. If graph MCP is missing, run
+`bash scripts/setup_code_review_graph.sh` and continue with Grep until the next
+session reloads MCP.

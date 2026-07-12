@@ -1,0 +1,12 @@
+---
+description: Benchmark / perf_matrix guardrails (apply when editing benchmarks)
+globs: benchmarks/**/*
+alwaysApply: false
+---
+
+# Benchmarks
+
+- Read `benchmarks/AGENTS.md` and root `AGENTS.md` → **Performance: perf_matrix.py**.
+- `compare` only accepts prior `run` JSON objects — never `docs/perf_comparison.json`.
+- Default `run` overwrites tracked `docs/perf_matrix_*.json/md` — write to `/tmp` unless updating baselines on purpose.
+- Do not silently change recipe shapes; preserve comparability (`matrix_compare_key`).

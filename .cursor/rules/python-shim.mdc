@@ -1,0 +1,12 @@
+---
+description: Compatibility / shim API guardrails
+globs: python-shim/**/*,COMPATIBILITY.md,docs/compatibility*
+alwaysApply: false
+---
+
+# Python shim & compatibility
+
+- Read `python-shim/AGENTS.md`, `COMPATIBILITY.md`, `docs/compatibility_review_workflow.md`.
+- Hotspots: `prefect_compat/__init__.py`, `server.py`, `pyproject.toml` (single-writer).
+- Any parity claim needs matrix + tests in the same change.
+- Prefer Rust for hot paths; keep Python thin (see skill `ironflow-rust-hotpath`).

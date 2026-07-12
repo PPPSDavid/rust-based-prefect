@@ -1,0 +1,7 @@
+# Agent / MCP tooling (not required for CI app tests).
+# Installed by scripts/setup_code_review_graph.sh and Cursor Cloud Update scripts.
+#
+# Core structural graph only — embeddings are optional and heavy (torch).
+# Windows desktop users who want GPU embeddings can keep using the conda path
+# documented in tools/dev/README.md (CRG_MCP_USE_CONDA=1).
+code-review-graph>=2.3.6,<3
