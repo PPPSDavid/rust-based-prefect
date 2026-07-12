@@ -14,6 +14,7 @@ from collections.abc import Callable, Iterable, Sequence
 from uuid import UUID, uuid4
 
 if TYPE_CHECKING:
+    from .gates import GateFuture
     from .subflows import SubflowFuture
 
 from .hooks import (
@@ -66,7 +67,7 @@ class TaskFuture(Generic[T]):
         return self.value
 
 
-def wait(futures: Sequence[TaskFuture[Any] | SubflowFuture[Any]]) -> list[Any]:
+def wait(futures: Sequence[TaskFuture[Any] | SubflowFuture[Any] | GateFuture[Any]]) -> list[Any]:
     return [future.result() for future in futures]
 
 
@@ -96,7 +97,7 @@ class TaskWrapper:
     def submit(
         self,
         *args: Any,
-        wait_for: Sequence[TaskFuture[Any] | SubflowFuture[Any]] | None = None,
+        wait_for: Sequence[TaskFuture[Any] | SubflowFuture[Any] | GateFuture[Any]] | None = None,
         **kwargs: Any,
     ) -> TaskFuture[T]:
         if wait_for:
@@ -181,13 +182,13 @@ class TaskWrapper:
     def map(
         self,
         values: Iterable[Any],
-        wait_for: Sequence[TaskFuture[Any] | SubflowFuture[Any]] | None = None,
+        wait_for: Sequence[TaskFuture[Any] | SubflowFuture[Any] | GateFuture[Any]] | None = None,
     ) -> list[TaskFuture[T]]:
         runner = _ACTIVE_TASK_RUNNER.get()
         if runner is None:
             runner = default_task_runner_from_env()
         vals = list(values)
-        wf: list[TaskFuture[Any] | SubflowFuture[Any]] | None = (
+        wf: list[TaskFuture[Any] | SubflowFuture[Any] | GateFuture[Any]] | None = (
             list(wait_for) if wait_for else None
         )
         if isinstance(runner, ProcessPoolTaskRunner):
@@ -303,7 +304,7 @@ class TaskWrapper:
     def _map_thread_pool(
         self,
         vals: list[Any],
-        wait_for: list[TaskFuture[Any] | SubflowFuture[Any]] | None,
+        wait_for: list[TaskFuture[Any] | SubflowFuture[Any] | GateFuture[Any]] | None,
         runner: ThreadPoolTaskRunner,
     ) -> list[TaskFuture[T]]:
         """Map with task bodies in a thread pool; control-plane work stays on the caller thread."""
@@ -326,7 +327,7 @@ class TaskWrapper:
     def _map_process_pool(
         self,
         vals: list[Any],
-        wait_for: list[TaskFuture[Any] | SubflowFuture[Any]] | None,
+        wait_for: list[TaskFuture[Any] | SubflowFuture[Any] | GateFuture[Any]] | None,
         runner: ProcessPoolTaskRunner,
     ) -> list[TaskFuture[T]]:
         """Map via child processes; task body must be picklable (single positional arg per value)."""
@@ -611,8 +612,11 @@ def _emit_task_single_hook_edge(
 def _resolve(value: Any) -> Any:
     if isinstance(value, TaskFuture):
         return value.result()
+    from .gates import GateFuture
     from .subflows import SubflowFuture
 
+    if isinstance(value, GateFuture):
+        return value.result()
     if isinstance(value, SubflowFuture):
         return value.result()
     return value

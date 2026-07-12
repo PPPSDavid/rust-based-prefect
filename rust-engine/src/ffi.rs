@@ -10,6 +10,7 @@ use rusqlite::Connection;
 use serde_json::{json, Value};
 
 use crate::deployment_ops;
+use crate::gate_ops;
 use crate::engine::{
     Engine, EngineError, FlowRun, SetStateRequest, SetTaskStateRequest, TaskRun,
 };
@@ -208,6 +209,7 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
             let kind = opt_str_from_field(body, "kind");
             let child_flow_run_id = opt_str_from_field(body, "child_flow_run_id");
             let child_deployment_run_id = opt_str_from_field(body, "child_deployment_run_id");
+            let gate_open_at = opt_str_from_field(body, "gate_open_at");
             ctx.engine.register_task_run(task.clone());
             if let Some(conn) = ctx.db_conn.as_ref() {
                 ui_write::persist_task_create_with_conn(
@@ -217,6 +219,7 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                     kind.as_deref(),
                     child_flow_run_id.as_deref(),
                     child_deployment_run_id.as_deref(),
+                    gate_open_at.as_deref(),
                 )
                 .map_err(|e| format!("persist task create failed: {e}"))?;
             } else {
@@ -227,6 +230,7 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                     kind.as_deref(),
                     child_flow_run_id.as_deref(),
                     child_deployment_run_id.as_deref(),
+                    gate_open_at.as_deref(),
                 )
                 .map_err(|e| format!("persist task create failed: {e}"))?;
             }
@@ -788,8 +792,20 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                 .as_ref()
                 .ok_or_else(|| "deployment_maintenance requires bind_db".to_string())?;
             let stale = body.get("stale_after_seconds").and_then(|v| v.as_i64()).unwrap_or(120).max(1);
-            let summary = deployment_ops::deployment_maintenance(conn, stale).map_err(|e| e.to_string())?;
+            let mut summary = deployment_ops::deployment_maintenance(conn, stale).map_err(|e| e.to_string())?;
+            let gates = gate_ops::tick_gate_tasks(conn, &mut ctx.engine).map_err(|e| e.to_string())?;
+            if let Some(obj) = summary.as_object_mut() {
+                obj.insert("gates_promoted".to_string(), json!(gates));
+            }
             Ok(json!({"ok": true, "summary": summary}))
+        }
+        "task_tick_gate_tasks" => {
+            let conn = ctx
+                .db_conn
+                .as_ref()
+                .ok_or_else(|| "task_tick_gate_tasks requires bind_db".to_string())?;
+            let promoted = gate_ops::tick_gate_tasks(conn, &mut ctx.engine).map_err(|e| e.to_string())?;
+            Ok(json!({"ok": true, "promoted": promoted}))
         }
         _ => Err(format!("unknown control op: {op}")),
     }

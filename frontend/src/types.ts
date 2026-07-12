@@ -94,9 +94,10 @@ export type DagNode = {
   op_type?: string;
   planned_node_id?: string | null;
   state: string;
-  kind?: "task" | "inline_subflow" | "subflow_task";
+  kind?: "task" | "inline_subflow" | "subflow_task" | "gate_task";
   child_flow_run_id?: string | null;
   child_deployment_run_id?: string | null;
+  gate_open_at?: string | null;
   execution_mode?: string | null;
 };
 
