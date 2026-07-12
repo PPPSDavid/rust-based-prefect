@@ -21,7 +21,7 @@ alwaysApply: true
 - Run Python tests for shim/planner changes.
 - Run Rust tests for engine changes.
 - Re-run benchmark when runtime/control-plane behavior changes.
-- On Cloud: ensure `bash scripts/setup_code_review_graph.sh` is in the Environment Update script.
+- On Cloud: `.cursor/environment.json` runs `.cursor/cloud-install.sh` (includes CRG setup).
 
 # Implementation Guardrails
 
