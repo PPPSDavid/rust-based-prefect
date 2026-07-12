@@ -13,7 +13,7 @@ Pick a **[release tag](https://github.com/PPPSDavid/rust-based-prefect/releases)
 ```bash
 git clone https://github.com/PPPSDavid/rust-based-prefect.git
 cd rust-based-prefect
-git checkout v0.1.1   # optional: replace with current tag
+git checkout v0.1.2   # optional: replace with current tag
 ```
 
 ## 2. Python environment
@@ -55,7 +55,7 @@ cargo build --release --manifest-path rust-engine/Cargo.toml
 | Variable | Purpose |
 | --- | --- |
 | **`IRONFLOW_RUST_LIB`** | Path to the built `ironflow_engine` shared library if it is **not** under `rust-engine/target/` (for example custom output directory). If unset, the shim searches default `cargo` output paths. Without a native library, some code paths use **Python fallbacks** where implemented—the intended stack is **always** build the `cdylib`. |
-| **`IRONFLOW_HISTORY_PATH`** | When set to a file path, flow history can be **appended as JSONL** for inspection and tooling (see the repository README for defaults and behavior). |
+| **`IRONFLOW_HISTORY_PATH`** | When set to a file path, flow history can be **appended as JSONL** for inspection and tooling (see [Environment variables](../reference/env-vars.md) and the repository README). |
 | **`PYTHONPATH`** | Set to `python-shim/src` at the repo root so `import prefect_compat` works **without** an editable install (used in **[Quick start](../QUICKSTART_DEMO.md)**). |
 
 Task-runner–related optional variables (**`IRONFLOW_TASK_RUNNER`**, **`IRONFLOW_TASK_RUNNER_THREAD_POOL_MAX_WORKERS`**, **`IRONFLOW_TASK_RUNNER_PROCESS_POOL_MAX_WORKERS`**) are described in **[Runners](../concepts/runners.md)**.
@@ -77,7 +77,7 @@ Preferred path when available: **`pip install ironflow-prefect-compat`** (produc
 You can also **`pip install` from Git**:
 
 ```bash
-python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v0.1.1#subdirectory=python-shim"
+python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v0.1.2#subdirectory=python-shim"
 ```
 
 That package **does not** ship `rust-engine`; build the native library separately and set **`IRONFLOW_RUST_LIB`**, or accept Python fallbacks. See also **[Installation](../INSTALL.md)** for the same material with slightly different emphasis.

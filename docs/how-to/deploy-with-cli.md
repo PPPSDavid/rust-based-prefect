@@ -2,7 +2,7 @@
 
 IronFlow **Tier 1** adds a Prefect-style deployment surface: an **`ironflow.yaml`** manifest, the **`ironflow`** CLI (`init`, `deploy`, `serve`, `worker start`), and Python helpers **`deploy()`** / **`serve()`**. This guide covers the supported subset — not full Prefect Cloud or work-pool parity.
 
-**Prerequisites:** [Installation](../INSTALL.md) and a running API (see [How to run the server and UI](server-and-ui.md)). From the repository root, the CLI is available after installing the shim (`pip install -e python-shim` or `requirements-ci.txt`).
+**Prerequisites:** [Installation](../INSTALL.md) and a running API (see [How to run the server and UI](server-and-ui.md)). The **`ironflow`** CLI ships with **`pip install ironflow-prefect-compat`**; editable installs (`pip install -e python-shim`) are for repository development.
 
 ## `ironflow.yaml` schema (Tier 1 subset)
 

@@ -18,6 +18,7 @@ exclude_docs: |
   perf_methodology.md
   compatibility_review_workflow.md
   ui_phase1_api_contract.md
+  gen_llms.py
 
 theme:
   name: material
@@ -32,12 +33,24 @@ theme:
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.action.edit
+    - content.action.view
 
 nav:
   - Home: index.md
   - Get started:
       - "Installation (PyPI · pip / uv)": INSTALL.md
+      - "Quick start: PyPI (no clone)": QUICKSTART_PYPI.md
       - "Quick start (demo flow)": QUICKSTART_DEMO.md
+      - "Quickstart: first deployment": quickstart-first-deployment.md
       - "Self-hosted server": SELF_HOSTED_SERVER.md
       - "Optional: verify the web UI": ui_e2e_visual_check.md
   - Concepts:
@@ -53,16 +66,22 @@ nav:
       - Overview: how-to/index.md
       - "How to set up IronFlow": how-to/setup.md
       - "How to run the server and UI": how-to/server-and-ui.md
+      - "How to deploy with the CLI and ironflow.yaml": how-to/deploy-with-cli.md
       - "How to create and update deployments": how-to/deployments.md
-      - "How to deploy with the CLI": how-to/deploy-with-cli.md
       - "How to compose flows with subflows": how-to/subflows.md
       - "How to port a flow from Prefect": how-to/port-from-prefect.md
   - Reference:
       - "Compatibility matrix": compatibility.md
+      - "Environment variables": reference/env-vars.md
+      - "REST API overview": reference/api.md
+      - "Troubleshooting and FAQ": reference/troubleshooting.md
       - "Performance (vs Prefect)": PERFORMANCE_OVERVIEW.md
 
 plugins:
   - search
+  - gen-files:
+      scripts:
+        - docs/gen_llms.py
 
 markdown_extensions:
   - admonition

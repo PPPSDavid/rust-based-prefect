@@ -190,7 +190,11 @@ class RustQueryBridge:
 
 
 class RustFsmBridge:
-    """Thread-safe native FSM (``Engine``) behind ``ironflow_engine_new`` / ``ironflow_control``."""
+    """Native FSM (``Engine``) behind ``ironflow_engine_new`` / ``ironflow_control``.
+
+    Rust serializes per-handle FFI calls; callers must also serialize Python-side writes
+    (see ``InMemoryControlPlane._lock`` and ``bind_db`` guidance in ``runtime.py``).
+    """
 
     def __init__(self) -> None:
         self._lib = load_ironflow_library()

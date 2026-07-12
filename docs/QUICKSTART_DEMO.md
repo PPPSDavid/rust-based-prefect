@@ -1,6 +1,11 @@
 # Quick start: run a demo flow
 
-This page walks through **one minimal flow** in a few minutes: no API server and no UI required. Complete **[Installation](INSTALL.md)** first (clone, Python env, `cargo build`), then continue here.
+This page walks through **one minimal flow** using the **bundled repository example** — no API server and no UI required.
+
+!!! note "PyPI users"
+    If you installed with **`pip install ironflow-prefect-compat`** and do **not** have a clone, use **[Quick start: PyPI](QUICKSTART_PYPI.md)** instead (copy-paste script, no `PYTHONPATH`).
+
+**Repository checkout path:** complete **[Installation](INSTALL.md)** §2–5 (clone, Python env, `cargo build`), then continue here.
 
 ## What the demo looks like (source)
 
@@ -69,6 +74,8 @@ Nothing listens on a port: orchestration runs **in-process**. If you set `IRONFL
 
 ## 5. Next steps
 
+- **[Quick start: PyPI](QUICKSTART_PYPI.md)** — same flow pattern without a clone.
+- **[Quickstart: first deployment](quickstart-first-deployment.md)** — API + `ironflow deploy`.
 - **[Prefect → IronFlow](PREFECT_IRONFLOW_MAPPING.md)** — map Prefect concepts to this project.
 - **[Compatibility](compatibility.md)** — what is supported vs not.
 - **[How to set up IronFlow](how-to/setup.md)** · **[How to run the server and UI](how-to/server-and-ui.md)** — optional stack beyond in-process runs.

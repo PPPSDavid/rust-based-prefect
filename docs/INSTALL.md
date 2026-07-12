@@ -1,5 +1,12 @@
 # Installation
 
+!!! tip "Quick install (PyPI)"
+    ```bash
+    python -m pip install --upgrade pip
+    python -m pip install ironflow-prefect-compat
+    ```
+    Requires **CPython 3.11 or 3.12** (see wheel platform table below). Then run the [Quick start: PyPI](QUICKSTART_PYPI.md) (no clone) or [Quickstart: first deployment](quickstart-first-deployment.md).
+
 **Primary path:** install **`ironflow-prefect-compat`** from **PyPI** with **`pip`** or **`uv`** — the same workflow as other wheel-published Python packages. On supported platforms, **prebuilt wheels bundle** the Rust **`ironflow_engine`** library under `prefect_compat/native/`; you **do not** need a Rust toolchain for those wheels.
 
 **Secondary paths:** install **from Git** (narrow Python-only integration) or **clone the repository** to build **`rust-engine`** from source (development, benchmarks, optional UI, or when no wheel matches your platform/Python ABI).
@@ -116,7 +123,7 @@ Pick a **[release tag](https://github.com/PPPSDavid/rust-based-prefect/releases)
 ```bash
 git clone https://github.com/PPPSDavid/rust-based-prefect.git
 cd rust-based-prefect
-git checkout v0.1.1   # replace with current release tag, or omit to stay on main
+git checkout v0.1.2   # replace with current release tag, or omit to stay on main
 ```
 
 ## 3. Python environment
@@ -180,13 +187,13 @@ cargo test --manifest-path rust-engine/Cargo.toml
 Prefer **`pip install ironflow-prefect-compat`** or **`uv pip install ironflow-prefect-compat`** from PyPI when a wheel matches your platform (see **[§1](#1-pypi-pip-uv-ironflow-prefect-compat)**). If you need a **Git URL** pin instead (pre-release testing or fork), install the shim **from Git**:
 
 ```bash
-python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v0.1.1#subdirectory=python-shim"
+python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v0.1.2#subdirectory=python-shim"
 ```
 
 Replace the tag with your target release. This install **does not** compile Rust unless **`cargo`** is available during the pip build; otherwise build **`rust-engine`** separately and set **`IRONFLOW_RUST_LIB`**, or accept Python fallbacks where implemented. For the **static planner** package:
 
 ```bash
-python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v0.1.1#subdirectory=static-planner"
+python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v0.1.2#subdirectory=static-planner"
 ```
 
 ## 7. Optional: API and UI

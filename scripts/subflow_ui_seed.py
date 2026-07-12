@@ -1,4 +1,8 @@
-"""Seed inline + deployment subflow runs into IRONFLOW_HISTORY_PATH for UI visual checks."""
+"""Seed inline + deployment subflow runs into persisted history for UI visual checks.
+
+Writes JSONL to IRONFLOW_HISTORY_PATH and the companion SQLite sidecar (.db) used by
+the API query path. The server must use the same IRONFLOW_HISTORY_PATH.
+"""
 
 from __future__ import annotations
 
