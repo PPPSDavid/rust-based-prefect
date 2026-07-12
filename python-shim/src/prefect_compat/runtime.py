@@ -88,11 +88,15 @@ class InMemoryControlPlane:
     _TASK_BATCH_MIN_SIZE = 2
 
     """
-    Python MVP control plane with the same transition semantics as the Rust engine.
-    This is used by the shim and can be swapped for an HTTP Rust facade.
+    Python control plane (Rust-accelerated when native lib + ``bind_db`` are available).
 
-    Concurrency: writes are serialized under ``_lock``; Rust-backed list/detail queries
-    bypass the lock and use WAL SQLite readers (see ``docs/perf_methodology.md``).
+    Backed by optional in-process Rust FSM + SQLite persistence via ``rust_bridge``
+    (ctypes FFI). This is used by the shim and optional FastAPI server.
+
+    Concurrency: writes are serialized under ``_lock``. List APIs and the initial Rust
+    read in ``get_flow_run_detail`` use lock-free WAL SQLite readers when the query
+    bridge is available; detail enrichment still takes ``_lock`` (see
+    ``docs/perf_methodology.md``).
     """
 
     def __init__(self, history_path: str | None = None) -> None:

@@ -10,7 +10,7 @@ export const DAG_VIEW_MODES: Record<
     label: "Aggregated fan-out",
     title: "Planned graph with aggregated fan-out",
     description:
-      "One node per forecast step. map() fan-out and repeated submits appear as separate planned steps, not individual executions."
+      "One node per forecast step; map() fan-out aggregates under a single planned node. Use expanded mode for per-execution task runs."
   },
   expanded: {
     label: "Task runs",

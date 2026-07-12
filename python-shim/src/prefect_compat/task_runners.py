@@ -1,4 +1,4 @@
-"""Pluggable task runners for Ironflow (Prefect-shaped API)."""
+"""Pluggable task runners for IronFlow (Prefect-shaped API)."""
 
 from __future__ import annotations
 
