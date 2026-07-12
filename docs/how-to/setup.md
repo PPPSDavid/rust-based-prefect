@@ -67,7 +67,7 @@ cargo build --release --manifest-path rust-engine/Cargo.toml
 | **`IRONFLOW_HISTORY_PATH`** | When set to a file path, flow history can be **appended as JSONL** for inspection and tooling (see [Environment variables](../reference/env-vars.md) and the repository README). |
 | **`PYTHONPATH`** | Set to `python-shim/src` at the repo root so `import prefect_compat` works **without** an editable install (used in **[Quick start](../QUICKSTART_DEMO.md)**). |
 
-Task-runner–related optional variables (**`IRONFLOW_TASK_RUNNER`**, **`IRONFLOW_TASK_RUNNER_THREAD_POOL_MAX_WORKERS`**, **`IRONFLOW_TASK_RUNNER_PROCESS_POOL_MAX_WORKERS`**) are described in **[Runners](../concepts/runners.md)**.
+Task-runner–related optional variables (**`IRONFLOW_TASK_RUNNER`**, **`IRONFLOW_TASK_RUNNER_THREAD_POOL_MAX_WORKERS`**, **`IRONFLOW_TASK_RUNNER_PROCESS_POOL_MAX_WORKERS`**) are described in **[Runners](../concepts/runners.md)** and **[How to choose a task runner](choose-task-runners.md)**.
 
 ## 5. Verify
 

@@ -40,7 +40,7 @@ IronFlow configuration uses `IRONFLOW_*` environment variables. Defaults assume 
 | `IRONFLOW_TASK_RUNNER_THREAD_POOL_MAX_WORKERS` | *(unset)* | Cap thread-pool workers when using the thread runner. |
 | `IRONFLOW_TASK_RUNNER_PROCESS_POOL_MAX_WORKERS` | *(unset)* | Cap process-pool workers when using the process runner. |
 
-See [Runners](../concepts/runners.md) for behavior details.
+See [Runners](../concepts/runners.md) for behavior details and **[How to choose a task runner](../how-to/choose-task-runners.md)** for workload-based selection.
 
 ## Development and packaging (contributors)
 

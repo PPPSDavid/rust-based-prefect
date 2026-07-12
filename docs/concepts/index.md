@@ -6,7 +6,7 @@ Use these pages to learn the IronFlow model end-to-end:
 
 - **[Flows](flows.md)** — `@flow`, flow runs, **subflows (inline + deployment-backed)**, and transition hooks.
 - **[Tasks](tasks.md)** — `@task`, `submit`, `map`, futures, custom names, repeated invocations.
-- **[Runners](runners.md)** — task runners and concurrent `map`.
+- **[Runners](runners.md)** — task runners and concurrent `map`. Practical choice guide: **[How to choose a task runner](../how-to/choose-task-runners.md)**.
 - **[DAG and forecast](dag-and-forecast.md)** — static planner, run DAG UI, subflow node kinds, wide/long graphs.
 - **[States and transitions](states-and-transitions.md)** — `RunState` values and allowed edges (enforced in Rust).
 - **[Prefect → IronFlow](../PREFECT_IRONFLOW_MAPPING.md)** — table mapping Prefect mental models to this project.

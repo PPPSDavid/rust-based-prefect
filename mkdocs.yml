@@ -70,6 +70,7 @@ nav:
       - "How to deploy with the CLI and ironflow.yaml": how-to/deploy-with-cli.md
       - "How to create and update deployments": how-to/deployments.md
       - "How to compose flows with subflows": how-to/subflows.md
+      - "How to choose a task runner": how-to/choose-task-runners.md
       - "How to port a flow from Prefect": how-to/port-from-prefect.md
   - Reference:
       - "Compatibility matrix": compatibility.md

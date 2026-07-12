@@ -79,6 +79,11 @@ PAGES: list[tuple[str, str, str]] = [
         "Inline and deployment-backed subflows.",
     ),
     (
+        "How to choose a task runner",
+        "how-to/choose-task-runners/",
+        "Thread vs process vs sequential for map().",
+    ),
+    (
         "How to port from Prefect",
         "how-to/port-from-prefect/",
         "Import swap and subset limits.",
@@ -132,6 +137,7 @@ with gen_open("llms.txt", "w") as f:
             "how-to/deploy-with-cli/": "how-to/deploy-with-cli.md",
             "how-to/deployments/": "how-to/deployments.md",
             "how-to/subflows/": "how-to/subflows.md",
+            "how-to/choose-task-runners/": "how-to/choose-task-runners.md",
             "how-to/port-from-prefect/": "how-to/port-from-prefect.md",
             "compatibility/": "compatibility.md",
             "reference/env-vars/": "reference/env-vars.md",
