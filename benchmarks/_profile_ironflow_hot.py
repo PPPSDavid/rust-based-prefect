@@ -1,4 +1,5 @@
 """One-off profiler for ironflow inproc hot paths (plan: profile-hot-path)."""
+
 from __future__ import annotations
 
 import cProfile

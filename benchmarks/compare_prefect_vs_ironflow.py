@@ -8,9 +8,9 @@ import tempfile
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Callable
+from collections.abc import Callable
 
-import httpx  # ty: ignore[unresolved-import]
+import httpx
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -87,7 +87,7 @@ def _run_ironflow(flavor: str, complexity: int) -> PerfResult:
 
 def _run_prefect(flavor: str, complexity: int, port: int = 4201) -> PerfResult:
     try:
-        from prefect import flow, task  # type: ignore
+        from prefect import flow, task
     except Exception as exc:
         return PerfResult(
             engine="prefect",
@@ -104,7 +104,15 @@ def _run_prefect(flavor: str, complexity: int, port: int = 4201) -> PerfResult:
     env = os.environ.copy()
     env["PREFECT_API_URL"] = api_url
 
-    server_cmd = ["prefect", "server", "start", "--host", "127.0.0.1", "--port", str(port)]
+    server_cmd = [
+        "prefect",
+        "server",
+        "start",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        str(port),
+    ]
     startup_begin = time.perf_counter()
     try:
         server = subprocess.Popen(
@@ -233,14 +241,22 @@ def _run_ironflow_http(flavor: str, complexity: int, port: int = 4210) -> PerfRe
             _wait_for_server(port, [f"http://127.0.0.1:{port}/health"])
             startup = time.perf_counter() - start
             with httpx.Client(timeout=60.0) as client:
-                before = client.get(f"http://127.0.0.1:{port}/history/summary").json().get("events", 0)
+                before = (
+                    client.get(f"http://127.0.0.1:{port}/history/summary")
+                    .json()
+                    .get("events", 0)
+                )
                 response = client.post(
                     f"http://127.0.0.1:{port}/benchmark/run",
                     json={"flavor": flavor, "complexity": complexity},
                 )
                 response.raise_for_status()
                 body = response.json()
-                after = client.get(f"http://127.0.0.1:{port}/history/summary").json().get("events", 0)
+                after = (
+                    client.get(f"http://127.0.0.1:{port}/history/summary")
+                    .json()
+                    .get("events", 0)
+                )
             delta_events = max(after - before, 0)
             runtime = float(body["runtime_seconds"])
             return PerfResult(
@@ -271,9 +287,14 @@ def _run_ironflow_http(flavor: str, complexity: int, port: int = 4210) -> PerfRe
                 server.kill()
 
 
-def _wait_for_server(port: int, urls: list[str] | None = None, timeout_s: int = 45) -> None:
+def _wait_for_server(
+    port: int, urls: list[str] | None = None, timeout_s: int = 45
+) -> None:
     deadline = time.time() + timeout_s
-    check_urls = urls or [f"http://127.0.0.1:{port}/api/health", f"http://127.0.0.1:{port}/health"]
+    check_urls = urls or [
+        f"http://127.0.0.1:{port}/api/health",
+        f"http://127.0.0.1:{port}/health",
+    ]
     while time.time() < deadline:
         for url in check_urls:
             try:
@@ -298,7 +319,12 @@ def _estimate_transitions(flavor: str, complexity: int) -> int:
 
 def main() -> None:
     results: list[PerfResult] = []
-    for flavor, complexity in [("mapped", 100), ("mapped", 500), ("chained", 100), ("chained", 500)]:
+    for flavor, complexity in [
+        ("mapped", 100),
+        ("mapped", 500),
+        ("chained", 100),
+        ("chained", 500),
+    ]:
         results.append(_run_ironflow(flavor, complexity))
         results.append(_run_ironflow_http(flavor, complexity))
         results.append(_run_prefect(flavor, complexity))

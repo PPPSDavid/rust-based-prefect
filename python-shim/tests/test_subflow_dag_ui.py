@@ -111,7 +111,9 @@ def test_dag_includes_subflow_task_node(tmp_path: Path) -> None:
         client = TestClient(app)
         api_dag = client.get(f"/api/flow-runs/{parent_run.run_id}/dag?mode=logical")
         assert api_dag.status_code == 200
-        api_subflow = [n for n in api_dag.json()["nodes"] if n.get("kind") == "subflow_task"]
+        api_subflow = [
+            n for n in api_dag.json()["nodes"] if n.get("kind") == "subflow_task"
+        ]
         assert len(api_subflow) == 1
     finally:
         stop.set()

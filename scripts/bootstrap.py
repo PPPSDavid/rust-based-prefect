@@ -13,9 +13,7 @@ from typing import Any, cast
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SMOKE_TEST = "python-shim/tests/test_compat.py::test_submit_chain_and_map"
 
-_RUST_BUILD_FAILURE_SUFFIX = (
-    " See docs/INSTALL.md §4 (Build the Rust engine) — ensure rustup stable is installed."
-)
+_RUST_BUILD_FAILURE_SUFFIX = " See docs/INSTALL.md §4 (Build the Rust engine) — ensure rustup stable is installed."
 _SMOKE_FAILURE_SUFFIX = (
     " See docs/INSTALL.md §5 (Check that it works) and verify IRONFLOW_RUST_LIB if a "
     "non-default native lib path is used."
@@ -35,7 +33,9 @@ def _resolve_python_hint() -> tuple[str | None, list[str]]:
     if py_launcher:
         diagnostics.append(f"[hint] Windows Python launcher found: {py_launcher}")
         diagnostics.append("[hint] Try: py -3 -m pip install -r requirements-ci.txt")
-    diagnostics.append("[hint] Install Python 3.11+ and ensure `python` is on PATH (or use `py`).")
+    diagnostics.append(
+        "[hint] Install Python 3.11+ and ensure `python` is on PATH (or use `py`)."
+    )
 
     return None, diagnostics
 
@@ -64,10 +64,16 @@ def _check_tooling(*, pytest_mode: str) -> tuple[bool, list[str]]:
         pytest_ok = False
         if pytest_mode == "require":
             diagnostics.append("[missing] pytest is not installed in this interpreter")
-            diagnostics.append("[hint] From repo root: python -m pip install -r requirements-ci.txt")
+            diagnostics.append(
+                "[hint] From repo root: python -m pip install -r requirements-ci.txt"
+            )
         elif pytest_mode == "warn":
-            diagnostics.append("[warn] pytest is not installed (needed for smoke verification)")
-            diagnostics.append("[hint] Install dev deps: python -m pip install -r requirements-ci.txt")
+            diagnostics.append(
+                "[warn] pytest is not installed (needed for smoke verification)"
+            )
+            diagnostics.append(
+                "[hint] Install dev deps: python -m pip install -r requirements-ci.txt"
+            )
 
     tooling_ok = python_bin is not None and cargo_bin is not None
     if pytest_mode == "require":
@@ -87,9 +93,15 @@ def _build_rust() -> tuple[bool, str]:
 
 
 def _smoke_verify() -> tuple[bool, str]:
-    result = _run_checked([sys.executable, "-m", "pytest", SMOKE_TEST, "-q"], cwd=REPO_ROOT)
+    result = _run_checked(
+        [sys.executable, "-m", "pytest", SMOKE_TEST, "-q"], cwd=REPO_ROOT
+    )
     if result.returncode != 0:
-        details = result.stderr.strip() or result.stdout.strip() or "smoke verification failed"
+        details = (
+            result.stderr.strip()
+            or result.stdout.strip()
+            or "smoke verification failed"
+        )
         return False, f"Smoke verification failed: {details}{_SMOKE_FAILURE_SUFFIX}"
     return True, "Smoke verification passed."
 
@@ -115,7 +127,9 @@ def _native_check() -> int:
     if not native_ok and not _rust_lib_env_set():
         print("[error] Native library is not available and IRONFLOW_RUST_LIB is unset.")
         print("[hint] Supported wheels bundle the native library (docs/INSTALL.md §1).")
-        print("[hint] Source builds: docs/INSTALL.md §4; IRONFLOW_RUST_LIB: docs/how-to/setup.md.")
+        print(
+            "[hint] Source builds: docs/INSTALL.md §4; IRONFLOW_RUST_LIB: docs/how-to/setup.md."
+        )
         return 1
 
     set_control_plane(InMemoryControlPlane())

@@ -3,39 +3,103 @@
 
 from __future__ import annotations
 
-from mkdocs_gen_files import open as gen_open  # ty: ignore[unresolved-import]
+from mkdocs_gen_files import open as gen_open
 
 SITE_BASE = "https://pppsdavid.github.io/rust-based-prefect"
 REPO_BASE = "https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs"
 
 PAGES: list[tuple[str, str, str]] = [
     ("Home", "", "Layered doc home and onboarding paths."),
-    ("Installation (PyPI · pip / uv)", "INSTALL/", "Primary install path from PyPI wheels."),
-    ("Quick start: PyPI (no clone)", "QUICKSTART_PYPI/", "Minimal in-process flow after pip install."),
-    ("Quick start (demo flow)", "QUICKSTART_DEMO/", "Repo demo with bundled example script."),
-    ("Quickstart: first deployment", "quickstart-first-deployment/", "Install → API → ironflow deploy → trigger run."),
-    ("Self-hosted server", "SELF_HOSTED_SERVER/", "API, workers, deployments, scheduling."),
-    ("Verify the web UI", "ui_e2e_visual_check/", "Visual checklist for the optional Vite UI."),
+    (
+        "Installation (PyPI · pip / uv)",
+        "INSTALL/",
+        "Primary install path from PyPI wheels.",
+    ),
+    (
+        "Quick start: PyPI (no clone)",
+        "QUICKSTART_PYPI/",
+        "Minimal in-process flow after pip install.",
+    ),
+    (
+        "Quick start (demo flow)",
+        "QUICKSTART_DEMO/",
+        "Repo demo with bundled example script.",
+    ),
+    (
+        "Quickstart: first deployment",
+        "quickstart-first-deployment/",
+        "Install → API → ironflow deploy → trigger run.",
+    ),
+    (
+        "Self-hosted server",
+        "SELF_HOSTED_SERVER/",
+        "API, workers, deployments, scheduling.",
+    ),
+    (
+        "Verify the web UI",
+        "ui_e2e_visual_check/",
+        "Visual checklist for the optional Vite UI.",
+    ),
     ("Concepts overview", "concepts/", "Flows, tasks, runners, states, DAG."),
     ("Flows", "concepts/flows/", "@flow decorator and flow runs."),
     ("Tasks", "concepts/tasks/", "@task, submit, map, futures."),
     ("Runners", "concepts/runners/", "Task runners and concurrent map."),
     ("DAG and forecast", "concepts/dag-and-forecast/", "Static planner and run DAG."),
-    ("States and transitions", "concepts/states-and-transitions/", "RunState and Rust FSM edges."),
-    ("Prefect → IronFlow", "PREFECT_IRONFLOW_MAPPING/", "Concept mapping from Prefect 3."),
+    (
+        "States and transitions",
+        "concepts/states-and-transitions/",
+        "RunState and Rust FSM edges.",
+    ),
+    (
+        "Prefect → IronFlow",
+        "PREFECT_IRONFLOW_MAPPING/",
+        "Concept mapping from Prefect 3.",
+    ),
     ("Architecture", "architecture/", "Python shim, Rust engine, persistence."),
     ("How-to overview", "how-to/", "Task-focused guides index."),
     ("How to set up IronFlow", "how-to/setup/", "Clone, env, cargo build, env vars."),
-    ("How to run the server and UI", "how-to/server-and-ui/", "ironflow_server.py and manual uvicorn."),
-    ("How to deploy with CLI", "how-to/deploy-with-cli/", "ironflow.yaml and ironflow CLI."),
-    ("How to create deployments", "how-to/deployments/", "HTTP API deployment recipes."),
-    ("How to compose flows with subflows", "how-to/subflows/", "Inline and deployment-backed subflows."),
-    ("How to port from Prefect", "how-to/port-from-prefect/", "Import swap and subset limits."),
-    ("Compatibility matrix", "compatibility/", "Supported vs unsupported Prefect semantics."),
+    (
+        "How to run the server and UI",
+        "how-to/server-and-ui/",
+        "ironflow_server.py and manual uvicorn.",
+    ),
+    (
+        "How to deploy with CLI",
+        "how-to/deploy-with-cli/",
+        "ironflow.yaml and ironflow CLI.",
+    ),
+    (
+        "How to create deployments",
+        "how-to/deployments/",
+        "HTTP API deployment recipes.",
+    ),
+    (
+        "How to compose flows with subflows",
+        "how-to/subflows/",
+        "Inline and deployment-backed subflows.",
+    ),
+    (
+        "How to port from Prefect",
+        "how-to/port-from-prefect/",
+        "Import swap and subset limits.",
+    ),
+    (
+        "Compatibility matrix",
+        "compatibility/",
+        "Supported vs unsupported Prefect semantics.",
+    ),
     ("Environment variables", "reference/env-vars/", "All IRONFLOW_* variables."),
     ("REST API overview", "reference/api/", "HTTP route index."),
-    ("Troubleshooting", "reference/troubleshooting/", "Common install and server issues."),
-    ("Performance (vs Prefect)", "PERFORMANCE_OVERVIEW/", "Control-plane throughput expectations."),
+    (
+        "Troubleshooting",
+        "reference/troubleshooting/",
+        "Common install and server issues.",
+    ),
+    (
+        "Performance (vs Prefect)",
+        "PERFORMANCE_OVERVIEW/",
+        "Control-plane throughput expectations.",
+    ),
 ]
 
 with gen_open("llms.txt", "w") as f:

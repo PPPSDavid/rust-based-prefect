@@ -27,7 +27,9 @@ def test_dispatch_exact_and_wildcard_to_state() -> None:
 
     specs = compile_transition_hooks(
         (
-            on_transition(record, from_state=RunState.RUNNING, to_state=RunState.COMPLETED),
+            on_transition(
+                record, from_state=RunState.RUNNING, to_state=RunState.COMPLETED
+            ),
             on_transition(record, to_state=RunState.FAILED),
         )
     )
@@ -99,7 +101,9 @@ def test_flow_hooks_batch_and_completion(tmp_path) -> None:
 
     def log_flow(ctx: TransitionContext) -> None:
         if ctx.kind == "flow":
-            edges.append((ctx.from_state.value, ctx.to_state.value, ctx.transition_kind))
+            edges.append(
+                (ctx.from_state.value, ctx.to_state.value, ctx.transition_kind)
+            )
 
     @flow(transition_hooks=[on_transition(log_flow)])
     def sample() -> int:
@@ -116,7 +120,11 @@ def test_flow_hook_to_failed_wildcard(tmp_path) -> None:
     set_control_plane(plane)
     failures: list[TransitionContext] = []
 
-    @flow(transition_hooks=[on_transition(lambda c: failures.append(c), to_state=RunState.FAILED)])
+    @flow(
+        transition_hooks=[
+            on_transition(lambda c: failures.append(c), to_state=RunState.FAILED)
+        ]
+    )
     def boom() -> None:
         raise ValueError("nope")
 
@@ -132,7 +140,15 @@ def test_task_hook_pending_to_running(tmp_path) -> None:
     set_control_plane(plane)
     hits: list[TransitionContext] = []
 
-    @task(transition_hooks=[on_transition(lambda c: hits.append(c), from_state=RunState.PENDING, to_state=RunState.RUNNING)])
+    @task(
+        transition_hooks=[
+            on_transition(
+                lambda c: hits.append(c),
+                from_state=RunState.PENDING,
+                to_state=RunState.RUNNING,
+            )
+        ]
+    )
     def inc(x: int) -> int:
         return x + 1
 
@@ -153,7 +169,9 @@ def test_task_completed_metadata(tmp_path) -> None:
 
     @task(
         name="inc2",
-        transition_hooks=[on_transition(lambda c: captured.append(c), to_state=RunState.COMPLETED)],
+        transition_hooks=[
+            on_transition(lambda c: captured.append(c), to_state=RunState.COMPLETED)
+        ],
     )
     def inc2(x: int) -> int:
         return x + 1
@@ -180,13 +198,21 @@ def test_flow_without_hooks_has_no_transition_callback(tmp_path) -> None:
 
 
 @pytest.mark.parametrize("use_rust", ("1", "0"))
-def test_hooks_with_rust_fsm_toggle(tmp_path, monkeypatch: pytest.MonkeyPatch, use_rust: str) -> None:
+def test_hooks_with_rust_fsm_toggle(
+    tmp_path, monkeypatch: pytest.MonkeyPatch, use_rust: str
+) -> None:
     monkeypatch.setenv("IRONFLOW_USE_RUST_FSM", use_rust)
     plane = InMemoryControlPlane(history_path=str(tmp_path / f"rust_{use_rust}.jsonl"))
     set_control_plane(plane)
     edges: list[str] = []
 
-    @flow(transition_hooks=[on_transition(lambda c: edges.append(c.to_state.value) if c.kind == "flow" else None)])
+    @flow(
+        transition_hooks=[
+            on_transition(
+                lambda c: edges.append(c.to_state.value) if c.kind == "flow" else None
+            )
+        ]
+    )
     def sample() -> int:
         return 7
 

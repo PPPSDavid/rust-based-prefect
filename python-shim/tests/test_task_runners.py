@@ -54,7 +54,10 @@ def test_map_thread_pool_parallel_smoke(tmp_path):
     assert f() == sum(i * 2 for i in range(8))
 
 
-@pytest.mark.skipif(os.name == "nt", reason="multiprocessing pool from pytest is unreliable on Windows spawn")
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="multiprocessing pool from pytest is unreliable on Windows spawn",
+)
 def test_map_process_pool_picklable_task(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     plane = InMemoryControlPlane(history_path=str(tmp_path / "proc.jsonl"))

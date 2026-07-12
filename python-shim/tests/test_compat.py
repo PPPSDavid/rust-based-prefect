@@ -1,6 +1,13 @@
 from uuid import uuid4
 
-from prefect_compat import InMemoryControlPlane, RunState, flow, set_control_plane, task, wait
+from prefect_compat import (
+    InMemoryControlPlane,
+    RunState,
+    flow,
+    set_control_plane,
+    task,
+    wait,
+)
 
 
 def test_submit_chain_and_map(tmp_path):

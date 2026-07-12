@@ -304,26 +304,41 @@ def _startup_local_worker() -> None:
             paused=False,
         )
     global _worker_thread, _scheduler_thread, _rust_scheduler_started
-    if os.getenv("IRONFLOW_ENABLE_SCHEDULER", "1").strip().lower() not in {"0", "false", "no"}:
+    if os.getenv("IRONFLOW_ENABLE_SCHEDULER", "1").strip().lower() not in {
+        "0",
+        "false",
+        "no",
+    }:
         interval_ms = int(os.getenv("IRONFLOW_SCHEDULER_INTERVAL_MS", "1000"))
         stale = int(os.getenv("IRONFLOW_SCHEDULER_STALE_SECONDS", "120"))
-        if control_plane.start_rust_deployment_scheduler(interval_ms=interval_ms, stale_after_seconds=stale):
+        if control_plane.start_rust_deployment_scheduler(
+            interval_ms=interval_ms, stale_after_seconds=stale
+        ):
             _rust_scheduler_started = True
         elif _scheduler_thread is None or not _scheduler_thread.is_alive():
             _scheduler_stop_event.clear()
             _scheduler_thread = threading.Thread(
-                target=_scheduler_maintenance_loop, name="ironflow-scheduler", daemon=True
+                target=_scheduler_maintenance_loop,
+                name="ironflow-scheduler",
+                daemon=True,
             )
             _scheduler_thread.start()
-    if os.getenv("IRONFLOW_ENABLE_LOCAL_WORKER", "1").strip().lower() in {"0", "false", "no"}:
+    if os.getenv("IRONFLOW_ENABLE_LOCAL_WORKER", "1").strip().lower() in {
+        "0",
+        "false",
+        "no",
+    }:
         return
     if _worker_thread is None or not _worker_thread.is_alive():
         _worker_stop_event.clear()
         use_rust_wait = bool(
-            getattr(control_plane, "_rust_db_bound", False) and getattr(control_plane, "_rust_fsm_bridge", None)
+            getattr(control_plane, "_rust_db_bound", False)
+            and getattr(control_plane, "_rust_fsm_bridge", None)
         )
         target = _local_worker_loop_rust_wait if use_rust_wait else _local_worker_loop
-        _worker_thread = threading.Thread(target=target, name="ironflow-local-worker", daemon=True)
+        _worker_thread = threading.Thread(
+            target=target, name="ironflow-local-worker", daemon=True
+        )
         _worker_thread.start()
 
 
@@ -361,7 +376,9 @@ def list_task_runs(
     limit: int = Query(default=200, ge=1, le=1000),
     cursor: str | None = Query(default=None),
 ) -> CursorPage:
-    page = control_plane.list_task_runs(flow_run_id=flow_run_id, limit=limit, cursor=cursor)
+    page = control_plane.list_task_runs(
+        flow_run_id=flow_run_id, limit=limit, cursor=cursor
+    )
     return CursorPage(items=page.items, next_cursor=page.next_cursor)
 
 
@@ -446,7 +463,9 @@ def list_deployment_runs(
     limit: int = Query(default=200, ge=1, le=1000),
     cursor: str | None = Query(default=None),
 ) -> CursorPage:
-    page = control_plane.list_deployment_runs(deployment_id=deployment_id, limit=limit, cursor=cursor)
+    page = control_plane.list_deployment_runs(
+        deployment_id=deployment_id, limit=limit, cursor=cursor
+    )
     return CursorPage(items=page.items, next_cursor=page.next_cursor)
 
 
@@ -508,7 +527,9 @@ def get_work_pool(work_pool_id: str) -> dict:
 @app.patch("/api/work-pools/{work_pool_id}")
 def patch_work_pool(work_pool_id: str, req: WorkPoolPatchRequest) -> dict:
     try:
-        return control_plane.patch_work_pool(work_pool_id, req.model_dump(exclude_unset=True))
+        return control_plane.patch_work_pool(
+            work_pool_id, req.model_dump(exclude_unset=True)
+        )
     except ValueError as exc:
         detail = str(exc)
         status_code = 404 if "not found" in detail else 400
@@ -521,7 +542,9 @@ def list_workers(
     limit: int = Query(default=100, ge=1, le=500),
     cursor: str | None = Query(default=None),
 ) -> CursorPage:
-    page = control_plane.list_workers(work_pool_id=work_pool_id, limit=limit, cursor=cursor)
+    page = control_plane.list_workers(
+        work_pool_id=work_pool_id, limit=limit, cursor=cursor
+    )
     return CursorPage(items=page.items, next_cursor=page.next_cursor)
 
 
@@ -542,7 +565,9 @@ def worker_heartbeat(req: WorkerHeartbeatRequest) -> dict:
 
 
 @app.post("/api/deployments/{deployment_id}/run")
-def trigger_deployment_run(deployment_id: UUID, req: DeploymentRunTriggerRequest) -> dict:
+def trigger_deployment_run(
+    deployment_id: UUID, req: DeploymentRunTriggerRequest
+) -> dict:
     try:
         return control_plane.trigger_deployment_run(
             deployment_id=deployment_id,
@@ -575,7 +600,9 @@ def list_events(
     limit: int = Query(default=500, ge=1, le=2000),
     cursor: str | None = Query(default=None),
 ) -> CursorPage:
-    page = control_plane.list_events(flow_run_id=flow_run_id, limit=limit, cursor=cursor)
+    page = control_plane.list_events(
+        flow_run_id=flow_run_id, limit=limit, cursor=cursor
+    )
     return CursorPage(items=page.items, next_cursor=page.next_cursor)
 
 
@@ -585,7 +612,9 @@ def get_flow_run_dag(
     mode: str = Query(default="logical"),
 ) -> dict:
     if mode not in {"logical", "expanded"}:
-        raise HTTPException(status_code=400, detail="mode must be 'logical' or 'expanded'")
+        raise HTTPException(
+            status_code=400, detail="mode must be 'logical' or 'expanded'"
+        )
     return control_plane.get_flow_run_dag(flow_run_id=flow_run_id, mode=mode)
 
 
@@ -644,7 +673,9 @@ async def _sleep_short() -> None:
 
 @app.get("/api/stream/flow-runs")
 async def stream_flow_runs() -> StreamingResponse:
-    return StreamingResponse(_sse_stream(channel="flow-runs"), media_type="text/event-stream")
+    return StreamingResponse(
+        _sse_stream(channel="flow-runs"), media_type="text/event-stream"
+    )
 
 
 @app.get("/api/stream/flow-runs/{flow_run_id}")

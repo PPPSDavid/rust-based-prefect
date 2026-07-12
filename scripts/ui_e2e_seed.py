@@ -26,11 +26,21 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Seed flow/task/log/event data for end-to-end UI visual checks."
     )
-    parser.add_argument("--api-base", default="http://127.0.0.1:8000", help="API base URL")
-    parser.add_argument("--mapped", type=int, default=2, help="Number of mapped runs to create")
-    parser.add_argument("--chained", type=int, default=2, help="Number of chained runs to create")
-    parser.add_argument("--failing", type=int, default=1, help="Number of failing runs to create")
-    parser.add_argument("--complexity", type=int, default=6, help="Task complexity input")
+    parser.add_argument(
+        "--api-base", default="http://127.0.0.1:8000", help="API base URL"
+    )
+    parser.add_argument(
+        "--mapped", type=int, default=2, help="Number of mapped runs to create"
+    )
+    parser.add_argument(
+        "--chained", type=int, default=2, help="Number of chained runs to create"
+    )
+    parser.add_argument(
+        "--failing", type=int, default=1, help="Number of failing runs to create"
+    )
+    parser.add_argument(
+        "--complexity", type=int, default=6, help="Task complexity input"
+    )
     args = parser.parse_args()
 
     health_url = f"{args.api_base}/health"

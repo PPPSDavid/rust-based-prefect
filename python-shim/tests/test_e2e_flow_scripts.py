@@ -14,9 +14,8 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def _is_prefect_temp_server_error(stderr: str) -> bool:
     lowered = stderr.lower()
-    return (
-        "prefect - starting temporary server" in lowered
-        and ("503" in lowered or "service unavailable" in lowered)
+    return "prefect - starting temporary server" in lowered and (
+        "503" in lowered or "service unavailable" in lowered
     )
 
 
@@ -50,7 +49,7 @@ def test_prefect_script_e2e_if_available():
         env=os.environ.copy(),
     )
     if proc.returncode != 0 and _is_prefect_temp_server_error(proc.stderr):
-        pytest.skip("Prefect temporary server returned 503 in this environment")
+        pytest.skip(msg="Prefect temporary server returned 503 in this environment")  # ty: ignore[unknown-argument]
     assert proc.returncode == 0, proc.stderr
     assert "prefect_result=26" in proc.stdout
 

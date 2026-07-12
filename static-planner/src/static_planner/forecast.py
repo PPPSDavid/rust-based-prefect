@@ -48,6 +48,8 @@ def forecast_graph(graph: GraphIR) -> dict:
         "task_count": task_count,
         "edge_count": sum(len(n.deps) for n in graph.nodes),
         "critical_path_length": critical_path,
-        "estimated_parallelism": ceil(task_count / critical_path) if critical_path else 0,
+        "estimated_parallelism": ceil(task_count / critical_path)
+        if critical_path
+        else 0,
         "cycle_detected": False,
     }

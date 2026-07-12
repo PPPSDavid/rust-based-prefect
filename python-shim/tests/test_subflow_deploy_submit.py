@@ -18,7 +18,9 @@ def _plane(tmp_path: Path) -> InMemoryControlPlane:
     return InMemoryControlPlane(history_path=str(tmp_path / "subflow-p1.jsonl"))
 
 
-def _start_worker(plane: InMemoryControlPlane, registry: dict, pool_id: str = "default-process-pool"):
+def _start_worker(
+    plane: InMemoryControlPlane, registry: dict, pool_id: str = "default-process-pool"
+):
     stop = threading.Event()
     thread = threading.Thread(
         target=run_worker_loop,

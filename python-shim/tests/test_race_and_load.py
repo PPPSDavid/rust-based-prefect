@@ -28,8 +28,12 @@ def test_transition_load_progression(tmp_path):
 
     for i in range(total_runs):
         run = plane.create_flow_run(f"flow-{i}")
-        plane.set_flow_state(run.run_id, RunState.PENDING, uuid4(), "propose", expected_version=0)
-        plane.set_flow_state(run.run_id, RunState.RUNNING, uuid4(), "start", expected_version=1)
+        plane.set_flow_state(
+            run.run_id, RunState.PENDING, uuid4(), "propose", expected_version=0
+        )
+        plane.set_flow_state(
+            run.run_id, RunState.RUNNING, uuid4(), "start", expected_version=1
+        )
         plane.set_flow_state(
             run.run_id, RunState.COMPLETED, uuid4(), "complete", expected_version=2
         )

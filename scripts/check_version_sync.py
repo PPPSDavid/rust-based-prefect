@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Verify repo VERSION matches rust-engine and Python package versions."""
+
 from __future__ import annotations
 
 import json
@@ -62,9 +63,21 @@ def main() -> int:
         frontend_ver = str(v) if isinstance(v, str) else None
 
     checks: list[tuple[str, Path, str | None]] = [
-        ("rust-engine [package].version", ROOT / "rust-engine" / "Cargo.toml", _cargo_package_version(ROOT / "rust-engine" / "Cargo.toml")),
-        ("python-shim [project].version", ROOT / "python-shim" / "pyproject.toml", _pyproject_project_version(ROOT / "python-shim" / "pyproject.toml")),
-        ("static-planner [project].version", ROOT / "static-planner" / "pyproject.toml", _pyproject_project_version(ROOT / "static-planner" / "pyproject.toml")),
+        (
+            "rust-engine [package].version",
+            ROOT / "rust-engine" / "Cargo.toml",
+            _cargo_package_version(ROOT / "rust-engine" / "Cargo.toml"),
+        ),
+        (
+            "python-shim [project].version",
+            ROOT / "python-shim" / "pyproject.toml",
+            _pyproject_project_version(ROOT / "python-shim" / "pyproject.toml"),
+        ),
+        (
+            "static-planner [project].version",
+            ROOT / "static-planner" / "pyproject.toml",
+            _pyproject_project_version(ROOT / "static-planner" / "pyproject.toml"),
+        ),
         ("frontend package.json version", frontend_pkg, frontend_ver),
     ]
 

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Generic, Sequence, TypeVar, cast
+from typing import Any, Generic, TypeVar, cast
+from collections.abc import Sequence
 from uuid import UUID
 
 from .decorators import (
@@ -56,8 +57,13 @@ class SubflowFuture(Generic[T]):
                 self._value = None
             return cast(T, self._value)
         if status == "CANCELLED":
-            raise RuntimeError(f"subflow deployment run {self.deployment_run_id} was cancelled")
-        err = terminal.get("error") or f"subflow deployment run {self.deployment_run_id} failed"
+            raise RuntimeError(
+                f"subflow deployment run {self.deployment_run_id} was cancelled"
+            )
+        err = (
+            terminal.get("error")
+            or f"subflow deployment run {self.deployment_run_id} failed"
+        )
         raise RuntimeError(str(err))
 
 
@@ -72,7 +78,7 @@ class DeploymentSubflowHandle:
     def submit(
         self,
         *,
-        wait_for: Sequence[TaskFuture[Any] | "SubflowFuture[Any]"] | None = None,
+        wait_for: Sequence[TaskFuture[Any] | SubflowFuture[Any]] | None = None,
         **parameters: Any,
     ) -> SubflowFuture[Any]:
         if wait_for:
@@ -94,7 +100,9 @@ class DeploymentSubflowHandle:
             planned_node_id=planned_node_id,
             kind="subflow",
         )
-        plane.record_task_event(task_run.task_run_id, "task_pending", {"subflow": self.name})
+        plane.record_task_event(
+            task_run.task_run_id, "task_pending", {"subflow": self.name}
+        )
 
         parent_dep_run_id = _ACTIVE_DEPLOYMENT_RUN.get()
         dep_run = plane.trigger_deployment_run(

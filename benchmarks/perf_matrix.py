@@ -13,7 +13,7 @@ import tempfile
 import threading
 import time
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -110,6 +110,7 @@ def _cpu_seconds_now() -> float:
 
 def _rss_bytes_now() -> int:
     if sys.platform == "win32":
+
         class PROCESS_MEMORY_COUNTERS(ctypes.Structure):
             _fields_ = [
                 ("cb", ctypes.c_ulong),
@@ -127,7 +128,9 @@ def _rss_bytes_now() -> int:
         counters = PROCESS_MEMORY_COUNTERS()
         counters.cb = ctypes.sizeof(PROCESS_MEMORY_COUNTERS)
         handle = ctypes.windll.kernel32.GetCurrentProcess()
-        ok = ctypes.windll.psapi.GetProcessMemoryInfo(handle, ctypes.byref(counters), counters.cb)
+        ok = ctypes.windll.psapi.GetProcessMemoryInfo(
+            handle, ctypes.byref(counters), counters.cb
+        )
         if ok:
             return int(counters.WorkingSetSize)
         return 0
@@ -561,7 +564,9 @@ def _run_decorator_hook_micro_iteration(
             history_path = None
             db_path = Path(td) / "unused.db"
 
-        plane = InMemoryControlPlane(history_path=str(history_path) if history_path else None)
+        plane = InMemoryControlPlane(
+            history_path=str(history_path) if history_path else None
+        )
         sqlite_before = float(db_path.stat().st_size) if db_path.exists() else 0.0
         wal_path = db_path.with_suffix(".db-wal")
         wal_before = float(wal_path.stat().st_size) if wal_path.exists() else 0.0
@@ -634,7 +639,9 @@ def _run_decorator_hook_micro_iteration(
         wall_seconds = time.perf_counter() - wall_start
 
         after_proc = _process_snapshot()
-        sqlite_after = float(db_path.stat().st_size) if db_path.exists() else sqlite_before
+        sqlite_after = (
+            float(db_path.stat().st_size) if db_path.exists() else sqlite_before
+        )
         wal_after = float(wal_path.stat().st_size) if wal_path.exists() else wal_before
 
         events = len(plane.events())
@@ -711,7 +718,9 @@ def _run_decorator_map_micro_iteration(
             history_path = None
             db_path = Path(td) / "unused.db"
 
-        plane = InMemoryControlPlane(history_path=str(history_path) if history_path else None)
+        plane = InMemoryControlPlane(
+            history_path=str(history_path) if history_path else None
+        )
         sqlite_before = float(db_path.stat().st_size) if db_path.exists() else 0.0
         wal_path = db_path.with_suffix(".db-wal")
         wal_before = float(wal_path.stat().st_size) if wal_path.exists() else 0.0
@@ -754,7 +763,9 @@ def _run_decorator_map_micro_iteration(
         wall_seconds = time.perf_counter() - wall_start
 
         after_proc = _process_snapshot()
-        sqlite_after = float(db_path.stat().st_size) if db_path.exists() else sqlite_before
+        sqlite_after = (
+            float(db_path.stat().st_size) if db_path.exists() else sqlite_before
+        )
         wal_after = float(wal_path.stat().st_size) if wal_path.exists() else wal_before
 
         tasks_per_flow = map_width + 1
@@ -767,13 +778,17 @@ def _run_decorator_map_micro_iteration(
         }
         throughput = {
             "flows_per_sec": iterations / wall_seconds if wall_seconds else 0.0,
-            "tasks_per_sec": (iterations * tasks_per_flow) / wall_seconds if wall_seconds else 0.0,
+            "tasks_per_sec": (iterations * tasks_per_flow) / wall_seconds
+            if wall_seconds
+            else 0.0,
             "transitions_per_sec": 0.0,
             "task_events_per_sec": 0.0,
         }
         latency_ms = {"decorator_map_micro.invocation_ms": _latency_stats_ms(per_ms)}
         process = {
-            "cpu_seconds_used": max(0.0, after_proc.cpu_seconds - before_proc.cpu_seconds),
+            "cpu_seconds_used": max(
+                0.0, after_proc.cpu_seconds - before_proc.cpu_seconds
+            ),
             "rss_bytes_start": float(before_proc.rss_bytes),
             "rss_bytes_end": float(after_proc.rss_bytes),
             "rss_bytes_delta": float(after_proc.rss_bytes - before_proc.rss_bytes),
@@ -835,7 +850,9 @@ def _run_subflow_iteration(
             history_path = None
             db_path = Path(td) / "unused.db"
 
-        plane = InMemoryControlPlane(history_path=str(history_path) if history_path else None)
+        plane = InMemoryControlPlane(
+            history_path=str(history_path) if history_path else None
+        )
         sqlite_before = float(db_path.stat().st_size) if db_path.exists() else 0.0
         wal_path = db_path.with_suffix(".db-wal")
         wal_before = float(wal_path.stat().st_size) if wal_path.exists() else 0.0
@@ -857,13 +874,17 @@ def _run_subflow_iteration(
         wall_seconds = time.perf_counter() - wall_start
 
         after_proc = _process_snapshot()
-        sqlite_after = float(db_path.stat().st_size) if db_path.exists() else sqlite_before
+        sqlite_after = (
+            float(db_path.stat().st_size) if db_path.exists() else sqlite_before
+        )
         wal_after = float(wal_path.stat().st_size) if wal_path.exists() else wal_before
         events = len(plane.events())
         _close_plane_footprint(plane)
         from prefect_compat import set_control_plane
 
-        set_control_plane(InMemoryControlPlane(history_path=str(Path(td) / "teardown.jsonl")))
+        set_control_plane(
+            InMemoryControlPlane(history_path=str(Path(td) / "teardown.jsonl"))
+        )
 
     counts = {
         "flows_created": int(profile_counts.get("flows_created", 0)),
@@ -877,12 +898,16 @@ def _run_subflow_iteration(
             counts[key] = int(value)
 
     throughput = {
-        "flows_per_sec": counts["flows_created"] / wall_seconds if wall_seconds else 0.0,
+        "flows_per_sec": counts["flows_created"] / wall_seconds
+        if wall_seconds
+        else 0.0,
         "tasks_per_sec": 0.0,
         "transitions_per_sec": events / wall_seconds if wall_seconds else 0.0,
         "task_events_per_sec": events / wall_seconds if wall_seconds else 0.0,
     }
-    latency_ms = {key: _latency_stats_ms(values) for key, values in latencies.items() if values}
+    latency_ms = {
+        key: _latency_stats_ms(values) for key, values in latencies.items() if values
+    }
     process = {
         "cpu_seconds_used": max(0.0, after_proc.cpu_seconds - before_proc.cpu_seconds),
         "rss_bytes_start": float(before_proc.rss_bytes),
@@ -926,18 +951,33 @@ def _measure_read_queries(
         choice = rng.random()
         # API shapes: list_flow_runs(state, limit, cursor); list_task_runs / list_events need a real flow_run_id.
         if choice < 0.34:
-            _timed_call(latencies, "query.list_flow_runs", plane.list_flow_runs, None, 200, None)
+            _timed_call(
+                latencies, "query.list_flow_runs", plane.list_flow_runs, None, 200, None
+            )
         elif not flow_ids:
-            _timed_call(latencies, "query.list_flow_runs", plane.list_flow_runs, None, 200, None)
+            _timed_call(
+                latencies, "query.list_flow_runs", plane.list_flow_runs, None, 200, None
+            )
         else:
             rid = flow_ids[rng.randrange(len(flow_ids))]
             if choice < 0.67:
-                _timed_call(latencies, "query.list_task_runs", plane.list_task_runs, rid, 200, None)
+                _timed_call(
+                    latencies,
+                    "query.list_task_runs",
+                    plane.list_task_runs,
+                    rid,
+                    200,
+                    None,
+                )
             else:
-                _timed_call(latencies, "query.list_events", plane.list_events, rid, 200, None)
+                _timed_call(
+                    latencies, "query.list_events", plane.list_events, rid, 200, None
+                )
         if flow_ids and rng.random() < 0.4:
             rid = flow_ids[rng.randrange(len(flow_ids))]
-            _timed_call(latencies, "query.get_flow_run_detail", plane.get_flow_run_detail, rid)
+            _timed_call(
+                latencies, "query.get_flow_run_detail", plane.get_flow_run_detail, rid
+            )
 
 
 _FSM_TASK_LIFECYCLE = (
@@ -986,7 +1026,13 @@ def _apply_flow_start_transitions(
         (RunState.RUNNING, uuid4(), "bench", 1),
         (RunState.COMPLETED, uuid4(), "bench", 2),
     ]
-    _timed_call(latencies, "set_flow_state", plane.set_flow_states_batch, flow_run_id, transitions)
+    _timed_call(
+        latencies,
+        "set_flow_state",
+        plane.set_flow_states_batch,
+        flow_run_id,
+        transitions,
+    )
     return 3
 
 
@@ -1012,10 +1058,16 @@ def _run_mixed_concurrent(
             if stop.is_set() or shared_flow_id is None:
                 break
             task = _timed_call(
-                latencies, "create_task", plane.create_task_run, shared_flow_id, f"mixed-task-{i}"
+                latencies,
+                "create_task",
+                plane.create_task_run,
+                shared_flow_id,
+                f"mixed-task-{i}",
             )
             if recipe.fsm_task_lifecycle:
-                n_events = _record_task_events_for_recipe(plane, latencies, task.task_run_id, recipe, i)
+                n_events = _record_task_events_for_recipe(
+                    plane, latencies, task.task_run_id, recipe, i
+                )
             else:
                 _timed_call(
                     latencies,
@@ -1031,7 +1083,13 @@ def _run_mixed_concurrent(
 
     def reader(reader_idx: int) -> None:
         local_reads = reads_per_reader + (1 if reader_idx < extra_reads else 0)
-        _measure_read_queries(plane, flow_ids, random.Random(rng.randint(0, 2**31)), latencies, local_reads)
+        _measure_read_queries(
+            plane,
+            flow_ids,
+            random.Random(rng.randint(0, 2**31)),
+            latencies,
+            local_reads,
+        )
         with lock:
             counts["read_queries"] += local_reads
 
@@ -1078,28 +1136,45 @@ def _run_recipe_iteration(
             history_path = None
             db_path = Path(td) / "unused.db"
 
-        plane = InMemoryControlPlane(history_path=str(history_path) if history_path else None)
+        plane = InMemoryControlPlane(
+            history_path=str(history_path) if history_path else None
+        )
         try:
             if not recipe.cold_start:
                 warm_flow = plane.create_flow_run("warmup-flow")
-                plane.set_flow_state(warm_flow.run_id, RunState.PENDING, uuid4(), "warmup")
-                plane.set_flow_state(warm_flow.run_id, RunState.RUNNING, uuid4(), "warmup")
-                plane.set_flow_state(warm_flow.run_id, RunState.COMPLETED, uuid4(), "warmup")
+                plane.set_flow_state(
+                    warm_flow.run_id, RunState.PENDING, uuid4(), "warmup"
+                )
+                plane.set_flow_state(
+                    warm_flow.run_id, RunState.RUNNING, uuid4(), "warmup"
+                )
+                plane.set_flow_state(
+                    warm_flow.run_id, RunState.COMPLETED, uuid4(), "warmup"
+                )
 
             before_proc = _process_snapshot()
             sqlite_before = float(db_path.stat().st_size) if db_path.exists() else 0.0
             wal_before = (
-                float((db_path.with_suffix(".db-wal")).stat().st_size) if db_path.with_suffix(".db-wal").exists() else 0.0
+                float((db_path.with_suffix(".db-wal")).stat().st_size)
+                if db_path.with_suffix(".db-wal").exists()
+                else 0.0
             )
             wall_start = time.perf_counter()
 
             flow_ids: list[Any] = []
             for idx in range(recipe.flow_count):
-                flow = _timed_call(latencies, "create_flow", plane.create_flow_run, f"{recipe.name}-flow-{idx}")
+                flow = _timed_call(
+                    latencies,
+                    "create_flow",
+                    plane.create_flow_run,
+                    f"{recipe.name}-flow-{idx}",
+                )
                 flow_ids.append(flow.run_id)
                 counts["flows_created"] += 1
 
-                counts["flow_transitions"] += _apply_flow_start_transitions(plane, latencies, flow.run_id)
+                counts["flow_transitions"] += _apply_flow_start_transitions(
+                    plane, latencies, flow.run_id
+                )
 
                 for task_idx in range(recipe.tasks_per_flow):
                     if recipe.fsm_task_lifecycle:
@@ -1112,8 +1187,10 @@ def _run_recipe_iteration(
                                 f"task-{task_idx}-{evt}",
                             )
                             counts["tasks_created"] += 1
-                            counts["task_events_recorded"] += _record_task_events_for_recipe(
-                                plane, latencies, task.task_run_id, recipe, evt
+                            counts["task_events_recorded"] += (
+                                _record_task_events_for_recipe(
+                                    plane, latencies, task.task_run_id, recipe, evt
+                                )
                             )
                     else:
                         task = _timed_call(
@@ -1125,11 +1202,15 @@ def _run_recipe_iteration(
                         )
                         counts["tasks_created"] += 1
                         for evt in range(recipe.task_events_per_task):
-                            counts["task_events_recorded"] += _record_task_events_for_recipe(
-                                plane, latencies, task.task_run_id, recipe, evt
+                            counts["task_events_recorded"] += (
+                                _record_task_events_for_recipe(
+                                    plane, latencies, task.task_run_id, recipe, evt
+                                )
                             )
 
-            read_count = int((counts["tasks_created"] + counts["flows_created"]) * recipe.read_ratio)
+            read_count = int(
+                (counts["tasks_created"] + counts["flows_created"]) * recipe.read_ratio
+            )
             if recipe.mixed:
                 write_iterations = max(10, recipe.flow_count // 2)
                 read_iterations = max(10, read_count)
@@ -1149,26 +1230,47 @@ def _run_recipe_iteration(
 
             wall_seconds = time.perf_counter() - wall_start
             after_proc = _process_snapshot()
-            sqlite_after = float(db_path.stat().st_size) if db_path.exists() else sqlite_before
+            sqlite_after = (
+                float(db_path.stat().st_size) if db_path.exists() else sqlite_before
+            )
             wal_after = (
-                float((db_path.with_suffix(".db-wal")).stat().st_size) if db_path.with_suffix(".db-wal").exists() else wal_before
+                float((db_path.with_suffix(".db-wal")).stat().st_size)
+                if db_path.with_suffix(".db-wal").exists()
+                else wal_before
             )
         finally:
             _close_plane_footprint(plane)
 
-        total_writes = counts["flows_created"] + counts["tasks_created"] + counts["flow_transitions"] + counts["task_events_recorded"]
+        total_writes = (
+            counts["flows_created"]
+            + counts["tasks_created"]
+            + counts["flow_transitions"]
+            + counts["task_events_recorded"]
+        )
         sqlite_growth = max(0.0, sqlite_after - sqlite_before)
         write_amp = (sqlite_growth / float(total_writes)) if total_writes else 0.0
 
         throughput = {
-            "flows_per_sec": counts["flows_created"] / wall_seconds if wall_seconds else 0.0,
-            "tasks_per_sec": counts["tasks_created"] / wall_seconds if wall_seconds else 0.0,
-            "transitions_per_sec": counts["flow_transitions"] / wall_seconds if wall_seconds else 0.0,
-            "task_events_per_sec": counts["task_events_recorded"] / wall_seconds if wall_seconds else 0.0,
+            "flows_per_sec": counts["flows_created"] / wall_seconds
+            if wall_seconds
+            else 0.0,
+            "tasks_per_sec": counts["tasks_created"] / wall_seconds
+            if wall_seconds
+            else 0.0,
+            "transitions_per_sec": counts["flow_transitions"] / wall_seconds
+            if wall_seconds
+            else 0.0,
+            "task_events_per_sec": counts["task_events_recorded"] / wall_seconds
+            if wall_seconds
+            else 0.0,
         }
-        latency_ms = {name: _latency_stats_ms(values) for name, values in latencies.items()}
+        latency_ms = {
+            name: _latency_stats_ms(values) for name, values in latencies.items()
+        }
         process = {
-            "cpu_seconds_used": max(0.0, after_proc.cpu_seconds - before_proc.cpu_seconds),
+            "cpu_seconds_used": max(
+                0.0, after_proc.cpu_seconds - before_proc.cpu_seconds
+            ),
             "rss_bytes_start": float(before_proc.rss_bytes),
             "rss_bytes_end": float(after_proc.rss_bytes),
             "rss_bytes_delta": float(after_proc.rss_bytes - before_proc.rss_bytes),
@@ -1228,12 +1330,16 @@ def _run_recipe_task(
     return local_samples, asdict(aggregate_recipe(recipe, measured))
 
 
-def aggregate_recipe(recipe: WorkloadRecipe, measured: list[RecipeRunSample]) -> RecipeAggregate:
+def aggregate_recipe(
+    recipe: WorkloadRecipe, measured: list[RecipeRunSample]
+) -> RecipeAggregate:
     wall_values = [s.wall_clock_seconds for s in measured]
     throughput_keys = sorted({k for s in measured for k in s.throughput})
     latency_keys = sorted({k for s in measured for k in s.latency_ms})
     process_keys = sorted({k for s in measured for k in s.process})
-    sqlite_keys = sorted({k for s in measured for k in s.sqlite if isinstance(s.sqlite[k], (int, float))})
+    sqlite_keys = sorted(
+        {k for s in measured for k in s.sqlite if isinstance(s.sqlite[k], (int, float))}
+    )
 
     throughput: dict[str, dict[str, float]] = {}
     for key in throughput_keys:
@@ -1352,7 +1458,12 @@ def compare_runs(
         cand = candidate_rows.get(recipe)
         if base is None or cand is None:
             regressions.append(
-                {"recipe": recipe, "metric": "missing_recipe", "detail": "recipe missing in one side", "regression": True}
+                {
+                    "recipe": recipe,
+                    "metric": "missing_recipe",
+                    "detail": "recipe missing in one side",
+                    "regression": True,
+                }
             )
             continue
         flat_base = flatten_aggregate(RecipeAggregate(**base))
@@ -1364,7 +1475,11 @@ def compare_runs(
                 continue
             delta_pct = ((c - b) / b) * 100.0
             better_is_higher = metric.startswith("throughput.")
-            regression = delta_pct < (-threshold * 100.0) if better_is_higher else delta_pct > (threshold * 100.0)
+            regression = (
+                delta_pct < (-threshold * 100.0)
+                if better_is_higher
+                else delta_pct > (threshold * 100.0)
+            )
             row = {
                 "recipe": recipe,
                 "metric": metric,
@@ -1466,7 +1581,9 @@ def run_suite(
 
     if jobs <= 1:
         for recipe_name in recipes:
-            local_samples, aggregate = _run_recipe_task(recipe_name, repetitions, warmups, seed)
+            local_samples, aggregate = _run_recipe_task(
+                recipe_name, repetitions, warmups, seed
+            )
             samples.extend(local_samples)
             aggregates.append(aggregate)
     else:
@@ -1481,14 +1598,16 @@ def run_suite(
                 aggregates.append(aggregate)
 
     aggregates.sort(key=lambda row: str(row["recipe"]))
-    samples.sort(key=lambda row: (str(row["recipe"]), int(row["iteration"]), bool(row["warmup"])))
+    samples.sort(
+        key=lambda row: (str(row["recipe"]), int(row["iteration"]), bool(row["warmup"]))
+    )
 
     matrix_compare_key = canonical_matrix_compare_key(recipes)
     matrix_mode = describe_matrix_compare_key(matrix_compare_key)
 
     return {
         "metadata": {
-            "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+            "timestamp_utc": datetime.now(UTC).isoformat(),
             "git_sha": _git_sha(),
             "python_version": platform.python_version(),
             "rust_version": "unknown",
@@ -1565,16 +1684,25 @@ def build_run_markdown(payload: dict[str, Any], out_json: Path) -> str:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Deterministic performance matrix runner and comparator.")
+    parser = argparse.ArgumentParser(
+        description="Deterministic performance matrix runner and comparator."
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     run_cmd = sub.add_parser("run", help="Run deterministic benchmark suite.")
     run_cmd.add_argument("--preset", default="full", choices=sorted(_presets().keys()))
-    run_cmd.add_argument("--recipes", default="", help="Comma-separated recipe names (overrides preset).")
+    run_cmd.add_argument(
+        "--recipes", default="", help="Comma-separated recipe names (overrides preset)."
+    )
     run_cmd.add_argument("--repetitions", type=int, default=5)
     run_cmd.add_argument("--warmups", type=int, default=2)
     run_cmd.add_argument("--seed", type=int, default=BASE_SEED)
-    run_cmd.add_argument("--jobs", type=int, default=1, help="Number of worker processes for recipe parallelism.")
+    run_cmd.add_argument(
+        "--jobs",
+        type=int,
+        default=1,
+        help="Number of worker processes for recipe parallelism.",
+    )
     run_cmd.add_argument(
         "--out-json",
         default=str(ROOT / "docs" / "perf_matrix_results.json"),
@@ -1599,15 +1727,21 @@ def parse_args() -> argparse.Namespace:
         default="latency_ms.create_flow.p95=0.10,latency_ms.set_flow_state.p95=0.10,throughput.transitions_per_sec.median=0.10,wall_clock_seconds.p95=0.10",
         help="Comma list metric=ratio threshold.",
     )
-    cmp_cmd.add_argument("--out-json", default=str(ROOT / "docs" / "perf_compare_report.json"))
-    cmp_cmd.add_argument("--out-md", default=str(ROOT / "docs" / "perf_compare_report.md"))
+    cmp_cmd.add_argument(
+        "--out-json", default=str(ROOT / "docs" / "perf_compare_report.json")
+    )
+    cmp_cmd.add_argument(
+        "--out-md", default=str(ROOT / "docs" / "perf_compare_report.md")
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     if args.command == "run":
-        recipes = parse_recipe_list(args.recipes) if args.recipes else _presets()[args.preset]
+        recipes = (
+            parse_recipe_list(args.recipes) if args.recipes else _presets()[args.preset]
+        )
         payload = run_suite(
             recipes=recipes,
             repetitions=args.repetitions,
@@ -1625,7 +1759,9 @@ def main() -> int:
         print(f"wrote run report: {out_md}")
         mk = payload.get("metadata") or {}
         if mk.get("matrix_compare_key"):
-            print(f"benchmark mode: {mk.get('matrix_compare_key')} ({mk.get('matrix_mode', '')})")
+            print(
+                f"benchmark mode: {mk.get('matrix_compare_key')} ({mk.get('matrix_mode', '')})"
+            )
         return 0
 
     try:
@@ -1655,7 +1791,9 @@ def main() -> int:
         return 3
 
     status = "PASS" if result["pass"] else "FAIL"
-    print(f"{status}: regressions={len(result['regressions'])} comparisons={len(result['comparisons'])}")
+    print(
+        f"{status}: regressions={len(result['regressions'])} comparisons={len(result['comparisons'])}"
+    )
     print(f"report json: {out_json}")
     print(f"report md: {out_md}")
     return 0 if result["pass"] else 2

@@ -12,7 +12,9 @@ from .decorators import _ACTIVE_DEPLOYMENT_RUN
 from .runtime import RunState
 
 
-def _deployment_run_flow_run_id(control_plane: Any, deployment_run_id: UUID) -> UUID | None:
+def _deployment_run_flow_run_id(
+    control_plane: Any, deployment_run_id: UUID
+) -> UUID | None:
     """Flow run created for this deployment execution (set at @flow entry)."""
     dep_run = control_plane.get_deployment_run(deployment_run_id)
     if dep_run is None:

@@ -19,7 +19,9 @@ def _plane(tmp_path: Path) -> InMemoryControlPlane:
     return InMemoryControlPlane(history_path=str(tmp_path / "subflow-cancel.jsonl"))
 
 
-def _start_worker(plane: InMemoryControlPlane, registry: dict) -> tuple[threading.Event, threading.Thread]:
+def _start_worker(
+    plane: InMemoryControlPlane, registry: dict
+) -> tuple[threading.Event, threading.Thread]:
     stop = threading.Event()
     thread = threading.Thread(
         target=run_worker_loop,

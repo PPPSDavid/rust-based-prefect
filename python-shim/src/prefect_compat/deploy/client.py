@@ -37,7 +37,9 @@ class _UrllibSession:
     def __init__(self, base_url: str) -> None:
         self._base_url = base_url.rstrip("/")
 
-    def _request(self, method: str, path: str, json_body: dict[str, Any] | None = None) -> _UrllibResponse:
+    def _request(
+        self, method: str, path: str, json_body: dict[str, Any] | None = None
+    ) -> _UrllibResponse:
         url = f"{self._base_url}{path}"
         data = None
         headers: dict[str, str] = {}
@@ -64,7 +66,9 @@ class _UrllibSession:
 
 
 class DeployClient:
-    def __init__(self, base_url: str = "http://127.0.0.1:8000", session: Any | None = None) -> None:
+    def __init__(
+        self, base_url: str = "http://127.0.0.1:8000", session: Any | None = None
+    ) -> None:
         self.base_url = base_url.rstrip("/")
         self._session = session if session is not None else self._default_session()
         self._owns_session = session is None
@@ -88,7 +92,9 @@ class DeployClient:
         self.close()
 
     def ensure_work_pool(self, name: str, pool_type: str = "process") -> dict[str, Any]:
-        response = self._session.post("/api/work-pools", json={"name": name, "type": pool_type})
+        response = self._session.post(
+            "/api/work-pools", json={"name": name, "type": pool_type}
+        )
         response.raise_for_status()
         return response.json()
 
@@ -108,7 +114,9 @@ class DeployClient:
         response.raise_for_status()
         return response.json()
 
-    def upsert_deployment(self, spec: DeploymentSpec, dry_run: bool = False) -> dict[str, Any]:
+    def upsert_deployment(
+        self, spec: DeploymentSpec, dry_run: bool = False
+    ) -> dict[str, Any]:
         pool_name = spec.work_pool_name or DEFAULT_WORK_POOL_NAME
         existing = self.find_deployment_by_name(spec.name)
 
@@ -134,7 +142,9 @@ class DeployClient:
                 for key, value in body.items()
                 if key not in {"name", "flow_name"}
             }
-            response = self._session.patch(f"/api/deployments/{existing['id']}", json=patch_body)
+            response = self._session.patch(
+                f"/api/deployments/{existing['id']}", json=patch_body
+            )
             response.raise_for_status()
             return {"action": "update", "dry_run": False, "deployment": response.json()}
 

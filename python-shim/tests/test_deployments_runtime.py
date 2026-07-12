@@ -29,7 +29,9 @@ def _swap_plane(tmp_path: Path) -> None:
     control_plane._rust_fsm_handle = plane._rust_fsm_handle
     control_plane._rust_native_persistence = plane._rust_native_persistence
     control_plane._rust_db_bound = plane._rust_db_bound
-    control_plane._warned_deployment_fallback = getattr(plane, "_warned_deployment_fallback", False)
+    control_plane._warned_deployment_fallback = getattr(
+        plane, "_warned_deployment_fallback", False
+    )
     control_plane._test_plane_ref = plane
     set_control_plane(control_plane)
 
@@ -82,7 +84,9 @@ def test_cancel_new_when_at_exec_capacity(tmp_path: Path) -> None:
 
     first = control_plane.trigger_deployment_run(d_id, parameters={})
     assert first["status"] == "SCHEDULED"
-    claimed = control_plane.claim_next_deployment_run(worker_name="w1", lease_seconds=30)
+    claimed = control_plane.claim_next_deployment_run(
+        worker_name="w1", lease_seconds=30
+    )
     assert claimed is not None
     assert claimed["id"] == first["id"]
 
@@ -112,7 +116,9 @@ def test_enqueue_second_run_stays_scheduled_until_slot_frees(tmp_path: Path) -> 
     c2 = control_plane.claim_next_deployment_run(worker_name="w1", lease_seconds=30)
     assert c2 is None
 
-    control_plane.mark_deployment_run_finished(UUID(c1["id"]), "COMPLETED", flow_run_id=None)
+    control_plane.mark_deployment_run_finished(
+        UUID(c1["id"]), "COMPLETED", flow_run_id=None
+    )
     c3 = control_plane.claim_next_deployment_run(worker_name="w1", lease_seconds=30)
     assert c3 is not None
     assert c3["id"] == r2["id"]
@@ -128,7 +134,9 @@ def test_reclaim_expired_claim_back_to_scheduled(tmp_path: Path) -> None:
     )
     d_id = UUID(dep["id"])
     run = control_plane.trigger_deployment_run(d_id, parameters={})
-    claimed = control_plane.claim_next_deployment_run(worker_name="w1", lease_seconds=30)
+    claimed = control_plane.claim_next_deployment_run(
+        worker_name="w1", lease_seconds=30
+    )
     assert claimed is not None
 
     past = (datetime.now(UTC) - timedelta(seconds=120)).isoformat()
@@ -161,7 +169,9 @@ def test_interval_schedule_tick_inserts_run(tmp_path: Path) -> None:
         "SELECT COUNT(*) AS c FROM deployment_runs WHERE deployment_id = ?",
         [dep["id"]],
     )[0]["c"]
-    if control_plane._rust_fsm_active() and getattr(control_plane, "_rust_db_bound", False):
+    if control_plane._rust_fsm_active() and getattr(
+        control_plane, "_rust_db_bound", False
+    ):
         summary = control_plane.deployment_maintenance_tick(stale_after_seconds=120)
         assert int(summary.get("triggered", 0)) >= 1
     else:
@@ -195,7 +205,9 @@ def test_update_deployment_enables_schedule(tmp_path: Path) -> None:
     assert updated["schedule_interval_seconds"] == 120
 
 
-def test_rrule_schedule_sets_next_tick_and_clears_other_schedule_types(tmp_path: Path) -> None:
+def test_rrule_schedule_sets_next_tick_and_clears_other_schedule_types(
+    tmp_path: Path,
+) -> None:
     _swap_plane(tmp_path)
     dep = control_plane.create_deployment(
         name="rrule-flow",
@@ -211,7 +223,9 @@ def test_rrule_schedule_sets_next_tick_and_clears_other_schedule_types(tmp_path:
     assert dep["schedule_next_run_at"]
 
 
-def test_disabled_rrule_metadata_can_be_stored_without_scheduler(tmp_path: Path) -> None:
+def test_disabled_rrule_metadata_can_be_stored_without_scheduler(
+    tmp_path: Path,
+) -> None:
     _swap_plane(tmp_path)
     dep = control_plane.create_deployment(
         name="rrule-disabled",
@@ -243,7 +257,9 @@ def test_deployment_maintenance_prefers_rust_when_bound(tmp_path: Path) -> None:
     _swap_plane(tmp_path)
     summary = control_plane.deployment_maintenance_tick(stale_after_seconds=120)
     assert "reclaimed" in summary and "triggered" in summary and "reaped" in summary
-    if control_plane._rust_fsm_active() and getattr(control_plane, "_rust_db_bound", False):
+    if control_plane._rust_fsm_active() and getattr(
+        control_plane, "_rust_db_bound", False
+    ):
         # Single FFI op returns all three counters when native build matches.
         assert isinstance(summary["reclaimed"], int)
 
@@ -252,5 +268,7 @@ def test_deployment_maintenance_prefers_rust_when_bound(tmp_path: Path) -> None:
 def test_worker_heartbeat_upsert(tmp_path: Path, worker: str) -> None:
     _swap_plane(tmp_path)
     control_plane.worker_heartbeat(worker)
-    rows = control_plane._query_rows("SELECT name, status FROM workers WHERE name = ?", [worker])
+    rows = control_plane._query_rows(
+        "SELECT name, status FROM workers WHERE name = ?", [worker]
+    )
     assert rows and rows[0]["status"] == "ONLINE"

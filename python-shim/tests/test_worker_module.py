@@ -45,7 +45,9 @@ def test_execute_claimed_run_completes(tmp_path: Path) -> None:
     run = control_plane.trigger_deployment_run(UUID(dep["id"]), parameters={"n": 5})
     assert run["status"] == "SCHEDULED"
 
-    claimed = control_plane.claim_next_deployment_run(worker_name="test-worker", lease_seconds=30)
+    claimed = control_plane.claim_next_deployment_run(
+        worker_name="test-worker", lease_seconds=30
+    )
     assert claimed is not None
     assert claimed["id"] == run["id"]
 

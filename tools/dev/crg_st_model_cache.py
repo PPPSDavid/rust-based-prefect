@@ -43,7 +43,7 @@ def _apply() -> None:
         return self._model
 
     emb.LocalEmbeddingProvider._get_model = _get_model_cached  # type: ignore[method-assign]
-    emb.LocalEmbeddingProvider._crg_cache_patched = True
+    setattr(emb.LocalEmbeddingProvider, "_crg_cache_patched", True)
 
 
 _apply()

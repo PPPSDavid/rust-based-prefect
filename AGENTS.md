@@ -116,9 +116,10 @@ When ownership areas shift, new hotspots appear, or validation commands change, 
 
 Run before declaring completion:
 
-1. `python -m pytest python-shim/tests static-planner/tests benchmarks/tests` (from repo root; `pytest.ini` adds `python-shim/src`, `static-planner/src`, and `.` to `PYTHONPATH`)
-2. `cargo test --manifest-path rust-engine/Cargo.toml`
-3. After any significant change/refactor/new feature, run a deterministic perf check to guard against regressions:
+1. `python -m ruff check .` and `python -m ty check` (configuration in root `pyproject.toml`; install `requirements-ci.txt` first)
+2. `python -m pytest python-shim/tests static-planner/tests benchmarks/tests` (from repo root; `pytest.ini` adds `python-shim/src`, `static-planner/src`, and `.` to `PYTHONPATH`)
+3. `cargo test --manifest-path rust-engine/Cargo.toml`
+4. After any significant change/refactor/new feature, run a deterministic perf check to guard against regressions:
    - Fast local gate: `python benchmarks/perf_matrix.py run --preset lite --repetitions 1 --warmups 0 --jobs 2`
    - If a baseline exists: `python benchmarks/perf_matrix.py compare --baseline <baseline.json> --candidate <candidate.json>` — only valid when both runs share the same **benchmark mode** (`metadata.matrix_compare_key`, e.g. `preset:lite` vs `preset:full`). If modes differ, the tool skips comparison and exits `3` (exit `2` = metric regression, `1` = bad input file such as a non–perf-matrix JSON).
 
@@ -289,9 +290,7 @@ Non-obvious caveats for this environment:
   Seed demo runs for the UI with `python3 scripts/ui_e2e_seed.py` (needs the backend up). The local
   worker + scheduler run as daemon threads inside the API process (toggle via `IRONFLOW_ENABLE_LOCAL_WORKER`
   / `IRONFLOW_ENABLE_SCHEDULER`).
-- **Lint is not a CI gate:** `ruff` is installed but the repo has no ruff config and CI never runs it, so
-  `python3 -m ruff check .` reports pre-existing default-rule style findings — do not treat those as failures
-  or "fix" them as part of unrelated work.
+- **Python lint:** CI runs `python -m ruff check .` and `python -m ty check` (see root `pyproject.toml`). Install `requirements-ci.txt` before running locally.
 - **Persistence is local files** under `data/` (JSONL history + a stdlib-SQLite read model); there is no
   external database/broker to start. `data/` is git-ignored, but `benchmarks/perf_matrix.py run` overwrites
   tracked `docs/perf_matrix_results.json` / `docs/perf_matrix_summary.md` — revert those unless a benchmark

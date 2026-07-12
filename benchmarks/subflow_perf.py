@@ -5,10 +5,17 @@ from __future__ import annotations
 import threading
 import time
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
+from collections.abc import Callable
 from uuid import UUID, uuid4
 
-from prefect_compat import InMemoryControlPlane, deployment_ref, flow, set_control_plane, task
+from prefect_compat import (
+    InMemoryControlPlane,
+    deployment_ref,
+    flow,
+    set_control_plane,
+    task,
+)
 from prefect_compat.cancellation import FlowRunCancelled, sleep_cancelable
 from prefect_compat.worker import run_worker_loop
 
@@ -20,7 +27,13 @@ POOL_A = "default-process-pool"
 POOL_B = "subflow-perf-pool-b"
 
 
-def _timed(latencies: dict[str, list[float]], key: str, fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+def _timed(
+    latencies: dict[str, list[float]],
+    key: str,
+    fn: Callable[..., Any],
+    *args: Any,
+    **kwargs: Any,
+) -> Any:
     start = time.perf_counter()
     result = fn(*args, **kwargs)
     latencies.setdefault(key, []).append((time.perf_counter() - start) * 1000.0)
@@ -55,7 +68,9 @@ def _start_workers(
     return stop, threads
 
 
-def _ensure_chain_deploy(plane: InMemoryControlPlane, registry: dict[str, Any], *, pool_id: str = POOL_A) -> None:
+def _ensure_chain_deploy(
+    plane: InMemoryControlPlane, registry: dict[str, Any], *, pool_id: str = POOL_A
+) -> None:
     if "chain_child" in registry:
         return
 
@@ -77,7 +92,9 @@ def _ensure_chain_deploy(plane: InMemoryControlPlane, registry: dict[str, Any], 
         )
 
 
-def _build_inline_depth_flows(depth: int, fanout: int) -> tuple[Callable[[], int], dict[str, Any]]:
+def _build_inline_depth_flows(
+    depth: int, fanout: int
+) -> tuple[Callable[[], int], dict[str, Any]]:
     registry: dict[str, Any] = {}
 
     @task
@@ -99,7 +116,9 @@ def _build_inline_depth_flows(depth: int, fanout: int) -> tuple[Callable[[], int
         bound_child = child_fn
         level_name = f"inline_level_{level}"
 
-        def _make_parent(inner: Callable[[int], int], name: str) -> Callable[[int], int]:
+        def _make_parent(
+            inner: Callable[[int], int], name: str
+        ) -> Callable[[int], int]:
             @flow(name=name)
             def parent_flow(n: int) -> int:
                 return inner(n)
@@ -155,7 +174,9 @@ def _close_plane(plane: InMemoryControlPlane) -> None:
             pass
 
 
-def _worker_count_for_profile(profile: str, flow_count: int, tasks_per_flow: int) -> int:
+def _worker_count_for_profile(
+    profile: str, flow_count: int, tasks_per_flow: int
+) -> int:
     if profile == "deploy_wait_chain":
         return max(3, flow_count)
     if profile == "deploy_cross_pool":
@@ -211,8 +232,19 @@ def run_query_dag_nested(
         detail = plane.get_flow_run_detail(root_run.run_id)
         if detail is None:
             return 0
-        _timed(latencies, "subflow.detail_query_ms", plane.get_flow_run_detail, root_run.run_id)
-        _timed(latencies, "subflow.dag_query_ms", plane.get_flow_run_dag, root_run.run_id, "logical")
+        _timed(
+            latencies,
+            "subflow.detail_query_ms",
+            plane.get_flow_run_detail,
+            root_run.run_id,
+        )
+        _timed(
+            latencies,
+            "subflow.dag_query_ms",
+            plane.get_flow_run_dag,
+            root_run.run_id,
+            "logical",
+        )
         reads = 2
         for child in detail.get("children") or []:
             plane.get_flow_run_dag(UUID(str(child["id"])), mode="logical")
@@ -260,7 +292,9 @@ def run_subflow_profile(
             plane,
             latencies,
             depth=flow_count,
-            query_iterations=max(1, tasks_per_flow if not warmup else max(1, tasks_per_flow // 5)),
+            query_iterations=max(
+                1, tasks_per_flow if not warmup else max(1, tasks_per_flow // 5)
+            ),
             warmup_iters=warmup_iters,
         )
 
@@ -289,7 +323,10 @@ def run_subflow_profile(
                 sample_fn=_sample,
             )
         for idx in range(iterations):
-            def _timed_sample(plane: InMemoryControlPlane, registry: dict[str, Any]) -> None:
+
+            def _timed_sample(
+                plane: InMemoryControlPlane, registry: dict[str, Any]
+            ) -> None:
                 set_control_plane(plane)
                 _ensure_chain_deploy(plane, registry)
 
@@ -324,7 +361,9 @@ def run_subflow_profile(
             pool_ids.append(pool_id)
             return pool_id
 
-        def _cross_pool_sample(plane: InMemoryControlPlane, registry: dict[str, Any], *, timed: bool) -> None:
+        def _cross_pool_sample(
+            plane: InMemoryControlPlane, registry: dict[str, Any], *, timed: bool
+        ) -> None:
             set_control_plane(plane)
             _ensure_chain_deploy(plane, registry, pool_id=pool_ids[0])
 
@@ -364,7 +403,13 @@ def run_subflow_profile(
         burst = flow_count
         warm_n = max(1, burst // 10)
 
-        def _burst_sample(plane: InMemoryControlPlane, registry: dict[str, Any], *, count: int, timed: bool) -> None:
+        def _burst_sample(
+            plane: InMemoryControlPlane,
+            registry: dict[str, Any],
+            *,
+            count: int,
+            timed: bool,
+        ) -> None:
             set_control_plane(plane)
 
             @flow
@@ -415,7 +460,9 @@ def run_subflow_profile(
         counts = {"cancel_ops": 0}
         child_count = flow_count
 
-        def _cancel_sample(plane: InMemoryControlPlane, registry: dict[str, Any]) -> None:
+        def _cancel_sample(
+            plane: InMemoryControlPlane, registry: dict[str, Any]
+        ) -> None:
             set_control_plane(plane)
 
             @flow
@@ -463,7 +510,12 @@ def run_subflow_profile(
             if not parent_id_holder:
                 raise RuntimeError("parent_launcher did not return a flow run id")
             parent_id = parent_id_holder[0]
-            _timed(latencies, "subflow.cancel_propagation_ms", plane.cancel_flow_run, parent_id)
+            _timed(
+                latencies,
+                "subflow.cancel_propagation_ms",
+                plane.cancel_flow_run,
+                parent_id,
+            )
             dep_rows = plane._query_rows(
                 "SELECT status FROM deployment_runs WHERE parent_flow_run_id = ?",
                 [str(parent_id)],

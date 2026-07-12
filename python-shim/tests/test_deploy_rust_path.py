@@ -29,7 +29,9 @@ def _swap_plane(tmp_path: Path) -> None:
     control_plane._rust_fsm_handle = plane._rust_fsm_handle
     control_plane._rust_native_persistence = plane._rust_native_persistence
     control_plane._rust_db_bound = plane._rust_db_bound
-    control_plane._warned_deployment_fallback = getattr(plane, "_warned_deployment_fallback", False)
+    control_plane._warned_deployment_fallback = getattr(
+        plane, "_warned_deployment_fallback", False
+    )
     control_plane._test_plane_ref = plane
     set_control_plane(control_plane)
 
@@ -67,12 +69,16 @@ def test_deployment_maintenance_prefers_rust_when_bound(tmp_path: Path) -> None:
     _swap_plane(tmp_path)
     summary = control_plane.deployment_maintenance_tick(stale_after_seconds=120)
     assert "reclaimed" in summary and "triggered" in summary and "reaped" in summary
-    if control_plane._rust_fsm_active() and getattr(control_plane, "_rust_db_bound", False):
+    if control_plane._rust_fsm_active() and getattr(
+        control_plane, "_rust_db_bound", False
+    ):
         # Single FFI op returns all three counters when native build matches.
         assert isinstance(summary["reclaimed"], int)
 
 
-def test_claim_uses_rust_when_bound(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_claim_uses_rust_when_bound(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _swap_plane(tmp_path)
     dep = control_plane.create_deployment(
         name="rust-claim-flow",
@@ -114,7 +120,9 @@ def test_claim_uses_rust_when_bound(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         },
     )
 
-    claimed = control_plane.claim_next_deployment_run(worker_name="w1", lease_seconds=30)
+    claimed = control_plane.claim_next_deployment_run(
+        worker_name="w1", lease_seconds=30
+    )
     assert "deployment_claim_next" in calls
     assert claimed is not None
     assert claimed["id"] == run["id"]
