@@ -60,7 +60,7 @@ Typical pattern:
 - Prefect Cloud-style API keys
 - Audit log of authenticated principals
 
-See [Compatibility matrix](../../COMPATIBILITY.md) for explicit boundaries.
+See [Compatibility matrix](../compatibility.md) for explicit boundaries.
 
 ## Related
 

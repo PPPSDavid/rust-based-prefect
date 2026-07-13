@@ -67,6 +67,8 @@ nav:
       - Overview: how-to/index.md
       - "How to set up IronFlow": how-to/setup.md
       - "How to run the server and UI": how-to/server-and-ui.md
+      - "How to run the server in Docker": how-to/docker-quickstart.md
+      - "How to secure a self-hosted server": how-to/secure-self-hosted.md
       - "How to deploy with the CLI and ironflow.yaml": how-to/deploy-with-cli.md
       - "How to create and update deployments": how-to/deployments.md
       - "How to compose flows with subflows": how-to/subflows.md

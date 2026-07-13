@@ -1,6 +1,6 @@
 # How to run the IronFlow server in Docker
 
-Quick path for a **single-container** API server with embedded scheduler and local worker (Tier A). For production compose (Postgres, split workers), see the [self-hosted plan](../plans/self-hosted-docker-auth.md).
+Quick path for a **single-container** API server with embedded scheduler and local worker (Tier A). For production compose (Postgres, split workers), see the [self-hosted server](../SELF_HOSTED_SERVER.md) guide; longer-term roadmap lives in `docs/plans/self-hosted-docker-auth.md` in the repository (not published to the MkDocs site).
 
 **Prefect reference:** [Run the Prefect server in Docker](https://docs.prefect.io/v3/how-to-guides/self-hosted/server-docker)
 
@@ -93,7 +93,7 @@ bash scripts/docker_server_smoke.sh
 | `pip install ironflow-prefect-compat` | Flow code, libraries, custom processes |
 | `docker pull ghcr.io/.../ironflow-server` | Running the control-plane API without managing Python/uvicorn |
 
-Both ship the **same wheel version**; the image is an opinionated server runtime. Details: [`deploy/docker/README.md`](../../deploy/docker/README.md).
+Both ship the **same wheel version**; the image is an opinionated server runtime. Maintainer notes (PyPI vs GHCR tags) live in `deploy/docker/README.md` in the repository.
 
 ## Related
 

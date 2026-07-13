@@ -97,8 +97,10 @@ curl -sf -u "admin:pass" -X POST "${BASE_URL}/api/deployments/${DEPLOYMENT_ID}/r
   -d '{"parameters":{"n":2}}' | "$PYTHON" -m json.tool >/dev/null
 
 echo "==> Smoke: CLI deploy client with IRONFLOW_API_AUTH_STRING"
+# Prefer the checkout tree over requiring ``uv`` (GitHub-hosted runners lack it).
+export PYTHONPATH="${ROOT}/python-shim/src${PYTHONPATH:+:${PYTHONPATH}}"
 IRONFLOW_API_URL="${BASE_URL}" IRONFLOW_API_AUTH_STRING="admin:pass" \
-  uv run python -c "
+  "$PYTHON" -c "
 from prefect_compat.deploy.client import DeployClient
 client = DeployClient('${BASE_URL}')
 pools = client._session.get('/api/work-pools')
