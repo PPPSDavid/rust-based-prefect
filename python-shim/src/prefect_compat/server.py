@@ -14,7 +14,7 @@ from starlette.responses import StreamingResponse
 
 from datetime import timedelta
 
-from .auth import BasicAuthMiddleware
+from .auth_middleware import BasicAuthMiddleware
 from .decorators import flow, set_control_plane, task, wait
 from .gates import gate
 from .runtime import InMemoryControlPlane

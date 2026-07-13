@@ -6,11 +6,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from prefect_compat.auth import (
-    BasicAuthMiddleware,
     api_client_auth_string,
     basic_authorization_header,
     server_api_auth_string,
 )
+from prefect_compat.auth_middleware import BasicAuthMiddleware
 from prefect_compat.server import app
 
 

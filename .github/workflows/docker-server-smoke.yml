@@ -6,6 +6,7 @@ on:
     paths:
       - "deploy/docker/**"
       - "python-shim/src/prefect_compat/auth.py"
+      - "python-shim/src/prefect_compat/auth_middleware.py"
       - "python-shim/src/prefect_compat/server.py"
       - "python-shim/src/prefect_compat/deploy/client.py"
       - "scripts/docker_server_smoke.sh"
