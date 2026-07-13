@@ -97,8 +97,9 @@ curl -sf -u "admin:pass" -X POST "${BASE_URL}/api/deployments/${DEPLOYMENT_ID}/r
   -d '{"parameters":{"n":2}}' | "$PYTHON" -m json.tool >/dev/null
 
 echo "==> Smoke: CLI deploy client with IRONFLOW_API_AUTH_STRING"
-# Prefer the checkout tree over requiring ``uv`` (GitHub-hosted runners lack it).
-export PYTHONPATH="${ROOT}/python-shim/src${PYTHONPATH:+:${PYTHONPATH}}"
+# Install the same local wheel the image used so host client deps (pydantic) resolve.
+WHEEL="$(ls "${ROOT}"/dist/wheels/ironflow_prefect_compat-*.whl | head -n 1)"
+"$PYTHON" -m pip install -q "${WHEEL}"
 IRONFLOW_API_URL="${BASE_URL}" IRONFLOW_API_AUTH_STRING="admin:pass" \
   "$PYTHON" -c "
 from prefect_compat.deploy.client import DeployClient
