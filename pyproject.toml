@@ -17,6 +17,7 @@ dev = [
   "rich>=13,<14",
   "ruff>=0.8,<1",
   "ty>=0.0.1,<1",
+  "psycopg[binary]>=3.1,<4",
 ]
 
 [tool.uv]
@@ -58,6 +59,7 @@ unused-type-ignore-comment = "error"
 # Optional deps not installed in the default CI Python environment.
 allowed-unresolved-imports = [
     "code_review_graph.**",
+    "crg_st_model_cache",
     "mcp.**",
     "mkdocs_gen_files",
     "prefect",

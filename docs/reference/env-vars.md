@@ -6,7 +6,8 @@ IronFlow configuration uses `IRONFLOW_*` environment variables. Defaults assume 
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `IRONFLOW_HISTORY_PATH` | `data/ironflow_history.jsonl` (when server defaults apply) | JSONL append-only history file. A SQLite sidecar (`.db` next to the JSONL path) powers query APIs. Server and standalone workers must share the same path. |
+| `IRONFLOW_HISTORY_PATH` | `data/ironflow_history.jsonl` (when server defaults apply) | JSONL append-only history file. A SQLite sidecar (`.db` next to the JSONL path) powers query APIs in file mode. Server and standalone workers must share the same path when not using Postgres + HTTP workers. |
+| `IRONFLOW_DATABASE_URL` | *(unset)* | When set to a `postgresql://` / `postgres://` DSN, use Postgres for the control-plane schema instead of the SQLite sidecar. Rust `bind_db` receives the DSN for claim/lease hot paths. Local default remains SQLite when unset. |
 
 ## Rust engine
 

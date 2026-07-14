@@ -14,6 +14,7 @@ uuid = { version = "=1.6.1", features = ["v4", "serde"] }
 chrono = { version = "=0.4.38", features = ["serde"] }
 rusqlite = { version = "0.31.0", features = ["bundled"] }
 cron = "=0.15.0"
+postgres = "0.19"
 
 [dev-dependencies]
 once_cell = "1"
