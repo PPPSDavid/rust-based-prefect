@@ -405,7 +405,7 @@ cargo test --manifest-path rust-engine/Cargo.toml
 | `cursor/docker-tier-a-c-b5da` | A, C | In progress | Server image + basic auth |
 | *(this PR / B0)* | B0 | In progress | RFC + SQLite persistence extract |
 | *(pending)* | B1 | Not started | Postgres + Rust bind + migrations |
-| *(pending)* | B2 | Not started | HTTP worker protocol |
+| *(pending)* | B2 | In flight | HTTP worker protocol |
 | *(pending)* | B3 | Not started | Services split |
 | *(pending)* | B4 | Not started | Redis / multi-worker API (optional) |
 | *(pending)* | B5 | Not started | Production compose |

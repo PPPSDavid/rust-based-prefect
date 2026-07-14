@@ -8,7 +8,7 @@ the short handoff; link the active plan from the task brief.
 | [subflows.md](subflows.md) | Implemented (Phases 0–5) |
 | [self-hosted-docker-auth.md](self-hosted-docker-auth.md) | Tier A+C shipped; Tier B in progress |
 | [self-hosted-storage-rfc.md](self-hosted-storage-rfc.md) | Accepted — persistence topology + Rust hot-path rules |
-| [self-hosted-docker-tier-b.md](self-hosted-docker-tier-b.md) | Executable 4-PR Tier B sequence (B0 done; B1 in flight) |
+| [self-hosted-docker-tier-b.md](self-hosted-docker-tier-b.md) | Executable 4-PR Tier B sequence (B0–B1 done; B2 in flight) |
 | [concurrency-limits.md](concurrency-limits.md) | Implemented (Phases 1–3 subset) — global + tag + rate_limit |
 
 When starting a large compatibility feature, add a plan before coding and name it
