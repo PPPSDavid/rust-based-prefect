@@ -91,10 +91,11 @@ Recommendation:
 
 ## Current Candidate Backlog
 
-These are not commitments; they are starting points from the May 2026 pass.
+These are not commitments; they are starting points from the May 2026 pass (updated July 2026 for concurrency).
 
 | Candidate | Current Prefect surface | IronFlow status | Why it fits |
 | --- | --- | --- | --- |
+| Global + tag concurrency limits | Named slot ledger, `concurrency` / `rate_limit`, leases, decay; tags as `tag:{name}` on enter `Running`. | Deployment concurrency only; global/tag **missing**. Plan: `docs/plans/concurrency-limits.md`. | Core control-plane feature; Rust lease/acquire fits existing claim patterns; high user impact. |
 | RRule deployment schedules | Prefect supports Cron, Interval, and RRule schedules. | Limited Rust-first RRule subset implemented; advanced calendar rules remain missing. | Bounded scheduling feature that fits existing Rust deployment scheduler paths. |
 | Minimal task caching | Prefect task caching uses cache keys, policies, expiration, storage, and isolation. | No documented cache API. | Good determinism/idempotency story, but result serialization and storage scope must stay narrow. |
 | `task.delay()` background tasks | Prefect supports fire-and-forget background task execution via workers. | `.submit()` and `.map()` exist; `.delay()` is missing. | Aligns with existing deployment queue/worker concepts, but needs careful future and queue semantics. |

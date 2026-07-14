@@ -29,4 +29,4 @@ The optional Vite/React frontend renders run DAGs from `GET /api/flow-runs/{id}/
 - `task.map` fan-out (subset)
 - `@task(name=...)` and repeated same-task invocations in one flow
 - retries/timeouts/cancellation semantics at control-plane level
-- concurrency-limit intent
+- deployment concurrency limits (per-deployment run caps); **not** Prefect global/tag slot limits yet — see `docs/plans/concurrency-limits.md`
