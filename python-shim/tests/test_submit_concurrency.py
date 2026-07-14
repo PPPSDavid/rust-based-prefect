@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 import time
 
 import pytest
@@ -13,10 +14,21 @@ from prefect_compat.task_runners import SequentialTaskRunner, ThreadPoolTaskRunn
 def test_independent_submits_overlap_with_thread_pool(tmp_path):
     plane = InMemoryControlPlane(history_path=str(tmp_path / "overlap.jsonl"))
     set_control_plane(plane)
+    in_sleep = 0
+    max_concurrent = 0
+    lock = threading.Lock()
 
     @task
     def sleep_ms(ms: int) -> int:
-        time.sleep(ms / 1000.0)
+        nonlocal in_sleep, max_concurrent
+        with lock:
+            in_sleep += 1
+            max_concurrent = max(max_concurrent, in_sleep)
+        try:
+            time.sleep(ms / 1000.0)
+        finally:
+            with lock:
+                in_sleep -= 1
         return ms
 
     @flow(task_runner=ThreadPoolTaskRunner(max_workers=4))
@@ -25,11 +37,10 @@ def test_independent_submits_overlap_with_thread_pool(tmp_path):
         b = sleep_ms.submit(250)
         wait([a, b])
 
-    t0 = time.perf_counter()
     f()
-    elapsed = time.perf_counter() - t0
-    # Two 0.25s sleeps should overlap (~0.25s), not serialize (~0.5s).
-    assert elapsed < 0.4, f"expected overlap, wall={elapsed:.3f}s"
+    # Prefer a concurrency counter over a brittle wall-clock ceiling (CI measured
+    # ~0.434s once vs a <0.4 bound while still overlapping).
+    assert max_concurrent >= 2, f"expected overlapping submits, max_concurrent={max_concurrent}"
 
 
 def test_wait_for_gates_submit_body_start(tmp_path):
