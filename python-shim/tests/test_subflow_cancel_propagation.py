@@ -53,7 +53,7 @@ def test_cancel_parent_cancels_scheduled_deployment_subflow(tmp_path: Path) -> N
     def parent_flow() -> None:
         from prefect_compat.decorators import _ACTIVE_FLOW_RUN
 
-        fut = deployment_ref("child-deploy").submit()
+        fut = deployment_ref("child-deploy").submit(detach=True)
         dep_run_id.append(fut.deployment_run_id)
         # fire-and-forget — parent completes without waiting
         _ = _ACTIVE_FLOW_RUN.get()
@@ -124,7 +124,7 @@ def test_cancel_parent_cancels_running_deployment_subflow(tmp_path: Path) -> Non
 
     threading.Thread(target=cancel_parent, daemon=True).start()
     try:
-        with pytest.raises(RuntimeError, match="cancelled"):
+        with pytest.raises((RuntimeError, FlowRunCancelled), match="cancelled"):
             parent_flow()
     finally:
         stop.set()

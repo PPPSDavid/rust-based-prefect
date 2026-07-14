@@ -6,7 +6,7 @@ the short handoff; link the active plan from the task brief.
 | Plan | Status |
 | --- | --- |
 | [subflows.md](subflows.md) | Implemented (Phases 0–5) |
-| [flow-run-final-state.md](flow-run-final-state.md) | Proposed — default wait_all aggregation + detach/explicit escape |
+| [flow-run-final-state.md](flow-run-final-state.md) | Implemented — default wait_all aggregation + detach/explicit escape |
 | [self-hosted-docker-auth.md](self-hosted-docker-auth.md) | Tier A+C shipped; Tier B in progress |
 | [self-hosted-storage-rfc.md](self-hosted-storage-rfc.md) | Accepted — persistence topology + Rust hot-path rules |
 | [self-hosted-docker-tier-b.md](self-hosted-docker-tier-b.md) | Executable 4-PR Tier B sequence (B0 done; B1 in flight) |

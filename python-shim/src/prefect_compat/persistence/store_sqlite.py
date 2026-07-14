@@ -99,7 +99,8 @@ class SqliteStore:
                 kind TEXT NOT NULL DEFAULT 'task',
                 child_flow_run_id TEXT,
                 child_deployment_run_id TEXT,
-                tags TEXT
+                tags TEXT,
+                contribute_to_flow_state INTEGER NOT NULL DEFAULT 1
             );
             CREATE TABLE IF NOT EXISTS dag_manifests (
                 seq INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -288,6 +289,11 @@ class SqliteStore:
             conn.execute("ALTER TABLE task_runs ADD COLUMN gate_open_at TEXT")
         if "tags" not in col_names:
             conn.execute("ALTER TABLE task_runs ADD COLUMN tags TEXT")
+        if "contribute_to_flow_state" not in col_names:
+            conn.execute(
+                "ALTER TABLE task_runs ADD COLUMN contribute_to_flow_state "
+                "INTEGER NOT NULL DEFAULT 1"
+            )
         # Global / tag concurrency limit tables (Python fallback + shared schema).
         ensure_gcl_schema(conn)
         conn.execute(

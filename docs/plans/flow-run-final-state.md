@@ -1,6 +1,6 @@
 # Flow-run final state from task / subflow states
 
-**Status:** Proposed (design only — not implemented)  
+**Status:** Implemented (slices 1–5 — Rust resolve, wait_all barrier, detach/explicit, docs, perf micro)  
 **Last updated:** 2026-07-14  
 **Scope (when implemented):** `rust-engine/` (aggregation), `python-shim/` (`@flow` completion barrier), docs (`COMPATIBILITY.md`, concepts)  
 **Forbidden on first slice:** Prefect `State` return-object parity, full CRASHED taxonomy, benchmark methodology changes  

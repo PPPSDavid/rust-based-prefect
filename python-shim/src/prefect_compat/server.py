@@ -224,6 +224,28 @@ def failing_flow(n: int) -> int:
     return final.result()
 
 
+@flow(task_runner=ThreadPoolTaskRunner())
+def wait_all_ok_flow(n: int) -> int:
+    """All concurrent submits succeed; wait_all resolves COMPLETED."""
+    a = inc.submit(n)
+    b = dbl.submit(n)
+    wait([a, b])
+    return a.result() + b.result()
+
+
+@flow(task_runner=ThreadPoolTaskRunner())
+def wait_all_orphan_fail_flow(n: int) -> str:
+    """Unobserved failed submit; wait_all must mark the flow FAILED."""
+    explode.submit(n)
+    return "unreachable"
+
+
+@flow
+def wait_all_inline_subflow(n: int) -> int:
+    """Inline subflow success under wait_all aggregation."""
+    return simple_flow(n)
+
+
 FLOW_REGISTRY = {
     "simple_flow": simple_flow,
     "wide_flow": wide_flow,
@@ -233,6 +255,9 @@ FLOW_REGISTRY = {
     "failing_flow": failing_flow,
     "cancelable_flow": cancelable_flow,
     "gated_flow": gated_flow,
+    "wait_all_ok_flow": wait_all_ok_flow,
+    "wait_all_orphan_fail_flow": wait_all_orphan_fail_flow,
+    "wait_all_inline_subflow": wait_all_inline_subflow,
 }
 
 
@@ -292,6 +317,9 @@ def benchmark_run(req: BenchmarkRequest) -> dict[str, float | int | str | bool |
         "long_chain": long_chain_flow,
         "failing": failing_flow,
         "gated": gated_flow,
+        "wait_all_ok": wait_all_ok_flow,
+        "wait_all_orphan_fail": wait_all_orphan_fail_flow,
+        "wait_all_inline_subflow": wait_all_inline_subflow,
         # Backwards-compatible aliases for existing scripts.
         "mapped": wide_flow,
         "chained": long_chain_flow,
@@ -300,7 +328,10 @@ def benchmark_run(req: BenchmarkRequest) -> dict[str, float | int | str | bool |
     if flow_fn is None:
         raise HTTPException(
             status_code=400,
-            detail="Unsupported flavor. Use one of: simple, wide, long_chain, failing, gated",
+            detail=(
+                "Unsupported flavor. Use one of: simple, wide, long_chain, failing, "
+                "gated, wait_all_ok, wait_all_orphan_fail, wait_all_inline_subflow"
+            ),
         )
     start = time.perf_counter()
     error: str | None = None
