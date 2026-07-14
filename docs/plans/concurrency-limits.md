@@ -134,16 +134,18 @@ Notes:
    - limit 0 → fail/abort task run (Prefect abort semantics)
    - otherwise block with backoff (env e.g. `IRONFLOW_TASK_TAG_SLOT_WAIT_SECONDS`, default 1–30s) then retry while flow run is still active / not cancelled.
 
-### Critical interaction with today’s execution model
+### Critical interaction with the execution model (plan-time note)
 
-IronFlow’s MVP `submit()` **batches** `PENDING`+`RUNNING` then runs the body **synchronously**. `map()` + `ThreadPoolTaskRunner` marks **all** mapped tasks `RUNNING` in `_prepare_map_task_runs` **before** workers execute bodies.
+**When this plan was written**, MVP `submit()` batched `PENDING`+`RUNNING` then ran the body **synchronously**, and `map()` + `ThreadPoolTaskRunner` marked mapped tasks `RUNNING` in `_prepare_map_task_runs` before workers executed bodies.
 
-Implications:
+**Current behavior (post concurrent-submit):** under `ThreadPoolTaskRunner`, independent `submit()` calls return futures immediately and run bodies in a shared pool; tag slots are acquired on the coordinating thread via `_start_task_run` (PENDING → acquire → RUNNING for tagged tasks). See `COMPATIBILITY.md` and **[Tasks](../concepts/tasks.md)**. Untagged submit may still batch PENDING+RUNNING; process-pool `submit` remains synchronous.
+
+Implications (original analysis):
 
 | Path | Gap if we only add a Python `concurrency()` CM |
 | --- | --- |
 | Explicit `with concurrency("db"):` inside task body | Works once slot ledger exists; slots held for body duration |
-| Tag limits on enter `Running` | **Broken today** if we keep “all map items → RUNNING” up front — tags would look fully used before any work starts |
+| Tag limits on enter `Running` | **Broken** if map path keeps “all map items → RUNNING” up front — tags would look fully used before any work starts |
 | Pure sequential `submit` chains | Tag limits rarely contended (one RUNNING at a time per flow) |
 
 **Required fix for tag parity:** split start transitions:
