@@ -104,4 +104,4 @@ Skip **B-fast** (shared-volume compose) unless explicitly requested.
 - [x] RFC checked in  
 - [x] `persistence/` package with SQLite backend  
 - [x] Control plane wires through `create_store` with unchanged SQLite behavior  
-- [ ] Focused store unit tests + existing deploy/worker/auth suites green  
+- [x] Focused store unit tests + existing deploy/worker/auth suites green  
