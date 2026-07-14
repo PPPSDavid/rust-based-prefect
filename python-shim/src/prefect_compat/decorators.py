@@ -55,9 +55,13 @@ _ACTIVE_FLOW_RUN: contextvars.ContextVar[UUID | None] = contextvars.ContextVar(
 _ACTIVE_DEPLOYMENT_RUN: contextvars.ContextVar[UUID | None] = contextvars.ContextVar(
     "ironflow_active_deployment_run", default=None
 )
-# Shared pool for concurrent ``submit`` under ``ThreadPoolTaskRunner`` (per flow invoke).
+# Shared pool for concurrent ``submit`` orchestration (thread + process runners).
 _ACTIVE_SUBMIT_EXECUTOR: contextvars.ContextVar[ThreadPoolExecutor | None] = (
     contextvars.ContextVar("ironflow_active_submit_executor", default=None)
+)
+# Process pool for picklable task bodies under ``ProcessPoolTaskRunner`` submit.
+_ACTIVE_PROCESS_POOL: contextvars.ContextVar[ProcessPoolExecutor | None] = (
+    contextvars.ContextVar("ironflow_active_process_pool", default=None)
 )
 
 _UNSET: Any = object()
@@ -66,9 +70,9 @@ _UNSET: Any = object()
 class TaskFuture(Generic[T]):
     """Future for a submitted task.
 
-    Completed synchronously (sequential / process / map finalize) or via an
-    underlying ``concurrent.futures.Future`` when ``ThreadPoolTaskRunner`` runs
-    the body off the coordinating thread.
+    Completed synchronously (sequential / map finalize) or via an underlying
+    ``concurrent.futures.Future`` when a non-sequential task runner orchestrates
+    wait/acquire/body off the coordinating thread.
     """
 
     __slots__ = ("task_run_id", "planned_node_id", "_value", "_cfuture")
@@ -131,33 +135,35 @@ class TaskWrapper:
         resolved_kwargs = {k: _resolve(v) for k, v in kwargs.items()}
         return cast(T, self.fn(*resolved_args, **resolved_kwargs))
 
-    def _start_task_run(
+    def _create_pending_task_run(
         self, flow_run_id: UUID, planned_node_id: str | None
-    ) -> tuple[TaskRunRecord, list[str]]:
-        """Create task run, PENDING, acquire tag slots, then RUNNING.
-
-        Untagged tasks keep the batched PENDING+RUNNING start for performance.
-        """
+    ) -> TaskRunRecord:
+        """Create a task run and record PENDING only (no tag acquire / RUNNING)."""
         task_run = _CONTROL_PLANE.create_task_run(
             flow_run_id,
             self.name,
             planned_node_id=planned_node_id,
             tags=self.tags,
         )
+        _CONTROL_PLANE.record_task_event(task_run.task_run_id, "task_pending", None)
+        th = self._transition_hooks
+        if th:
+            _emit_task_single_hook_edge(
+                th,
+                task_run,
+                self.name,
+                RunState.SCHEDULED,
+                RunState.PENDING,
+                "task_pending",
+                None,
+            )
+        return task_run
+
+    def _promote_pending_to_running(self, task_run: TaskRunRecord) -> list[str]:
+        """Acquire tag slots (if any), then transition PENDING → RUNNING."""
         lease_ids: list[str] = []
+        th = self._transition_hooks
         if self.tags:
-            _CONTROL_PLANE.record_task_event(task_run.task_run_id, "task_pending", None)
-            th = self._transition_hooks
-            if th:
-                _emit_task_single_hook_edge(
-                    th,
-                    task_run,
-                    self.name,
-                    RunState.SCHEDULED,
-                    RunState.PENDING,
-                    "task_pending",
-                    None,
-                )
             from .concurrency import (
                 ConcurrencyLimitError,
                 acquire_tag_slots_for_task,
@@ -189,31 +195,49 @@ class TaskWrapper:
                         {"task_name": self.name},
                     )
                 raise
-            _CONTROL_PLANE.record_task_event(task_run.task_run_id, "task_running", None)
-            if th:
-                _emit_task_single_hook_edge(
-                    th,
-                    task_run,
-                    self.name,
-                    RunState.PENDING,
-                    RunState.RUNNING,
-                    "task_running",
-                    None,
-                )
-        else:
-            _CONTROL_PLANE.record_task_events_batch(
-                task_run.task_run_id,
-                [
-                    ("task_pending", None),
-                    ("task_running", None),
-                ],
+        _CONTROL_PLANE.record_task_event(task_run.task_run_id, "task_running", None)
+        if th:
+            _emit_task_single_hook_edge(
+                th,
+                task_run,
+                self.name,
+                RunState.PENDING,
+                RunState.RUNNING,
+                "task_running",
+                None,
             )
-            th = self._transition_hooks
-            if th:
-                _emit_task_transition_edges(
-                    th, task_run, self.name, _TASK_HOOK_START_EDGES
-                )
-        return task_run, lease_ids
+        return lease_ids
+
+    def _start_task_run(
+        self, flow_run_id: UUID, planned_node_id: str | None
+    ) -> tuple[TaskRunRecord, list[str]]:
+        """Create task run through RUNNING on the coordinating thread (sequential path).
+
+        Untagged tasks keep the batched PENDING+RUNNING start for performance.
+        """
+        if self.tags:
+            task_run = self._create_pending_task_run(flow_run_id, planned_node_id)
+            return task_run, self._promote_pending_to_running(task_run)
+
+        task_run = _CONTROL_PLANE.create_task_run(
+            flow_run_id,
+            self.name,
+            planned_node_id=planned_node_id,
+            tags=self.tags,
+        )
+        _CONTROL_PLANE.record_task_events_batch(
+            task_run.task_run_id,
+            [
+                ("task_pending", None),
+                ("task_running", None),
+            ],
+        )
+        th = self._transition_hooks
+        if th:
+            _emit_task_transition_edges(
+                th, task_run, self.name, _TASK_HOOK_START_EDGES
+            )
+        return task_run, []
 
     def _release_tag_leases(self, lease_ids: list[str]) -> None:
         if lease_ids:
@@ -225,11 +249,37 @@ class TaskWrapper:
         wait_for: Sequence[TaskFuture[Any] | SubflowFuture[Any] | GateFuture[Any]] | None = None,
         **kwargs: Any,
     ) -> TaskFuture[T]:
-        # Gate deps on the coordinating thread so tag leases are not held while waiting.
+        flow_run_id = _ACTIVE_FLOW_RUN.get()
+        executor = _ACTIVE_SUBMIT_EXECUTOR.get()
+
+        # Non-sequential runners: create PENDING + return a future immediately.
+        # wait_for, tag acquire, RUNNING, and the body run on a worker.
+        if executor is not None:
+            task_run = None
+            if flow_run_id is not None:
+                planned_node_id = _CONTROL_PLANE.next_planned_node_id(
+                    flow_run_id, self.name
+                )
+                task_run = self._create_pending_task_run(flow_run_id, planned_node_id)
+            wait_for_list = list(wait_for) if wait_for else None
+            ctx = contextvars.copy_context()
+            cfuture = executor.submit(
+                ctx.run,
+                self._run_deferred_submit,
+                args,
+                kwargs,
+                task_run,
+                wait_for_list,
+            )
+            return TaskFuture(
+                task_run_id=str(task_run.task_run_id) if task_run is not None else None,
+                planned_node_id=task_run.planned_node_id if task_run is not None else None,
+                _cfuture=cfuture,
+            )
+
+        # Sequential / no shared pool: gate deps, start RUNNING, then run body sync.
         if wait_for:
             wait(wait_for)
-
-        flow_run_id = _ACTIVE_FLOW_RUN.get()
         task_run = None
         lease_ids: list[str] = []
         if flow_run_id is not None:
@@ -237,25 +287,23 @@ class TaskWrapper:
                 flow_run_id, self.name
             )
             task_run, lease_ids = self._start_task_run(flow_run_id, planned_node_id)
-
-        executor = _ACTIVE_SUBMIT_EXECUTOR.get()
-        if executor is not None:
-            ctx = contextvars.copy_context()
-            cfuture = executor.submit(
-                ctx.run,
-                self._execute_and_finalize_submit,
-                args,
-                kwargs,
-                task_run,
-                lease_ids,
-            )
-            return TaskFuture(
-                task_run_id=str(task_run.task_run_id) if task_run is not None else None,
-                planned_node_id=task_run.planned_node_id if task_run is not None else None,
-                _cfuture=cfuture,
-            )
-        # Sequential / process / no shared pool: run body on the caller thread.
         return self._run_submitted_body_sync(args, kwargs, task_run, lease_ids)
+
+    def _run_deferred_submit(
+        self,
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+        task_run: TaskRunRecord | None,
+        wait_for_list: list[TaskFuture[Any] | SubflowFuture[Any] | GateFuture[Any]]
+        | None,
+    ) -> T:
+        """Worker path: wait_for → tag acquire → RUNNING → body → finalize."""
+        if wait_for_list:
+            wait(wait_for_list)
+        lease_ids: list[str] = []
+        if task_run is not None:
+            lease_ids = self._promote_pending_to_running(task_run)
+        return self._execute_and_finalize_submit(args, kwargs, task_run, lease_ids)
 
     def _run_submitted_body_sync(
         self,
@@ -282,12 +330,20 @@ class TaskWrapper:
     ) -> T:
         """Run the task body, then record COMPLETED/FAILED via the control plane.
 
-        User work may run on a thread-pool worker; transitions always go through
-        ``InMemoryControlPlane.record_task_event`` (Rust FSM + lock serialization),
-        not a Python-only state write.
+        User work may run on a thread-pool worker (or a process-pool child); transitions
+        always go through ``InMemoryControlPlane.record_task_event`` (Rust FSM + lock
+        serialization), not a Python-only state write.
         """
         try:
-            result = self(*args, **kwargs)
+            process_pool = _ACTIVE_PROCESS_POOL.get()
+            if process_pool is not None:
+                resolved_args = [_resolve(v) for v in args]
+                resolved_kwargs = {k: _resolve(v) for k, v in kwargs.items()}
+                result = process_pool.submit(
+                    self.fn, *resolved_args, **resolved_kwargs
+                ).result()
+            else:
+                result = self(*args, **kwargs)
             if task_run is not None:
                 _CONTROL_PLANE.record_task_event(
                     task_run.task_run_id, "task_completed", {"task_name": self.name}
@@ -688,14 +744,26 @@ def flow(
             fh = compiled_flow_hooks
             submit_executor: ThreadPoolExecutor | None = None
             submit_exec_token: contextvars.Token[ThreadPoolExecutor | None] | None = None
-            if (
-                isinstance(resolved_runner, ThreadPoolTaskRunner)
-                and resolved_runner.resolve_max_workers() > 1
-            ):
-                submit_executor = ThreadPoolExecutor(
-                    max_workers=resolved_runner.resolve_max_workers()
+            process_pool: ProcessPoolExecutor | None = None
+            process_pool_token: contextvars.Token[ProcessPoolExecutor | None] | None = (
+                None
+            )
+            mx = (
+                resolved_runner.resolve_max_workers()
+                if isinstance(
+                    resolved_runner, (ThreadPoolTaskRunner, ProcessPoolTaskRunner)
                 )
+                else 1
+            )
+            if isinstance(resolved_runner, ThreadPoolTaskRunner) and mx > 1:
+                submit_executor = ThreadPoolExecutor(max_workers=mx)
                 submit_exec_token = _ACTIVE_SUBMIT_EXECUTOR.set(submit_executor)
+            elif isinstance(resolved_runner, ProcessPoolTaskRunner) and mx > 1:
+                # Orchestrate wait_for / tag acquire / FSM on threads; bodies in processes.
+                submit_executor = ThreadPoolExecutor(max_workers=mx)
+                submit_exec_token = _ACTIVE_SUBMIT_EXECUTOR.set(submit_executor)
+                process_pool = ProcessPoolExecutor(max_workers=mx)
+                process_pool_token = _ACTIVE_PROCESS_POOL.set(process_pool)
             try:
                 dep_run_id = _ACTIVE_DEPLOYMENT_RUN.get()
                 parent_flow_run_id = None
@@ -753,9 +821,16 @@ def flow(
                     )
                 try:
                     result = f(*args, **kwargs)
-                    _drain_submit_executor(submit_executor, submit_exec_token)
+                    _drain_submit_pools(
+                        submit_executor,
+                        submit_exec_token,
+                        process_pool,
+                        process_pool_token,
+                    )
                     submit_executor = None
                     submit_exec_token = None
+                    process_pool = None
+                    process_pool_token = None
                     current = _CONTROL_PLANE.get_flow(record.run_id)
                     if current.state == RunState.CANCELLED:
                         raise FlowRunCancelled(
@@ -813,7 +888,12 @@ def flow(
                         )
                     raise
             finally:
-                _drain_submit_executor(submit_executor, submit_exec_token)
+                _drain_submit_pools(
+                    submit_executor,
+                    submit_exec_token,
+                    process_pool,
+                    process_pool_token,
+                )
                 _ACTIVE_FLOW_RUN.reset(flow_token)
                 _ACTIVE_TASK_RUNNER.reset(token)
 
@@ -824,15 +904,22 @@ def flow(
     return decorate(fn)
 
 
-def _drain_submit_executor(
+def _drain_submit_pools(
     executor: ThreadPoolExecutor | None,
-    token: contextvars.Token[ThreadPoolExecutor | None] | None,
+    exec_token: contextvars.Token[ThreadPoolExecutor | None] | None,
+    process_pool: ProcessPoolExecutor | None = None,
+    process_token: contextvars.Token[ProcessPoolExecutor | None] | None = None,
 ) -> None:
-    """Shut down the per-flow submit pool after outstanding bodies finish."""
-    if token is not None:
-        _ACTIVE_SUBMIT_EXECUTOR.reset(token)
+    """Shut down per-flow submit orchestration / process pools after outstanding work."""
+    if exec_token is not None:
+        _ACTIVE_SUBMIT_EXECUTOR.reset(exec_token)
+    if process_token is not None:
+        _ACTIVE_PROCESS_POOL.reset(process_token)
+    # Drain orchestration threads first so process-pool submits finish, then processes.
     if executor is not None:
         executor.shutdown(wait=True)
+    if process_pool is not None:
+        process_pool.shutdown(wait=True)
 
 
 def _emit_flow_transition(

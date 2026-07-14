@@ -900,8 +900,8 @@ def _run_decorator_submit_micro_iteration(
 ) -> RecipeRunSample:
     """Benchmark N independent concurrent ``task.submit()`` calls (Rust FSM + thread pool).
 
-    Exercises coordinating-thread create / PENDING→RUNNING (batched Rust persist) and
-    lock-serialized COMPLETED transitions from worker threads via ``record_task_event``.
+    Exercises coordinating-thread create + PENDING, worker-side RUNNING, and
+    lock-serialized COMPLETED transitions via ``record_task_event``.
     """
     rng = random.Random(seed)
     _ = rng

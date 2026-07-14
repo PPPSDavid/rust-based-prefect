@@ -12,7 +12,7 @@ Task runners are **not** deployment **workers** or **work pools**. Workers claim
 | --- | --- |
 | **`SequentialTaskRunner`** | Single-threaded `submit` / `map`; bodies run on the coordinating thread (no overlap). |
 | **`ThreadPoolTaskRunner`** | Concurrent `submit` and `map` via `ThreadPoolExecutor` (Prefect 3–style default). Optional `max_workers`; pool size can also follow **`IRONFLOW_TASK_RUNNER_THREAD_POOL_MAX_WORKERS`**. |
-| **`ProcessPoolTaskRunner`** | Process-pool `map` for picklable tasks; optional **`IRONFLOW_TASK_RUNNER_PROCESS_POOL_MAX_WORKERS`**. Independent `submit()` calls remain **synchronous** on the caller (process-pool submit concurrency is not wired yet). |
+| **`ProcessPoolTaskRunner`** | Concurrent `submit` / `map` for picklable tasks; optional **`IRONFLOW_TASK_RUNNER_PROCESS_POOL_MAX_WORKERS`**. Orchestration (wait_for, tags, FSM) uses a thread pool; bodies run in child processes. |
 
 ## Choosing a runner
 
@@ -23,8 +23,8 @@ Task runners are **not** deployment **workers** or **work pools**. Workers claim
 
 ### `submit` vs `map`
 
-With **`ThreadPoolTaskRunner`** (the default), independent **`task.submit()`** calls return a future immediately and run task bodies concurrently in the flow’s shared thread pool. Use **`wait_for`** (or pass upstream futures as args) so dependents start only after upstream work finishes. **`map()`** remains the preferred fan-out for many inputs; both paths share the same runner semantics for threads.
+With **`ThreadPoolTaskRunner`** or **`ProcessPoolTaskRunner`**, independent **`task.submit()`** calls create a **PENDING** task run and return a future immediately. Workers then apply **`wait_for`**, acquire tag slots, promote to **RUNNING**, and run the body. Use **`wait_for`** (or pass upstream futures as args) so dependents do not start early. **`map()`** remains the preferred fan-out for many inputs.
 
-**`SequentialTaskRunner`** keeps `submit` / `map` non-overlapping. **`ProcessPoolTaskRunner`** parallelizes **`map()`** only; `submit()` stays synchronous until process-pool submit is supported.
+**`SequentialTaskRunner`** keeps `submit` / `map` end-to-end synchronous on the coordinating thread.
 
 For execution semantics of `submit` / `map` themselves, see **[Tasks](tasks.md)** and **[Compatibility matrix](../compatibility.md)**.
