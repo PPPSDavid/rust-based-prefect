@@ -93,3 +93,30 @@ def test_sequential_runner_submit_does_not_overlap(tmp_path):
     f()
     elapsed = time.perf_counter() - t0
     assert elapsed >= 0.28, f"sequential submit should not overlap, wall={elapsed:.3f}s"
+
+
+def test_concurrent_submit_control_plane_uses_rust_fsm_when_available(tmp_path):
+    """Prepare + COMPLETED must stay on the locked Rust FSM path under thread concurrency."""
+    plane = InMemoryControlPlane(history_path=str(tmp_path / "rust.jsonl"))
+    set_control_plane(plane)
+    if not plane._rust_fsm_active():
+        pytest.skip("native rust FSM not loaded")
+
+    @task
+    def inc(x: int) -> int:
+        return x + 1
+
+    @flow(task_runner=ThreadPoolTaskRunner(max_workers=8))
+    def f() -> int:
+        futs = [inc.submit(i) for i in range(16)]
+        wait(futs)
+        return sum(fut.result() for fut in futs)
+
+    assert f() == sum(i + 1 for i in range(16))
+    # All task runs reached COMPLETED through control-plane transitions (Rust-backed).
+    from prefect_compat.runtime import RunState
+
+    tasks = [t for t in plane._tasks.values() if t.task_name == "inc"]
+    assert len(tasks) == 16
+    assert all(t.state == RunState.COMPLETED for t in tasks)
+    assert all(t.version >= 3 for t in tasks)  # scheduled → pending → running → completed

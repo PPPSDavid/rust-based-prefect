@@ -212,6 +212,12 @@ class TaskWrapper:
         kwargs: dict[str, Any],
         task_run: TaskRunRecord | None,
     ) -> T:
+        """Run the task body, then record COMPLETED/FAILED via the control plane.
+
+        User work may run on a thread-pool worker; transitions always go through
+        ``InMemoryControlPlane.record_task_event`` (Rust FSM + lock serialization),
+        not a Python-only state write.
+        """
         try:
             result = self(*args, **kwargs)
             if task_run is not None:
