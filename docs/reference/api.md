@@ -39,7 +39,7 @@ Monotonic `seq` in storage backs cursors.
 | `GET` | `/api/flow-runs/{flow_run_id}/events` | Control-plane events |
 | `GET` | `/api/flow-runs/{flow_run_id}/dag` | DAG payload for UI |
 | `POST` | `/api/flow-runs/{flow_run_id}/cancel` | Cancel (idempotent for terminal states) |
-| `POST` | `/api/flow-runs/{flow_run_id}/retry` | Retry deployment-backed runs (`409` otherwise) |
+| `POST` | `/api/flow-runs/{flow_run_id}/retry` | Retry deployment-backed runs (`409` otherwise). New run carries resume lineage so eligible completed tasks may skip — see **[task resume how-to](../how-to/task-resume-and-persist.md)**. |
 
 ## Flows and tasks (registry)
 

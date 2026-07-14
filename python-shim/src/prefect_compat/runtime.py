@@ -20,6 +20,7 @@ from .persistence import (
     create_store,
     resolve_sqlite_path,
 )
+from .result_codec import ResultEncodeError, decode_task_result, encode_task_result
 
 _RustQueryBridge: Any = None
 _RustFsmBridge: Any = None
@@ -61,6 +62,8 @@ class FlowRunRecord:
     root_flow_run_id: UUID | None = None
     execution_mode: str | None = None
     depth: int = 0
+    resume_from_flow_run_id: UUID | None = None
+    resume_lineage_id: UUID | None = None
 
 
 @dataclass
@@ -126,6 +129,10 @@ class InMemoryControlPlane:
         self._tokens: set[UUID] = set()
         self._lock = RLock()
         self._latest_flow_run_id: UUID | None = None
+        self._pending_resume_from: UUID | None = None
+        self._resume_lookups_enabled: bool = False
+        self._resume_schema_ready: bool = False
+        self._task_result_cache_ready: bool = False
         self._history_path = Path(history_path) if history_path else None
         self._store: ControlPlaneStore = create_store(history_path=self._history_path)
         # Keep path/conn attributes for tests and Rust bind_db (SQLite-only today).
@@ -653,6 +660,7 @@ class InMemoryControlPlane:
         parent_flow_run_id: UUID | None = None,
         parent_task_run_id: UUID | None = None,
         execution_mode: str | None = None,
+        resume_from_flow_run_id: UUID | None = None,
     ) -> FlowRunRecord:
         run_id = uuid4()
         root_flow_run_id: UUID | None = run_id
@@ -663,6 +671,23 @@ class InMemoryControlPlane:
             depth = parent.depth + 1
             if depth > SUBFLOW_MAX_DEPTH:
                 raise ValueError(f"subflow depth exceeds maximum ({SUBFLOW_MAX_DEPTH})")
+        resume_lineage_id: UUID | None = None
+        if resume_from_flow_run_id is not None:
+            with self._lock:
+                self._ensure_resume_schema()
+            prior = self._flows.get(resume_from_flow_run_id)
+            if prior is None:
+                # Durable path: prior may only exist in SQLite after process restart.
+                prior_row = self._query_rows(
+                    "SELECT id FROM flow_runs WHERE id = ? LIMIT 1",
+                    [str(resume_from_flow_run_id)],
+                )
+                if not prior_row:
+                    raise ValueError("resume_from flow run not found")
+                resume_lineage_id = self._lineage_id_for_flow(resume_from_flow_run_id)
+            else:
+                resume_lineage_id = prior.resume_lineage_id or prior.run_id
+            self._resume_lookups_enabled = True
         record = FlowRunRecord(
             run_id=run_id,
             name=name,
@@ -673,6 +698,8 @@ class InMemoryControlPlane:
             root_flow_run_id=root_flow_run_id,
             execution_mode=execution_mode,
             depth=depth,
+            resume_from_flow_run_id=resume_from_flow_run_id,
+            resume_lineage_id=resume_lineage_id,
         )
         with self._lock:
             persisted_by_rust = False
@@ -716,6 +743,19 @@ class InMemoryControlPlane:
             self._latest_flow_run_id = record.run_id
             if not persisted_by_rust:
                 self._insert_flow_row(record)
+            elif record.resume_from_flow_run_id is not None:
+                # Only patch resume columns on actual resume runs (avoid create_flow hot path).
+                self._sqlite_conn.execute(
+                    "UPDATE flow_runs SET resume_from_flow_run_id = ?, resume_lineage_id = ? "
+                    "WHERE id = ?",
+                    [
+                        str(record.resume_from_flow_run_id),
+                        str(record.resume_lineage_id)
+                        if record.resume_lineage_id
+                        else None,
+                        str(record.run_id),
+                    ],
+                )
             self._persist_record(
                 {
                     "record_type": "flow_create",
@@ -739,6 +779,227 @@ class InMemoryControlPlane:
             if (not self._rust_native_persistence) and self._rust_fsm_active():
                 self._rust_register_flow(record)
         return record
+
+    def prepare_resume(self, from_flow_run_id: UUID) -> None:
+        """Queue resume lineage for the next ``create_flow_run`` (in-process tests / helpers)."""
+        with self._lock:
+            self._ensure_resume_schema()
+            if from_flow_run_id not in self._flows:
+                rows = self._query_rows(
+                    "SELECT id FROM flow_runs WHERE id = ? LIMIT 1",
+                    [str(from_flow_run_id)],
+                )
+                if not rows:
+                    raise ValueError("resume_from flow run not found")
+            self._pending_resume_from = from_flow_run_id
+            self._resume_lookups_enabled = True
+
+    def consume_pending_resume(self) -> UUID | None:
+        with self._lock:
+            pending = self._pending_resume_from
+            self._pending_resume_from = None
+            return pending
+
+    def _lineage_id_for_flow(self, flow_run_id: UUID) -> UUID:
+        rec = self._flows.get(flow_run_id)
+        if rec is not None:
+            return rec.resume_lineage_id or rec.run_id
+        rows = self._query_rows(
+            "SELECT resume_lineage_id FROM flow_runs WHERE id = ? LIMIT 1",
+            [str(flow_run_id)],
+        )
+        if rows and rows[0]["resume_lineage_id"]:
+            return UUID(str(rows[0]["resume_lineage_id"]))
+        return flow_run_id
+
+    def effective_resume_lineage_id(self, flow_run_id: UUID) -> UUID | None:
+        rec = self._flows.get(flow_run_id)
+        if rec is None:
+            return None
+        if rec.resume_lineage_id is not None:
+            return rec.resume_lineage_id
+        # Fresh runs use their own id as lineage root when storing results.
+        return rec.run_id
+
+    def _ensure_resume_schema(self) -> None:
+        """Lazily add resume columns / cache table (keeps cold create_flow off the critical path)."""
+        if self._resume_schema_ready:
+            return
+        flow_cols = {
+            c["name"]
+            for c in self._sqlite_conn.execute("PRAGMA table_info(flow_runs)").fetchall()
+        }
+        if "resume_from_flow_run_id" not in flow_cols:
+            self._sqlite_conn.execute(
+                "ALTER TABLE flow_runs ADD COLUMN resume_from_flow_run_id TEXT"
+            )
+        if "resume_lineage_id" not in flow_cols:
+            self._sqlite_conn.execute(
+                "ALTER TABLE flow_runs ADD COLUMN resume_lineage_id TEXT"
+            )
+        dep_run_cols = {
+            c["name"]
+            for c in self._sqlite_conn.execute(
+                "PRAGMA table_info(deployment_runs)"
+            ).fetchall()
+        }
+        if "resume_from_flow_run_id" not in dep_run_cols:
+            self._sqlite_conn.execute(
+                "ALTER TABLE deployment_runs ADD COLUMN resume_from_flow_run_id TEXT"
+            )
+        self._ensure_task_result_cache_table()
+        self._resume_schema_ready = True
+
+    def _ensure_task_result_cache_table(self) -> None:
+        if self._task_result_cache_ready:
+            return
+        self._sqlite_conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS task_result_cache (
+                lineage_id TEXT NOT NULL,
+                planned_node_id TEXT NOT NULL,
+                map_index INTEGER NOT NULL,
+                task_name TEXT NOT NULL,
+                is_none_result INTEGER NOT NULL,
+                has_payload INTEGER NOT NULL,
+                payload_json TEXT,
+                source_flow_run_id TEXT NOT NULL,
+                source_task_run_id TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (lineage_id, planned_node_id, map_index)
+            )
+            """
+        )
+        self._task_result_cache_ready = True
+
+    def lookup_resumed_task_result(
+        self,
+        flow_run_id: UUID,
+        planned_node_id: str | None,
+        *,
+        map_index: int | None = None,
+        persist_result: bool = False,
+    ) -> tuple[bool, Any]:
+        """Return ``(hit, value)`` for a DAG node on a resume run."""
+        if not self._resume_lookups_enabled:
+            return False, None
+        if not planned_node_id:
+            return False, None
+        rec = self._flows.get(flow_run_id)
+        if rec is None or rec.resume_from_flow_run_id is None:
+            return False, None
+        lineage_id = rec.resume_lineage_id or rec.run_id
+        map_key = -1 if map_index is None else int(map_index)
+        with self._lock:
+            self._ensure_resume_schema()
+        rows = self._query_rows(
+            """
+            SELECT is_none_result, has_payload, payload_json
+            FROM task_result_cache
+            WHERE lineage_id = ? AND planned_node_id = ? AND map_index = ?
+            LIMIT 1
+            """,
+            [str(lineage_id), planned_node_id, map_key],
+        )
+        if not rows:
+            return False, None
+        row = rows[0]
+        if int(row["is_none_result"] or 0) == 1:
+            return True, None
+        if int(row["has_payload"] or 0) != 1:
+            return False, None
+        if not persist_result:
+            return False, None
+        raw = row["payload_json"]
+        if raw is None:
+            return False, None
+        try:
+            return True, decode_task_result(str(raw))
+        except Exception:
+            return False, None
+
+    def store_task_result_for_resume(
+        self,
+        flow_run_id: UUID,
+        task_run_id: UUID,
+        task_name: str,
+        planned_node_id: str | None,
+        value: Any,
+        *,
+        persist_result: bool = False,
+        map_index: int | None = None,
+    ) -> dict[str, Any]:
+        """Persist a completion marker / optional JSON payload for DAG resume.
+
+        Returns artifact summary fields (``result`` / ``persisted``) when applicable.
+        """
+        summary_extra: dict[str, Any] = {}
+        if not planned_node_id:
+            return summary_extra
+        is_none = value is None
+        if not is_none and not persist_result:
+            # Non-persisted value-producing tasks recompute on resume — skip store write.
+            return summary_extra
+        lineage_id = self.effective_resume_lineage_id(flow_run_id)
+        if lineage_id is None:
+            return summary_extra
+        map_key = -1 if map_index is None else int(map_index)
+        has_payload = False
+        payload_json: str | None = None
+        if is_none:
+            summary_extra["result"] = None
+            summary_extra["persisted"] = True
+        elif persist_result:
+            try:
+                payload_json = encode_task_result(value)
+                has_payload = True
+                summary_extra["result"] = decode_task_result(payload_json)
+                summary_extra["persisted"] = True
+            except ResultEncodeError:
+                summary_extra["persisted"] = False
+                return summary_extra
+        now = self._now()
+        with self._lock:
+            self._ensure_resume_schema()
+            self._sqlite_conn.execute(
+                """
+                INSERT INTO task_result_cache(
+                    lineage_id, planned_node_id, map_index, task_name,
+                    is_none_result, has_payload, payload_json,
+                    source_flow_run_id, source_task_run_id, updated_at
+                ) VALUES(?,?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(lineage_id, planned_node_id, map_index) DO UPDATE SET
+                    task_name=excluded.task_name,
+                    is_none_result=excluded.is_none_result,
+                    has_payload=excluded.has_payload,
+                    payload_json=excluded.payload_json,
+                    source_flow_run_id=excluded.source_flow_run_id,
+                    source_task_run_id=excluded.source_task_run_id,
+                    updated_at=excluded.updated_at
+                """,
+                [
+                    str(lineage_id),
+                    planned_node_id,
+                    map_key,
+                    task_name,
+                    1 if is_none else 0,
+                    1 if has_payload else 0,
+                    payload_json,
+                    str(flow_run_id),
+                    str(task_run_id),
+                    now,
+                ],
+            )
+            # Fresh runs: keep lineage in memory as run_id; SQL update only for non-identity lineages.
+            flow = self._flows.get(flow_run_id)
+            if flow is not None and flow.resume_lineage_id is None:
+                flow.resume_lineage_id = lineage_id
+                if lineage_id != flow_run_id:
+                    self._sqlite_conn.execute(
+                        "UPDATE flow_runs SET resume_lineage_id = ? WHERE id = ?",
+                        [str(lineage_id), str(flow_run_id)],
+                    )
+        return summary_extra
 
     def create_task_run(
         self,
@@ -2390,6 +2651,7 @@ class InMemoryControlPlane:
         parent_flow_run_id: UUID | None = None,
         parent_task_run_id: UUID | None = None,
         parent_deployment_run_id: UUID | None = None,
+        resume_from_flow_run_id: UUID | None = None,
     ) -> dict[str, Any]:
         rust_body: dict[str, Any] = {
             "deployment_id": str(deployment_id),
@@ -2405,7 +2667,17 @@ class InMemoryControlPlane:
         rust = self._rust_deployment_dispatch("deployment_trigger_run", rust_body)
         if rust is not None:
             if rust.get("ok"):
-                return rust["run"]
+                run = rust["run"]
+                if resume_from_flow_run_id is not None and run.get("id"):
+                    with self._lock:
+                        self._ensure_resume_schema()
+                        self._sqlite_conn.execute(
+                            "UPDATE deployment_runs SET resume_from_flow_run_id = ? WHERE id = ?",
+                            [str(resume_from_flow_run_id), str(run["id"])],
+                        )
+                    run = dict(run)
+                    run["resume_from_flow_run_id"] = str(resume_from_flow_run_id)
+                return run
             err = rust.get("error") or {}
             code = err.get("code", "")
             msg = str(err.get("message", ""))
@@ -2453,13 +2725,17 @@ class InMemoryControlPlane:
                 err_msg = "concurrency limit reached"
             now = self._now()
             run_id = str(uuid4())
+            # INSERT always names resume_from_flow_run_id; ensure column exists even
+            # when resume is unset (common deployment / subflow trigger path).
+            self._ensure_resume_schema()
             self._sqlite_conn.execute(
                 """
                 INSERT INTO deployment_runs
                 (id,deployment_id,status,requested_parameters,resolved_parameters,idempotency_key,
                  worker_name,lease_until,flow_run_id,error,parent_flow_run_id,parent_task_run_id,parent_deployment_run_id,
+                 resume_from_flow_run_id,
                  created_at,updated_at,started_at,finished_at)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 [
                     run_id,
@@ -2475,6 +2751,7 @@ class InMemoryControlPlane:
                     str(parent_flow_run_id) if parent_flow_run_id else None,
                     str(parent_task_run_id) if parent_task_run_id else None,
                     str(parent_deployment_run_id) if parent_deployment_run_id else None,
+                    str(resume_from_flow_run_id) if resume_from_flow_run_id else None,
                     now,
                     now,
                     None,
@@ -2716,7 +2993,11 @@ class InMemoryControlPlane:
             raise ValueError("flow run is not deployment-backed")
         deployment_id = UUID(str(rows[0]["deployment_id"]))
         requested = json.loads(rows[0]["requested_parameters"] or "{}")
-        return self.trigger_deployment_run(deployment_id, parameters=requested)
+        return self.trigger_deployment_run(
+            deployment_id,
+            parameters=requested,
+            resume_from_flow_run_id=flow_run_id,
+        )
 
     def list_work_pools(self, limit: int = 50, cursor: str | None = None) -> PageResult:
         query = "SELECT rowid AS seq, id, name, type, paused, created_at, updated_at FROM work_pools"
@@ -3321,6 +3602,18 @@ class InMemoryControlPlane:
                 record.depth,
             ],
         )
+        if record.resume_from_flow_run_id is not None or record.resume_lineage_id is not None:
+            self._sqlite_conn.execute(
+                "UPDATE flow_runs SET resume_from_flow_run_id = ?, resume_lineage_id = ? "
+                "WHERE id = ?",
+                [
+                    str(record.resume_from_flow_run_id)
+                    if record.resume_from_flow_run_id
+                    else None,
+                    str(record.resume_lineage_id) if record.resume_lineage_id else None,
+                    str(record.run_id),
+                ],
+            )
 
     def _update_flow_row(self, record: FlowRunRecord) -> None:
         self._sqlite_conn.execute(
@@ -4074,6 +4367,9 @@ class InMemoryControlPlane:
             else None,
             "parent_deployment_run_id": row["parent_deployment_run_id"]
             if "parent_deployment_run_id" in keys
+            else None,
+            "resume_from_flow_run_id": row["resume_from_flow_run_id"]
+            if "resume_from_flow_run_id" in keys
             else None,
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],

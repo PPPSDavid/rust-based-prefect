@@ -63,10 +63,10 @@ Open `http://localhost:4173/runs` and verify:
 
 Inside run detail verify tabs:
 
-- **Task Runs**: multiple task rows present
+- **Task Runs**: multiple task rows present; when tasks used **`persist_result`** (or returned `None`), pretty-printed JSON / `null` may appear under the row
 - **Logs**: log entries present
 - **Events**: state transitions and task events present
-- **Artifacts**: result artifacts present for completed task events
+- **Artifacts**: result artifacts present for completed task events; persisted payloads show as pretty JSON when `summary` includes `result`
 - **DAG**:
   - **Aggregated fan-out** mode renders the forecast/manifest graph (`source: forecast` when static compile succeeded; `map()` fan-out collapsed)
   - **Task runs** mode renders one node per execution
