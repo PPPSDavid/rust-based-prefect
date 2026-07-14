@@ -59,6 +59,7 @@ unused-type-ignore-comment = "error"
 # Optional deps not installed in the default CI Python environment.
 allowed-unresolved-imports = [
     "code_review_graph.**",
+    "crg_st_model_cache",
     "mcp.**",
     "mkdocs_gen_files",
     "prefect",

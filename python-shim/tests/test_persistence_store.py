@@ -76,7 +76,7 @@ def test_create_store_postgres_when_url_set(
         with psycopg.connect(url, connect_timeout=2) as conn:
             conn.execute("SELECT 1")
     except Exception:
-        pytest.skip("Postgres not available")
+        pytest.skip("Postgres not available")  # ty: ignore[too-many-positional-arguments]
 
     monkeypatch.setenv("IRONFLOW_DATABASE_URL", url)
     from prefect_compat.persistence import PostgresStore

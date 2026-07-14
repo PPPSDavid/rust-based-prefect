@@ -4,15 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
+import psycopg
+from psycopg.rows import dict_row
+
 from .constants import DEFAULT_WORK_POOL_ID
 from .dialect import PostgresConnectionAdapter
-
-try:
-    import psycopg
-    from psycopg.rows import dict_row
-except ImportError:  # pragma: no cover - optional until B1 deps installed
-    psycopg = None  # type: ignore[assignment]
-    dict_row = None  # type: ignore[assignment]
 
 
 _SCHEMA_SQL = f"""
@@ -183,12 +179,12 @@ class PostgresStore:
 
     @classmethod
     def open(cls, database_url: str) -> PostgresStore:
-        if psycopg is None or dict_row is None:
-            raise ImportError(
-                "psycopg is required for IRONFLOW_DATABASE_URL Postgres mode; "
-                "install with: uv sync --group dev (or pip install 'psycopg[binary]')"
-            )
-        raw = psycopg.connect(database_url, autocommit=True, row_factory=dict_row)
+        # dict_row yields dict rows; psycopg's generic Row typing is overly narrow for ty.
+        raw = psycopg.connect(
+            database_url,
+            autocommit=True,
+            row_factory=dict_row,  # ty: ignore[invalid-argument-type]
+        )
         adapter = PostgresConnectionAdapter(raw)
         store = cls(database_url, raw, adapter)
         store.ensure_schema()
