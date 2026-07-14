@@ -7,6 +7,13 @@
 
 This plan separates **what IronFlow needs** from **Prefect’s full cache-policy matrix**, walks concrete cases, then recommends a small phased subset.
 
+**Quick answers (flushed out in §5.1–§5.3):**
+
+| Question | v1 answer |
+| --- | --- |
+| Does the DAG approach **automatically** cache? | **Partially.** On a *resume* run only: `None` results auto-skip; non-`None` skip only if the task opted into result persistence. Fresh runs never auto-hit. |
+| Limit result types when cache/persist is enabled? | **Yes.** JSON-safe scalars/containers only, with a size cap. No pickle, DataFrames, files, or arbitrary objects in v1. |
+
 ---
 
 ## 1. Problem statement
@@ -220,16 +227,154 @@ Naming bikeshed (pick at implement time): `persist_result=True` vs `cache=True` 
 
 ---
 
+## 5.1 DAG-based resume model (flushed out)
+
+Think of a flow run as a **logical DAG** whose nodes are `planned_node_id`s (plus map indices). A retry is a **new flow run** that may **rebinding** onto prior node outcomes from the same lineage — not a mutation of the old run.
+
+```text
+Attempt 1 (flow_run=R1, lineage=L)          Attempt 2 (flow_run=R2, resume_from=R1, lineage=L)
+─────────                                    ─────────
+n1 setup        COMPLETED (None)     ──►     n1  SKIP  (marker hit)     → TaskFuture(None)
+n2 expensive    COMPLETED (payload)  ──►     n2  SKIP  (payload hit)    → TaskFuture({...})
+n3 work         CANCELLED            ──►     n3  RUN
+n4 downstream   not started          ──►     n4  RUN   (sees restored n2 value via .result())
+```
+
+### Runtime algorithm (per `task.submit` / mapped child)
+
+```text
+1. Allocate planned_node_id (+ map_index) as today.
+2. If this flow run has no resume lineage → always execute (no lookup).
+3. Else lookup store[lineage, planned_node_id, map_index]:
+   a. miss / FAILED / CANCELLED / no usable payload → execute
+   b. hit COMPLETED + value is None → skip body; return TaskFuture(None); emit completed w/ cache_hit
+   c. hit COMPLETED + payload present + task.persist_result → deserialize; return TaskFuture(value); emit cache_hit
+   d. hit COMPLETED + non-None but task lacks persist_result or payload unusable → execute (recompute)
+4. On successful execute:
+   a. always write completion marker for this DAG key
+   b. if persist_result and value is not None → try encode (see §5.3); on success store payload; on failure keep marker only
+```
+
+Downstream wiring stays ordinary Python: skipped tasks still return a `TaskFuture` with the restored (or `None`) value, so `wait_for` / `.result()` need no special API.
+
+### What is automatic vs opt-in?
+
+| Situation | Automatic? | Why |
+| --- | --- | --- |
+| Fresh run / schedule tick | **No** lookup | Avoids skipping side effects across independent runs |
+| Resume run + task returned `None` | **Yes** skip | Marker-only; no serialization burden |
+| Resume run + non-`None` + default `@task` | **No** skip (recompute) | Matches user rule 3; no silent pickle/JSON of arbitrary objects |
+| Resume run + non-`None` + `@task(persist_result=True)` | **Yes** skip if encode ok | Author opted in; type allowlist applies |
+| Gate / time-based nodes | **Never** skip | Time must re-evaluate |
+| Cross-flow / cross-deployment reuse | **Never** in v1 | Goal B later |
+
+So: the **DAG keying is always how we identify nodes**, but **automatic caching is only the `None`-marker path on resume**. Value-producing tasks are opt-in.
+
+### Why not auto-persist every JSON-looking return?
+
+Tempting (better cancel→retry UX), but:
+
+- Authors returning ad-hoc objects would see silent recompute or surprising encode errors.
+- Control-plane completion path would always pay encode cost.
+- Harder to explain than: “`None` resumes free; values need `persist_result`.”
+
+If product feedback later wants “auto for JSON-safe returns,” that can be a `@task(persist_result="auto")` or flow-level default without changing the DAG key.
+
+---
+
+## 5.2 Opt-in surface
+
+```python
+@task  # None → auto resume-skip; non-None → recompute on resume
+def setup() -> None: ...
+
+@task(persist_result=True)  # values eligible if type allowlist + size ok
+def expensive(x: int) -> dict: ...
+
+@task(persist_result=True)
+def bad() -> MyClass:  # not JSON-safe → marker only; resume recomputes (warn once)
+    return MyClass()
+```
+
+Semantics of `persist_result=True`:
+
+- Declares intent to **reuse the return value on resume**.
+- Does **not** enable cross-run Prefect-style caching.
+- Encode failure is non-fatal to the live run (task still COMPLETED); resume simply cannot skip.
+
+Optional later knobs (out of v1): `persist_result="auto"`, flow-level default, max payload override.
+
+---
+
+## 5.3 Result type allowlist (yes — limit hard in v1)
+
+**Consensus:** limit persisted payloads to a small JSON subset to bound performance and interface surface.
+
+### Allowed (v1)
+
+| Type | Notes |
+| --- | --- |
+| `None` | Marker path (no payload blob needed) |
+| `bool`, `int`, `float` | JSON numbers/bools; reject `inf`/`nan` (not JSON) |
+| `str` | UTF-8; counts toward size cap |
+| `list` / `dict` | Nested only with allowed types; dict keys must be `str` |
+| JSON `null` round-trip | Only for explicit `None` inside containers |
+
+### Rejected in v1 (recompute on resume)
+
+| Type / shape | Why defer |
+| --- | --- |
+| `bytes` / `bytearray` | Encoding choice (base64) adds API surface |
+| `datetime` / `date` / `UUID` | Need canonical encoding; easy to get wrong vs Prefect |
+| `tuple` / `set` / custom sequences | JSON erases type |
+| `pathlib.Path`, files, IO | Not values — side-effect territory |
+| pandas / numpy / Arrow | Huge, version-sensitive |
+| Pydantic / dataclasses / namedtuple | Needs schema registry |
+| Arbitrary objects / pickle | Security + version fragility |
+
+### Limits
+
+| Limit | Proposed default | On breach |
+| --- | --- | --- |
+| Encoded UTF-8 size | **64 KiB** | Do not store payload; log warning; live run still succeeds |
+| Nesting depth | **32** | Same |
+| Container length | **10_000** elements (top-level or nested count) | Same |
+
+Encoder: stdlib `json.dumps` with a strict default that **raises** on unknown types (no `default=` that coerces). Decoder: `json.loads` only — never `pickle` / `eval`.
+
+### Why this bound helps
+
+- **Perf:** encode/decode stays microseconds–low ms; fits SQLite TEXT/BLOB next to existing artifact rows.
+- **Interface:** one mental model (“JSON values”); no result-storage backend API in v1.
+- **Correctness:** fail open to recompute rather than restoring a wrong Python type.
+- **Expansion path:** later add tagged codecs (`{"__ironflow__": "datetime", "v": "..."}`) or external blob refs without changing DAG keys.
+
+---
+
 ## 6. Answers to open questions
+
+### Does it automatically cache?
+
+**Short answer:** only on **resume**, and only for:
+
+1. `None` results (always), and  
+2. non-`None` results when `persist_result=True` **and** the value passes the allowlist.
+
+It does **not** automatically cache across fresh runs, schedule ticks, or other flows. See §5.1.
+
+### Should we limit result types when cache/persist is enabled?
+
+**Yes.** v1 = JSON-safe scalars/containers + size/depth caps (§5.3). Richer types are a deliberate later codec layer, not a silent pickle escape hatch.
 
 ### Performance impact?
 
 | Path | Cost |
 | --- | --- |
 | Write completion marker | One SQLite row / JSONL record — similar to today’s artifact insert; acceptable on the completion hot path if done in Rust persist batch |
-| Write opted-in payload | Dominated by serialization size; keep off the critical FSM lock; size limit (e.g. reject or fall back to recompute above N bytes) |
+| Write opted-in payload | Dominated by serialization size; keep off the critical FSM lock; **64 KiB cap** fails open to “marker only” |
 | Read on task start (resume run only) | One keyed lookup; skip user function + PENDING/RUNNING work; large win for slow tasks |
-| Non-resume runs | No lookup (feature flag / lineage absent) — **zero** overhead |
+| Non-resume runs | No lookup (lineage absent) — **zero** overhead |
+| Rejected type at complete | One failed encode attempt; no payload write |
 
 Lite `perf_matrix` should add a recipe: multi-task flow cancel+retry with first task persisted, assert second attempt wall time drops and task event shows skip.
 
@@ -249,7 +394,7 @@ same := resume_lineage_id
         + map_index? 
         + (parameters unchanged)
         + prior state == COMPLETED
-        + (None marker | persist_result payload present)
+        + (None marker | persist_result payload present + allowlist ok)
 ```
 
 Not: `task_run_id`, not bare `task_name`, not bare Python `id(fn)`.
@@ -263,9 +408,9 @@ Not: `task_run_id`, not bare `task_name`, not bare Python `id(fn)`.
 def setup() -> None:
     ...
 
-@task(persist_result=True)  # non-None → resume restores value
+@task(persist_result=True)  # JSON-safe non-None → resume restores value
 def expensive(x: int) -> dict:
-    ...
+    return {"x": x, "n": 42}
 
 @task  # non-None, no persist → recomputed on resume
 def volatile(x: int) -> int:
@@ -287,7 +432,7 @@ UI later: task run detail shows `resumed_from` / `cache_hit` (not required for v
 | Phase | Deliverable | Validation |
 | --- | --- | --- |
 | **0** | This plan + COMPATIBILITY “missing” row for task resume/cache | Doc review |
-| **1** | Result store schema (marker + optional JSON payload); lineage on retry; skip in `TaskWrapper.submit` | Shim tests: cancel→retry Cases 1,4,6,8 |
+| **1** | Result store schema (marker + optional JSON payload); lineage on retry; skip in `TaskWrapper.submit`; JSON allowlist encoder | Shim tests: cancel→retry Cases 1,4,6,8; reject non-JSON / oversize |
 | **2** | Map index in key; parameter guard; Rust-backed lookup/persist | Map + multi-worker tests; lite perf recipe |
 | **3** | Subflow/gate policies; UI `cache_hit` | Subflow tests; UI checklist |
 | **4** | Goal B opt-in cross-run cache (separate design spike) | Compat matrix “partial”; do not claim Prefect parity |
