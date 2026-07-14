@@ -62,6 +62,7 @@ Last updated: 2026-07-12.
 
 - For multi-task flows where some tasks **completed** before cancel, **retry currently recomputes those completed tasks**. Desired Prefect-like semantics: on retry, **already-completed tasks should not be recomputed** (task-level resume / result cache keyed by flow run lineage or equivalent).
 - Implementing this requires architectural work: task result persistence across retry, idempotent resume graph, and UI/API surfacing of which tasks were skipped vs re-run. Track in compatibility matrix before claiming parity.
+- Design exploration (cases, identity, `None` vs opt-in persist, Prefect delta): **`docs/plans/task-result-cache.md`**.
 
 **Useful test scenario (manual / E2E):**
 

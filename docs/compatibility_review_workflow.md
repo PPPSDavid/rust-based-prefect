@@ -96,7 +96,7 @@ These are not commitments; they are starting points from the May 2026 pass.
 | Candidate | Current Prefect surface | IronFlow status | Why it fits |
 | --- | --- | --- | --- |
 | RRule deployment schedules | Prefect supports Cron, Interval, and RRule schedules. | Limited Rust-first RRule subset implemented; advanced calendar rules remain missing. | Bounded scheduling feature that fits existing Rust deployment scheduler paths. |
-| Minimal task caching | Prefect task caching uses cache keys, policies, expiration, storage, and isolation. | No documented cache API. | Good determinism/idempotency story, but result serialization and storage scope must stay narrow. |
+| Minimal task caching | Prefect task caching uses cache keys, policies, expiration, storage, and isolation. | No documented cache API. Design: `docs/plans/task-result-cache.md` (resume-first, not full cache_policy). | Good determinism/idempotency story, but result serialization and storage scope must stay narrow. |
 | `task.delay()` background tasks | Prefect supports fire-and-forget background task execution via workers. | `.submit()` and `.map()` exist; `.delay()` is missing. | Aligns with existing deployment queue/worker concepts, but needs careful future and queue semantics. |
 | Variables JSON store | Prefect variables support structured JSON configuration. | No documented variable API. | Small API/storage feature, but lower value than control-plane alignment. |
 | Events/automations subset | Prefect 3 OSS includes events and automations. | IronFlow records events and has transition hooks, but no automation engine. | Strong conceptual fit, but broader product surface; design before implementation. |
