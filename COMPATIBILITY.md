@@ -20,7 +20,7 @@ Maintainers should use `docs/compatibility_review_workflow.md` before changing t
 
 - Supported:
   - `@flow` and `@task` decorated functions (compatibility shim).
-  - `task.submit()` dependency chains.
+  - `task.submit()` dependency chains; with **`ThreadPoolTaskRunner`** (default), independent submits return immediately and run concurrently (bodies in a shared thread pool). **`SequentialTaskRunner`** keeps submit non-overlapping. **`ProcessPoolTaskRunner`**: `submit()` remains synchronous; use `map()` for process concurrency.
   - `task.map()` with moderate fan-out.
   - `@task(name=...)` custom task names (runtime + static forecast when tasks are module-level or flow-closure visible).
   - retries / timeouts / cancellation intent propagation.

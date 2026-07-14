@@ -46,6 +46,8 @@ class WorkloadRecipe:
     decorator_hook_profile: str | None = None
     # When set, run ``@flow`` with ``ThreadPoolTaskRunner`` map workloads (``tasks_per_flow`` = map width).
     decorator_map_width: int | None = None
+    # When set, run ``@flow`` with N independent concurrent ``task.submit()`` calls (thread pool).
+    decorator_submit_width: int | None = None
     # Subflow benchmark profile (inline depth, deploy wait chain, etc.).
     subflow_profile: str | None = None
     # Concurrent reader threads in mixed recipes (writers always use one thread).
@@ -304,6 +306,28 @@ def _recipe_catalog() -> dict[str, WorkloadRecipe]:
             sqlite_enabled=True,
             decorator_map_width=100,
         ),
+        "micro_submit_threadpool_narrow": WorkloadRecipe(
+            name="micro_submit_threadpool_narrow",
+            flow_count=20,
+            tasks_per_flow=2,
+            task_events_per_task=0,
+            read_ratio=0.0,
+            mixed=False,
+            cold_start=True,
+            sqlite_enabled=True,
+            decorator_submit_width=10,
+        ),
+        "micro_submit_threadpool_wide": WorkloadRecipe(
+            name="micro_submit_threadpool_wide",
+            flow_count=10,
+            tasks_per_flow=1,
+            task_events_per_task=0,
+            read_ratio=0.0,
+            mixed=False,
+            cold_start=True,
+            sqlite_enabled=True,
+            decorator_submit_width=100,
+        ),
         "gcl_cm_contention": WorkloadRecipe(
             name="gcl_cm_contention",
             flow_count=20,
@@ -427,6 +451,10 @@ def _presets() -> dict[str, list[str]]:
             "micro_map_threadpool_narrow",
             "micro_map_threadpool_wide",
         ],
+        "flow_submit": [
+            "micro_submit_threadpool_narrow",
+            "micro_submit_threadpool_wide",
+        ],
         "concurrency": [
             "medium_narrow_fsm_batch_warm",
             "medium_narrow_heavy_mixed_2readers_warm",
@@ -454,6 +482,7 @@ def _presets() -> dict[str, list[str]]:
             for k in _recipe_catalog().keys()
             if not k.startswith("micro_decorator_hooks_")
             and not k.startswith("micro_map_")
+            and not k.startswith("micro_submit_")
             and not k.startswith("subflow_")
             and not k.startswith("gcl_")
         ],
@@ -864,6 +893,136 @@ def _run_decorator_map_micro_iteration(
     )
 
 
+def _run_decorator_submit_micro_iteration(
+    recipe: WorkloadRecipe,
+    seed: int,
+    warmup: bool,
+) -> RecipeRunSample:
+    """Benchmark N independent concurrent ``task.submit()`` calls (Rust FSM + thread pool).
+
+    Exercises coordinating-thread create / PENDING→RUNNING (batched Rust persist) and
+    lock-serialized COMPLETED transitions from worker threads via ``record_task_event``.
+    """
+    rng = random.Random(seed)
+    _ = rng
+    iterations = max(1, int(recipe.flow_count))
+    warmup_iters = max(0, int(recipe.tasks_per_flow))
+    submit_width = max(1, int(recipe.decorator_submit_width or 1))
+    if warmup:
+        iterations = max(2, iterations // 4)
+        warmup_iters = max(1, warmup_iters // 2)
+
+    latencies: dict[str, list[float]] = {}
+    notes: list[str] = [f"decorator_submit_micro width={submit_width}"]
+
+    with tempfile.TemporaryDirectory(prefix="perf-matrix-submit-") as td:
+        history_path = Path(td) / "history.jsonl"
+        db_path = history_path.with_suffix(".db")
+        if not recipe.sqlite_enabled:
+            history_path = None
+            db_path = Path(td) / "unused.db"
+
+        plane = InMemoryControlPlane(
+            history_path=str(history_path) if history_path else None
+        )
+        rust_active = bool(plane._rust_fsm_active())
+        notes.append(f"rust_fsm={'1' if rust_active else '0'}")
+        sqlite_before = float(db_path.stat().st_size) if db_path.exists() else 0.0
+        wal_path = db_path.with_suffix(".db-wal")
+        wal_before = float(wal_path.stat().st_size) if wal_path.exists() else 0.0
+        before_proc = _process_snapshot()
+
+        from prefect_compat import flow, set_control_plane, task, wait
+        from prefect_compat.task_runners import ThreadPoolTaskRunner
+
+        from benchmarks._task_cast import as_task_wrapper
+
+        set_control_plane(plane)
+
+        @task
+        def _inc(x: int) -> int:
+            return x + 1
+
+        inc = as_task_wrapper(_inc)
+
+        @flow(task_runner=ThreadPoolTaskRunner(max_workers=min(32, max(4, submit_width))))
+        def sample() -> int:
+            futs = [inc.submit(i) for i in range(submit_width)]
+            wait(futs)
+            return sum(f.result() for f in futs)
+
+        for _ in range(warmup_iters):
+            _timed_call(latencies, "decorator_submit_micro.warmup_invocation", sample)
+
+        wall_start = time.perf_counter()
+        per_ms: list[float] = []
+        for _ in range(iterations):
+            t0 = time.perf_counter()
+            sample()
+            per_ms.append((time.perf_counter() - t0) * 1000.0)
+        wall_seconds = time.perf_counter() - wall_start
+
+        after_proc = _process_snapshot()
+        sqlite_after = (
+            float(db_path.stat().st_size) if db_path.exists() else sqlite_before
+        )
+        wal_after = float(wal_path.stat().st_size) if wal_path.exists() else wal_before
+
+        counts = {
+            "flows_created": iterations,
+            "tasks_created": iterations * submit_width,
+            "flow_transitions": 0,
+            "task_events_recorded": 0,
+            "read_queries": 0,
+            "rust_fsm_active": 1 if rust_active else 0,
+        }
+        throughput = {
+            "flows_per_sec": iterations / wall_seconds if wall_seconds else 0.0,
+            "tasks_per_sec": (iterations * submit_width) / wall_seconds
+            if wall_seconds
+            else 0.0,
+            "transitions_per_sec": 0.0,
+            "task_events_per_sec": 0.0,
+        }
+        latency_ms = {"decorator_submit_micro.invocation_ms": _latency_stats_ms(per_ms)}
+        process = {
+            "cpu_seconds_used": max(
+                0.0, after_proc.cpu_seconds - before_proc.cpu_seconds
+            ),
+            "rss_bytes_start": float(before_proc.rss_bytes),
+            "rss_bytes_end": float(after_proc.rss_bytes),
+            "rss_bytes_delta": float(after_proc.rss_bytes - before_proc.rss_bytes),
+        }
+        sqlite: dict[str, float] = {
+            "db_bytes_before": sqlite_before,
+            "db_bytes_after": sqlite_after,
+            "db_bytes_growth": max(0.0, sqlite_after - sqlite_before),
+            "wal_bytes_before": wal_before,
+            "wal_bytes_after": wal_after,
+            "wal_bytes_growth": max(0.0, wal_after - wal_before),
+            "bytes_per_write_op": 0.0,
+        }
+        if notes:
+            sqlite["notes"] = float(len(notes))
+
+        events = len(plane.events())
+        _ = events
+        _close_plane_footprint(plane)
+
+    return RecipeRunSample(
+        recipe=recipe.name,
+        iteration=0,
+        warmup=warmup,
+        seed=seed,
+        wall_clock_seconds=wall_seconds,
+        counts=counts,
+        throughput=throughput,
+        latency_ms=latency_ms,
+        process=process,
+        sqlite=sqlite,
+    )
+
+
 def _run_gcl_iteration(
     recipe: WorkloadRecipe,
     seed: int,
@@ -1024,7 +1183,6 @@ def _run_gcl_iteration(
         process=process,
         sqlite=sqlite,
     )
-
 
 def _run_subflow_iteration(
     recipe: WorkloadRecipe,
@@ -1318,6 +1476,8 @@ def _run_recipe_iteration(
         return _run_decorator_hook_micro_iteration(recipe, seed, warmup)
     if recipe.decorator_map_width is not None:
         return _run_decorator_map_micro_iteration(recipe, seed, warmup)
+    if recipe.decorator_submit_width is not None:
+        return _run_decorator_submit_micro_iteration(recipe, seed, warmup)
     if recipe.gcl_profile is not None:
         return _run_gcl_iteration(recipe, seed, warmup)
     if recipe.subflow_profile is not None:

@@ -2,7 +2,7 @@
 
 A **task runner** controls how **`map`** (and related scheduling) executes work: sequentially, in a thread pool, or via a process pool for picklable callables.
 
-Task runners are **not** deployment **workers** or **work pools**. Workers claim deployment runs from the control plane; task runners only affect parallelism inside a running flow (today: **`map()`** only — see below).
+Task runners are **not** deployment **workers** or **work pools**. Workers claim deployment runs from the control plane; task runners affect parallelism inside a running flow for both **`submit()`** and **`map()`**.
 
 ## Built-in runners
 
@@ -10,9 +10,9 @@ Task runners are **not** deployment **workers** or **work pools**. Workers claim
 
 | Runner | Role |
 | --- | --- |
-| **`SequentialTaskRunner`** | Single-threaded `map`; deterministic in-process ordering. |
-| **`ThreadPoolTaskRunner`** | Concurrent `map` via `ThreadPoolExecutor` (Prefect 3–style default). Optional `max_workers`; pool size can also follow **`IRONFLOW_TASK_RUNNER_THREAD_POOL_MAX_WORKERS`**. |
-| **`ProcessPoolTaskRunner`** | Process-pool `map` for picklable tasks; optional **`IRONFLOW_TASK_RUNNER_PROCESS_POOL_MAX_WORKERS`**. |
+| **`SequentialTaskRunner`** | Single-threaded `submit` / `map`; bodies run on the coordinating thread (no overlap). |
+| **`ThreadPoolTaskRunner`** | Concurrent `submit` and `map` via `ThreadPoolExecutor` (Prefect 3–style default). Optional `max_workers`; pool size can also follow **`IRONFLOW_TASK_RUNNER_THREAD_POOL_MAX_WORKERS`**. |
+| **`ProcessPoolTaskRunner`** | Process-pool `map` for picklable tasks; optional **`IRONFLOW_TASK_RUNNER_PROCESS_POOL_MAX_WORKERS`**. Independent `submit()` calls remain **synchronous** on the caller (process-pool submit concurrency is not wired yet). |
 
 ## Choosing a runner
 
@@ -21,8 +21,10 @@ Task runners are **not** deployment **workers** or **work pools**. Workers claim
 
 **Workload guide:** **[How to choose a task runner](../how-to/choose-task-runners.md)** — API/remote vs local CPU, `submit` vs `map`, and common mistakes.
 
-### MVP caveat: `submit` vs `map`
+### `submit` vs `map`
 
-Task runners parallelize **`map()`** fan-out. **`task.submit()`** runs the task body **synchronously** in the current MVP before returning the future, so `.submit()` chains do not gain concurrency from the runner. Use **`map()`** when you need overlapping I/O-bound or CPU-bound mapped work.
+With **`ThreadPoolTaskRunner`** (the default), independent **`task.submit()`** calls return a future immediately and run task bodies concurrently in the flow’s shared thread pool. Use **`wait_for`** (or pass upstream futures as args) so dependents start only after upstream work finishes. **`map()`** remains the preferred fan-out for many inputs; both paths share the same runner semantics for threads.
+
+**`SequentialTaskRunner`** keeps `submit` / `map` non-overlapping. **`ProcessPoolTaskRunner`** parallelizes **`map()`** only; `submit()` stays synchronous until process-pool submit is supported.
 
 For execution semantics of `submit` / `map` themselves, see **[Tasks](tasks.md)** and **[Compatibility matrix](../compatibility.md)**.
