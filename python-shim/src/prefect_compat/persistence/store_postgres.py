@@ -4,9 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-import psycopg
-from psycopg.rows import dict_row
-
 from .constants import DEFAULT_WORK_POOL_ID
 from .dialect import PostgresConnectionAdapter
 
@@ -179,6 +176,17 @@ class PostgresStore:
 
     @classmethod
     def open(cls, database_url: str) -> PostgresStore:
+        # Keep psycopg optional so SQLite default / wheel smoke / perf jobs import
+        # prefect_compat without installing the Postgres driver.
+        try:
+            import psycopg
+            from psycopg.rows import dict_row
+        except ImportError as exc:
+            raise ImportError(
+                "Postgres backend requires psycopg. "
+                "Install with: pip install 'psycopg[binary]' "
+                "(or ironflow-prefect-compat[postgres])."
+            ) from exc
         # dict_row yields dict rows; psycopg's generic Row typing is overly narrow for ty.
         raw = psycopg.connect(
             database_url,

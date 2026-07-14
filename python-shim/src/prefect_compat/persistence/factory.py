@@ -6,7 +6,6 @@ import os
 from pathlib import Path
 
 from .protocol import ControlPlaneStore
-from .store_postgres import PostgresStore
 from .store_sqlite import SqliteStore
 
 
@@ -34,6 +33,9 @@ def create_store(
         else os.getenv("IRONFLOW_DATABASE_URL", "")
     ).strip()
     if url and url.lower().startswith(("postgres://", "postgresql://")):
+        # Import only when selected so envs without psycopg can use SQLite.
+        from .store_postgres import PostgresStore
+
         return PostgresStore.open(url)
     if url and not url.lower().startswith("sqlite"):
         raise ValueError(
