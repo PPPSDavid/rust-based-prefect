@@ -298,12 +298,45 @@ class TaskWrapper:
         | None,
     ) -> T:
         """Worker path: wait_for → tag acquire → RUNNING → body → finalize."""
-        if wait_for_list:
-            wait(wait_for_list)
-        lease_ids: list[str] = []
-        if task_run is not None:
-            lease_ids = self._promote_pending_to_running(task_run)
-        return self._execute_and_finalize_submit(args, kwargs, task_run, lease_ids)
+        try:
+            if wait_for_list:
+                wait(wait_for_list)
+            lease_ids: list[str] = []
+            if task_run is not None:
+                lease_ids = self._promote_pending_to_running(task_run)
+            return self._execute_and_finalize_submit(args, kwargs, task_run, lease_ids)
+        except FlowRunCancelled:
+            raise
+        except Exception as exc:
+            # PENDING was created on the coordinating thread; if wait_for / promote
+            # fails before RUNNING, close the run so it cannot linger forever.
+            if task_run is not None:
+                try:
+                    st = _CONTROL_PLANE.get_task_run(task_run.task_run_id).state
+                except Exception:
+                    st = None
+                if st == RunState.PENDING:
+                    _CONTROL_PLANE.record_task_event(
+                        task_run.task_run_id,
+                        "task_cancelled",
+                        {
+                            "task_name": self.name,
+                            "error": str(exc),
+                            "reason": "dependency_or_start_failed",
+                        },
+                    )
+                    th = self._transition_hooks
+                    if th:
+                        _emit_task_single_hook_edge(
+                            th,
+                            task_run,
+                            self.name,
+                            RunState.PENDING,
+                            RunState.CANCELLED,
+                            "task_cancelled",
+                            {"task_name": self.name, "error": str(exc)},
+                        )
+            raise
 
     def _run_submitted_body_sync(
         self,
