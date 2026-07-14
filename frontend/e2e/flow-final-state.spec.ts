@@ -102,3 +102,49 @@ test("wait_all inline subflow parent COMPLETED with child navigation", async ({
     fullPage: true,
   });
 });
+
+test("detach orphan fail keeps flow COMPLETED with failed task visible", async ({
+  page,
+  request,
+}) => {
+  const payload = await runFlavor(request, "detach_orphan_fail");
+  expect(payload.flow_failed ?? false).toBeFalsy();
+  const run = await latestNamedRun(request, "detach_orphan_fail_flow");
+  expect(run.state).toBe("COMPLETED");
+
+  await page.goto(`http://localhost:4173/runs/${run.id}?tab=dag`);
+  await expect(page.getByText(/detach_orphan_fail_flow/i).first()).toBeVisible({
+    timeout: 15000,
+  });
+  // Parent badge COMPLETED while detached explode remains FAILED in the DAG.
+  await expect(page.getByText("COMPLETED").first()).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText(/explode/i).first()).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText("FAILED").first()).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText(/dbl/i).first()).toBeVisible({ timeout: 15000 });
+  await page.screenshot({
+    path: `${ARTIFACT_DIR}/detach-orphan-fail-dag.png`,
+    fullPage: true,
+  });
+});
+
+test("explicit orphan fail keeps flow COMPLETED with failed task visible", async ({
+  page,
+  request,
+}) => {
+  const payload = await runFlavor(request, "explicit_orphan_fail");
+  expect(payload.flow_failed ?? false).toBeFalsy();
+  const run = await latestNamedRun(request, "explicit_orphan_fail_flow");
+  expect(run.state).toBe("COMPLETED");
+
+  await page.goto(`http://localhost:4173/runs/${run.id}?tab=dag`);
+  await expect(page.getByText(/explicit_orphan_fail_flow/i).first()).toBeVisible({
+    timeout: 15000,
+  });
+  await expect(page.getByText("COMPLETED").first()).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText(/explode/i).first()).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText("FAILED").first()).toBeVisible({ timeout: 15000 });
+  await page.screenshot({
+    path: `${ARTIFACT_DIR}/explicit-orphan-fail-dag.png`,
+    fullPage: true,
+  });
+});
