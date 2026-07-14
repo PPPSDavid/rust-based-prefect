@@ -9,6 +9,7 @@ use std::time::Duration;
 use rusqlite::Connection;
 use serde_json::{json, Value};
 
+use crate::concurrency_ops;
 use crate::deployment_ops;
 use crate::gate_ops;
 use crate::engine::{
@@ -794,8 +795,10 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
             let stale = body.get("stale_after_seconds").and_then(|v| v.as_i64()).unwrap_or(120).max(1);
             let mut summary = deployment_ops::deployment_maintenance(conn, stale).map_err(|e| e.to_string())?;
             let gates = gate_ops::tick_gate_tasks(conn, &mut ctx.engine).map_err(|e| e.to_string())?;
+            let gcl_reclaimed = concurrency_ops::reclaim_expired(conn, None).map_err(|e| e.to_string())?;
             if let Some(obj) = summary.as_object_mut() {
                 obj.insert("gates_promoted".to_string(), json!(gates));
+                obj.insert("gcl_reclaimed".to_string(), json!(gcl_reclaimed));
             }
             Ok(json!({"ok": true, "summary": summary}))
         }
@@ -806,6 +809,73 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                 .ok_or_else(|| "task_tick_gate_tasks requires bind_db".to_string())?;
             let promoted = gate_ops::tick_gate_tasks(conn, &mut ctx.engine).map_err(|e| e.to_string())?;
             Ok(json!({"ok": true, "promoted": promoted}))
+        }
+        "gcl_upsert" => {
+            let conn = ctx
+                .db_conn
+                .as_ref()
+                .ok_or_else(|| "gcl_upsert requires bind_db".to_string())?;
+            let lim = concurrency_ops::upsert_limit(conn, body)?;
+            Ok(json!({"ok": true, "limit": lim}))
+        }
+        "gcl_delete" => {
+            let conn = ctx
+                .db_conn
+                .as_ref()
+                .ok_or_else(|| "gcl_delete requires bind_db".to_string())?;
+            let name = body
+                .get("name")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| "missing name".to_string())?;
+            concurrency_ops::delete_limit(conn, name)
+        }
+        "gcl_get" => {
+            let conn = ctx
+                .db_conn
+                .as_ref()
+                .ok_or_else(|| "gcl_get requires bind_db".to_string())?;
+            let name = body
+                .get("name")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| "missing name".to_string())?;
+            concurrency_ops::get_limit(conn, name)
+        }
+        "gcl_list" => {
+            let conn = ctx
+                .db_conn
+                .as_ref()
+                .ok_or_else(|| "gcl_list requires bind_db".to_string())?;
+            concurrency_ops::list_limits(conn)
+        }
+        "gcl_acquire" => {
+            let conn = ctx
+                .db_conn
+                .as_ref()
+                .ok_or_else(|| "gcl_acquire requires bind_db".to_string())?;
+            concurrency_ops::acquire(conn, body)
+        }
+        "gcl_release" => {
+            let conn = ctx
+                .db_conn
+                .as_ref()
+                .ok_or_else(|| "gcl_release requires bind_db".to_string())?;
+            concurrency_ops::release(conn, body)
+        }
+        "gcl_renew" => {
+            let conn = ctx
+                .db_conn
+                .as_ref()
+                .ok_or_else(|| "gcl_renew requires bind_db".to_string())?;
+            concurrency_ops::renew(conn, body)
+        }
+        "gcl_reclaim_expired" => {
+            let conn = ctx
+                .db_conn
+                .as_ref()
+                .ok_or_else(|| "gcl_reclaim_expired requires bind_db".to_string())?;
+            let now = body.get("now").and_then(|v| v.as_str());
+            let n = concurrency_ops::reclaim_expired(conn, now)?;
+            Ok(json!({"ok": true, "reclaimed": n}))
         }
         _ => Err(format!("unknown control op: {op}")),
     }

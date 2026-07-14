@@ -83,11 +83,13 @@ class TaskWrapper:
         name: str | None = None,
         *,
         transition_hooks: tuple[TransitionHookSpec, ...] | None = None,
+        tags: tuple[str, ...] = (),
         persist_result: bool = False,
     ) -> None:
         self.fn = fn
         self.name = name or getattr(fn, "__name__", "<task>")
         self._transition_hooks = transition_hooks
+        self.tags = tags
         self.persist_result = bool(persist_result)
         wraps(fn)(self)
 
@@ -96,34 +98,76 @@ class TaskWrapper:
         resolved_kwargs = {k: _resolve(v) for k, v in kwargs.items()}
         return cast(T, self.fn(*resolved_args, **resolved_kwargs))
 
-    def submit(
-        self,
-        *args: Any,
-        wait_for: Sequence[TaskFuture[Any] | SubflowFuture[Any] | GateFuture[Any]] | None = None,
-        **kwargs: Any,
-    ) -> TaskFuture[T]:
-        if wait_for:
-            wait(wait_for)
+    def _start_task_run(
+        self, flow_run_id: UUID, planned_node_id: str | None
+    ) -> tuple[TaskRunRecord, list[str]]:
+        """Create task run, PENDING, acquire tag slots, then RUNNING.
 
-        flow_run_id = _ACTIVE_FLOW_RUN.get()
-        task_run = None
-        planned_node_id: str | None = None
-        if flow_run_id is not None:
-            planned_node_id = _CONTROL_PLANE.next_planned_node_id(
-                flow_run_id, self.name
-            )
-            hit, cached = _CONTROL_PLANE.lookup_resumed_task_result(
-                flow_run_id,
-                planned_node_id,
-                persist_result=self.persist_result,
-            )
-            if hit:
-                return self._complete_from_cache(
-                    flow_run_id, planned_node_id, cast(T, cached)
+        Untagged tasks keep the batched PENDING+RUNNING start for performance.
+        """
+        task_run = _CONTROL_PLANE.create_task_run(
+            flow_run_id,
+            self.name,
+            planned_node_id=planned_node_id,
+            tags=self.tags,
+        )
+        lease_ids: list[str] = []
+        if self.tags:
+            _CONTROL_PLANE.record_task_event(task_run.task_run_id, "task_pending", None)
+            th = self._transition_hooks
+            if th:
+                _emit_task_single_hook_edge(
+                    th,
+                    task_run,
+                    self.name,
+                    RunState.SCHEDULED,
+                    RunState.PENDING,
+                    "task_pending",
+                    None,
                 )
-            task_run = _CONTROL_PLANE.create_task_run(
-                flow_run_id, self.name, planned_node_id=planned_node_id
+            from .concurrency import (
+                ConcurrencyLimitError,
+                acquire_tag_slots_for_task,
             )
+
+            try:
+                lease_ids = acquire_tag_slots_for_task(
+                    self.tags,
+                    task_run_id=str(task_run.task_run_id),
+                    plane=_CONTROL_PLANE,
+                )
+            except ConcurrencyLimitError:
+                _CONTROL_PLANE.record_task_event(
+                    task_run.task_run_id,
+                    "task_cancelled",
+                    {
+                        "task_name": self.name,
+                        "error": "tag concurrency limit denied (limit=0)",
+                    },
+                )
+                if th:
+                    _emit_task_single_hook_edge(
+                        th,
+                        task_run,
+                        self.name,
+                        RunState.PENDING,
+                        RunState.CANCELLED,
+                        "task_cancelled",
+                        {"task_name": self.name},
+                    )
+                raise
+            _CONTROL_PLANE.record_task_event(task_run.task_run_id, "task_running", None)
+            if th:
+                _emit_task_single_hook_edge(
+                    th,
+                    task_run,
+                    self.name,
+                    RunState.PENDING,
+                    RunState.RUNNING,
+                    "task_running",
+                    None,
+                )
+        else:
             _CONTROL_PLANE.record_task_events_batch(
                 task_run.task_run_id,
                 [
@@ -136,6 +180,39 @@ class TaskWrapper:
                 _emit_task_transition_edges(
                     th, task_run, self.name, _TASK_HOOK_START_EDGES
                 )
+        return task_run, lease_ids
+
+    def _release_tag_leases(self, lease_ids: list[str]) -> None:
+        if lease_ids:
+            _CONTROL_PLANE.release_concurrency_slots(lease_ids)
+
+    def submit(
+        self,
+        *args: Any,
+        wait_for: Sequence[TaskFuture[Any] | SubflowFuture[Any] | GateFuture[Any]] | None = None,
+        **kwargs: Any,
+    ) -> TaskFuture[T]:
+        if wait_for:
+            wait(wait_for)
+
+        flow_run_id = _ACTIVE_FLOW_RUN.get()
+        task_run = None
+        lease_ids: list[str] = []
+        if flow_run_id is not None:
+            planned_node_id = _CONTROL_PLANE.next_planned_node_id(
+                flow_run_id, self.name
+            )
+            hit, cached = _CONTROL_PLANE.lookup_resumed_task_result(
+                flow_run_id,
+                planned_node_id,
+                persist_result=self.persist_result,
+            )
+            if hit:
+                # Resume skip does not consume tag concurrency slots.
+                return self._complete_from_cache(
+                    flow_run_id, planned_node_id, cast(T, cached)
+                )
+            task_run, lease_ids = self._start_task_run(flow_run_id, planned_node_id)
 
         try:
             result = self(*args, **kwargs)
@@ -159,14 +236,14 @@ class TaskWrapper:
                     st = _CONTROL_PLANE.get_task_run(task_run.task_run_id).state
                 except Exception:
                     st = None
-                if st == RunState.RUNNING:
+                if st in (RunState.RUNNING, RunState.PENDING):
                     _CONTROL_PLANE.record_task_event(
                         task_run.task_run_id,
                         "task_failed",
                         {"task_name": self.name, "error": str(exc)},
                     )
                     th = self._transition_hooks
-                    if th:
+                    if th and st == RunState.RUNNING:
                         _emit_task_single_hook_edge(
                             th,
                             task_run,
@@ -177,6 +254,8 @@ class TaskWrapper:
                             {"task_name": self.name, "error": str(exc)},
                         )
             raise
+        finally:
+            self._release_tag_leases(lease_ids)
 
     def _complete_from_cache(
         self,
@@ -185,7 +264,10 @@ class TaskWrapper:
         value: T,
     ) -> TaskFuture[T]:
         task_run = _CONTROL_PLANE.create_task_run(
-            flow_run_id, self.name, planned_node_id=planned_node_id
+            flow_run_id,
+            self.name,
+            planned_node_id=planned_node_id,
+            tags=self.tags,
         )
         _CONTROL_PLANE.record_task_events_batch(
             task_run.task_run_id,
@@ -238,6 +320,7 @@ class TaskWrapper:
                 "task_completed",
                 data,
             )
+
     def map(
         self,
         values: Iterable[Any],
@@ -281,20 +364,39 @@ class TaskWrapper:
                         flow_run_id, self.name
                     )
                 task_run = _CONTROL_PLANE.create_task_run(
-                    flow_run_id, self.name, planned_node_id=planned_node_id
+                    flow_run_id,
+                    self.name,
+                    planned_node_id=planned_node_id,
+                    tags=self.tags,
                 )
-                _CONTROL_PLANE.record_task_events_batch(
-                    task_run.task_run_id,
-                    [
-                        ("task_pending", None),
-                        ("task_running", None),
-                    ],
-                )
-                th = self._transition_hooks
-                if th:
-                    _emit_task_transition_edges(
-                        th, task_run, self.name, _TASK_HOOK_START_EDGES
+                if self.tags:
+                    _CONTROL_PLANE.record_task_event(
+                        task_run.task_run_id, "task_pending", None
                     )
+                    th = self._transition_hooks
+                    if th:
+                        _emit_task_single_hook_edge(
+                            th,
+                            task_run,
+                            self.name,
+                            RunState.SCHEDULED,
+                            RunState.PENDING,
+                            "task_pending",
+                            None,
+                        )
+                else:
+                    _CONTROL_PLANE.record_task_events_batch(
+                        task_run.task_run_id,
+                        [
+                            ("task_pending", None),
+                            ("task_running", None),
+                        ],
+                    )
+                    th = self._transition_hooks
+                    if th:
+                        _emit_task_transition_edges(
+                            th, task_run, self.name, _TASK_HOOK_START_EDGES
+                        )
             metas.append((task_run, v))
         return metas
 
@@ -330,7 +432,7 @@ class TaskWrapper:
                 st = _CONTROL_PLANE.get_task_run(task_run.task_run_id).state
             except Exception:
                 st = None
-            if st != RunState.RUNNING:
+            if st not in (RunState.RUNNING, RunState.PENDING):
                 continue
             _CONTROL_PLANE.record_task_event(
                 task_run.task_run_id,
@@ -338,7 +440,7 @@ class TaskWrapper:
                 {"task_name": self.name, "error": str(exc)},
             )
             th = self._transition_hooks
-            if th:
+            if th and st == RunState.RUNNING:
                 _emit_task_single_hook_edge(
                     th,
                     task_run,
@@ -348,6 +450,48 @@ class TaskWrapper:
                     "task_failed",
                     {"task_name": self.name, "error": str(exc)},
                 )
+
+    def _run_tagged_map_body(self, task_run: TaskRunRecord | None, value: Any) -> Any:
+        """Acquire tag slots, enter RUNNING, execute body, release slots."""
+        lease_ids: list[str] = []
+        if task_run is not None and self.tags:
+            from .concurrency import (
+                ConcurrencyLimitError,
+                acquire_tag_slots_for_task,
+            )
+
+            try:
+                lease_ids = acquire_tag_slots_for_task(
+                    self.tags,
+                    task_run_id=str(task_run.task_run_id),
+                    plane=_CONTROL_PLANE,
+                )
+            except ConcurrencyLimitError:
+                _CONTROL_PLANE.record_task_event(
+                    task_run.task_run_id,
+                    "task_cancelled",
+                    {
+                        "task_name": self.name,
+                        "error": "tag concurrency limit denied (limit=0)",
+                    },
+                )
+                raise
+            _CONTROL_PLANE.record_task_event(task_run.task_run_id, "task_running", None)
+            th = self._transition_hooks
+            if th:
+                _emit_task_single_hook_edge(
+                    th,
+                    task_run,
+                    self.name,
+                    RunState.PENDING,
+                    RunState.RUNNING,
+                    "task_running",
+                    None,
+                )
+        try:
+            return self.fn(value)
+        finally:
+            self._release_tag_leases(lease_ids)
 
     def _map_thread_pool(
         self,
@@ -366,7 +510,15 @@ class TaskWrapper:
 
         with ThreadPoolExecutor(max_workers=mx) as pool:
             try:
-                outs = list(pool.map(self.fn, [m[1] for m in metas]))
+                if self.tags:
+                    outs = list(
+                        pool.map(
+                            lambda m: self._run_tagged_map_body(m[0], m[1]),
+                            metas,
+                        )
+                    )
+                else:
+                    outs = list(pool.map(self.fn, [m[1] for m in metas]))
             except Exception as exc:
                 self._fail_map_task_runs(metas, exc)
                 raise
@@ -386,6 +538,65 @@ class TaskWrapper:
         metas = self._prepare_map_task_runs(vals)
         mx = min(len(vals), runner.resolve_max_workers())
         fn = self.fn
+        if self.tags:
+            # Tag slots on the parent; bodies run in children (process pool cannot share GCL).
+            # Outer threads acquire/release while ProcessPoolExecutor runs picklable bodies.
+            from concurrent.futures import ThreadPoolExecutor
+
+            with ProcessPoolExecutor(max_workers=mx) as pool:
+
+                def _one(item: tuple[TaskRunRecord | None, Any]) -> Any:
+                    task_run, v = item
+                    lease_ids: list[str] = []
+                    if task_run is not None:
+                        from .concurrency import (
+                            ConcurrencyLimitError,
+                            acquire_tag_slots_for_task,
+                        )
+
+                        try:
+                            lease_ids = acquire_tag_slots_for_task(
+                                self.tags,
+                                task_run_id=str(task_run.task_run_id),
+                                plane=_CONTROL_PLANE,
+                            )
+                        except ConcurrencyLimitError:
+                            _CONTROL_PLANE.record_task_event(
+                                task_run.task_run_id,
+                                "task_cancelled",
+                                {
+                                    "task_name": self.name,
+                                    "error": "tag concurrency limit denied (limit=0)",
+                                },
+                            )
+                            raise
+                        _CONTROL_PLANE.record_task_event(
+                            task_run.task_run_id, "task_running", None
+                        )
+                        th = self._transition_hooks
+                        if th:
+                            _emit_task_single_hook_edge(
+                                th,
+                                task_run,
+                                self.name,
+                                RunState.PENDING,
+                                RunState.RUNNING,
+                                "task_running",
+                                None,
+                            )
+                    try:
+                        return pool.submit(fn, v).result()
+                    finally:
+                        self._release_tag_leases(lease_ids)
+
+                with ThreadPoolExecutor(max_workers=mx) as orchestrator:
+                    try:
+                        outs = list(orchestrator.map(_one, metas))
+                    except Exception as exc:
+                        self._fail_map_task_runs(metas, exc)
+                        raise
+            return self._finalize_map_task_runs(metas, outs)
+
         with ProcessPoolExecutor(max_workers=mx) as pool:
             try:
                 outs = list(pool.map(fn, [m[1] for m in metas]))
@@ -401,6 +612,7 @@ def task(
     *,
     name: str | None = None,
     transition_hooks: Sequence[TransitionHookSpec] | None = None,
+    tags: Sequence[str] | None = None,
     persist_result: bool = False,
 ) -> TaskWrapper: ...
 
@@ -411,6 +623,7 @@ def task(
     *,
     name: str | None = None,
     transition_hooks: Sequence[TransitionHookSpec] | None = None,
+    tags: Sequence[str] | None = None,
     persist_result: bool = False,
 ) -> Callable[[Callable[..., T]], TaskWrapper]: ...
 
@@ -420,14 +633,17 @@ def task(
     *,
     name: str | None = None,
     transition_hooks: Sequence[TransitionHookSpec] | None = None,
+    tags: Sequence[str] | None = None,
     persist_result: bool = False,
 ) -> TaskWrapper | Callable[[Callable[..., T]], TaskWrapper]:
     def decorate(f: Callable[..., T]) -> TaskWrapper:
         compiled = compile_transition_hooks(transition_hooks)
+        tag_tuple = tuple(str(t) for t in (tags or ()))
         return TaskWrapper(
             f,
             name=name,
             transition_hooks=compiled,
+            tags=tag_tuple,
             persist_result=persist_result,
         )
 

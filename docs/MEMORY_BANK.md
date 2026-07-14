@@ -1,13 +1,13 @@
 # Memory Bank
 
 Compact context handoff for future sessions. Process/validation contract: root `AGENTS.md`.
-Last updated: 2026-07-12.
+Last updated: 2026-07-14.
 
 ## Project Snapshot
 
 - Name: Project IronFlow (`rust-based-prefect`)
 - Goal: Prefect-compatible orchestration with stronger determinism, performance, and static planning.
-- Status: Hybrid MVP in active use — deployments (schedules, CLI/YAML Tier 1); **subflows M1+M2** on `main` (#34/#36) with user guide at `docs/how-to/subflows.md`; transition hooks; agent tooling under `.cursor/` + `docs/agent/`. **Self-hosted:** Tier A (server Docker) + Tier C (basic auth) on `main`. **Active plan:** Tier B — RFC `docs/plans/self-hosted-storage-rfc.md`, sequence `docs/plans/self-hosted-docker-tier-b.md` (B0 store extract → Postgres+Rust → HTTP workers → compose).
+- Status: Hybrid MVP in active use — deployments; subflows; transition hooks; **global + tag concurrency limits** (`docs/how-to/concurrency-limits.md`). **Self-hosted:** Tier A (server Docker) + Tier C (basic auth) on `main`; Tier B RFC/sequence — `docs/plans/self-hosted-storage-rfc.md`, `docs/plans/self-hosted-docker-tier-b.md` (B0 store extract landed). Concurrency plan implemented — `docs/plans/concurrency-limits.md`.
 
 ## Core Architecture
 
@@ -26,8 +26,8 @@ Last updated: 2026-07-12.
 
 - Dual local persistence in shim runtime:
   - JSONL append history for durable event replay
-  - SQLite read model for query/API/UI reads
-- Query / schedule / claim hot paths prefer Rust when the native bridge is loaded.
+  - SQLite read model for query/API/UI reads via `prefect_compat.persistence` (`SqliteStore` / `ControlPlaneStore`; B0 extract)
+- Query / schedule / claim / GCL hot paths prefer Rust when the native bridge is loaded.
 
 ## Agent tooling (code-review-graph)
 
@@ -73,6 +73,7 @@ Last updated: 2026-07-12.
 1. Move remaining projection write hot paths from Python into Rust-backed implementation.
 2. Expand Prefect API compatibility matrix with concrete parity tests.
 3. Add migration/versioning path toward PostgreSQL for larger-scale persistence.
-4. Keep CI + `perf_matrix` regression thresholds healthy.
+4. Keep CI + `perf_matrix` regression thresholds healthy (including `--preset gcl`).
 5. **Task-level resume on flow-run retry** — Phase 1 landed. Follow-ups: map-index resume hardening, parameter-guard, Rust hot-path lookup, subflow/gate policies.
-6. Optional: Cloud embeddings path if NL `semantic_search` becomes important; keep decision log current (`docs/agent/DECISION_LOG.md`).
+6. Optional: async `concurrency` / CLI `gcl` / UI admin for concurrency limits.
+7. Optional: Cloud embeddings path if NL `semantic_search` becomes important; keep decision log current (`docs/agent/DECISION_LOG.md`).

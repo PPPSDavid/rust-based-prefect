@@ -15,6 +15,9 @@ This project is **not** a drop-in replacement for Prefect Cloud or the full Pref
 | Subflows / nested flows / `run_deployment` | **Two mechanisms (subset):** (1) **inline** — call `child_flow(...)` inside a parent `@flow` (blocking, same process, linked child run); (2) **deployment-backed** — `deployment_ref("name").submit(...).result()` with `SubflowFuture` and `wait_for`. Not full Prefect subflow / `run_deployment` API parity. Guide: **[How to compose flows with subflows](how-to/subflows.md)**. |
 | `task.map()` | Supported with moderate fan-out (see `COMPATIBILITY.md`). |
 | Retries, timeouts, cancellation | Enforced at the **control-plane** level for supported flows; semantics are workload-driven—see `COMPATIBILITY.md` for exact boundaries. |
+| Deployment concurrency / collision strategy | **Subset:** `concurrency_limit` + `ENQUEUE` / `CANCEL_NEW` on deployments (claim/trigger path). Caps concurrent runs **of that deployment**, not named global slots. |
+| Global concurrency limits (`concurrency` / `rate_limit`) | **Subset:** named slots, sync CM, leases, rate-limit decay — **[how-to](how-to/concurrency-limits.md)**. |
+| Tag-based concurrency (`@task(tags=...)`) | **Subset:** tags backed by `tag:{name}` limits; gated on enter `Running`. Same how-to. |
 | Task caching (`cache_policy`, …) | **Different model:** IronFlow **resume** skips DAG nodes on retry lineage (`None` auto; `@task(persist_result=True)` for JSON-safe values). Not Prefect cache-policy parity. Guide: **[How to resume tasks and persist results](how-to/task-resume-and-persist.md)**. |
 | Blocks, integrations, secrets | **Not** a focus of the MVP; many patterns are unsupported or stubbed. |
 | State hooks (`on_running`, …) | IronFlow uses **`transition_hooks`** on `@flow` / `@task` with `TransitionHookSpec` / `on_transition`—see `COMPATIBILITY.md`. This is an **extension**, not Prefect’s hook API. |

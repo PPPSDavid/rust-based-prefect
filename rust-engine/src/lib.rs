@@ -1,3 +1,4 @@
+pub mod concurrency_ops;
 pub mod deployment_ops;
 pub mod engine;
 pub mod ffi;

@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+from ..concurrency_store import ensure_schema as ensure_gcl_schema
 from .constants import DEFAULT_WORK_POOL_ID
 
 
@@ -99,7 +100,8 @@ class SqliteStore:
                 updated_at TEXT NOT NULL,
                 kind TEXT NOT NULL DEFAULT 'task',
                 child_flow_run_id TEXT,
-                child_deployment_run_id TEXT
+                child_deployment_run_id TEXT,
+                tags TEXT
             );
             CREATE TABLE IF NOT EXISTS dag_manifests (
                 seq INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -293,6 +295,10 @@ class SqliteStore:
             )
         if "gate_open_at" not in col_names:
             conn.execute("ALTER TABLE task_runs ADD COLUMN gate_open_at TEXT")
+        if "tags" not in col_names:
+            conn.execute("ALTER TABLE task_runs ADD COLUMN tags TEXT")
+        # Global / tag concurrency limit tables (Python fallback + shared schema).
+        ensure_gcl_schema(conn)
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_task_runs_gate_due "
             "ON task_runs(kind, state, gate_open_at)"
