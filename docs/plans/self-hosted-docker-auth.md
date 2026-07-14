@@ -1,7 +1,7 @@
 # Self-Hosted Docker & Access Control Plan (IronFlow)
 
-**Status:** Draft — not started  
-**Last updated:** 2026-07-12  
+**Status:** Tier A + C shipped; Tier B in progress (see tier-b + storage RFC)  
+**Last updated:** 2026-07-14  
 **Scope:** `deploy/docker/`, `python-shim/`, `rust-engine/`, `frontend/`, `scripts/`, `docs/`, `COMPATIBILITY.md`  
 **User-facing docs (target):** see §13 Documentation matrix  
 **Prefect references (baseline, not parity claims):**
@@ -123,7 +123,7 @@ Tier B is **not** packaging-only. It requires control-plane changes first. Sub-p
 
 - **Postgres** as production store (align with Prefect); SQLite remains default for zero-config local dev.
 - **JSONL:** keep as optional append-only audit/replay sidecar **or** migrate event writes to Postgres only — pick one in RFC.
-- **Rust hot paths:** deployment claim, schedule tick, gate promotion — either Postgres via `tokio-postgres`/`sqlx` in `rust-engine` **or** HTTP boundary so workers never touch DB (Prefect model). **Recommended:** HTTP worker boundary + Postgres only on server/services (matches Prefect, simpler worker images).
+- **Rust hot paths:** deployment claim, schedule tick, gate promotion stay in `rust-engine` against the server-owned DB (SQLite path today; Postgres DSN in B1). **HTTP worker boundary** so workers never touch DB (Prefect model). Do **not** leave Postgres as Python-only forever — see `self-hosted-storage-rfc.md`.
 
 ---
 
@@ -403,8 +403,8 @@ cargo test --manifest-path rust-engine/Cargo.toml
 | --- | --- | --- | --- |
 | `cursor/self-hosted-docker-auth-plan-b5da` | — | Plan doc | PR #45 |
 | `cursor/docker-tier-a-c-b5da` | A, C | In progress | Server image + basic auth |
-| *(pending)* | B0 | Not started | RFC + storage abstraction |
-| *(pending)* | B1 | Not started | Postgres + migrations |
+| *(this PR / B0)* | B0 | In progress | RFC + SQLite persistence extract |
+| *(pending)* | B1 | Not started | Postgres + Rust bind + migrations |
 | *(pending)* | B2 | Not started | HTTP worker protocol |
 | *(pending)* | B3 | Not started | Services split |
 | *(pending)* | B4 | Not started | Redis / multi-worker API (optional) |
