@@ -71,7 +71,7 @@ def test_create_store_rejects_postgres_until_b1(
 
 def test_control_plane_uses_store(tmp_path: Path) -> None:
     history = tmp_path / "hist.jsonl"
-    plane = InMemoryControlPlane(history_path=history)
+    plane = InMemoryControlPlane(history_path=str(history))
     assert plane._store.backend_kind == "sqlite"
     assert plane._sqlite_path == history.with_suffix(".db")
     assert plane._sqlite_conn is plane._store.connection
