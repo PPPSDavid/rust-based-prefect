@@ -1,6 +1,6 @@
 # How to choose a task runner
 
-A **task runner** controls how **`task.map()`** fans out work inside a `@flow`. It is **not** the same as a deployment **worker** or **work pool** — those claim queued deployment runs from the control plane. This guide helps you pick a runner for common workload shapes (remote API calls vs local Python).
+A **task runner** controls how **`task.submit()`** and **`task.map()`** run work inside a `@flow`. It is **not** the same as a deployment **worker** or **work pool** — those claim queued deployment runs from the control plane. This guide helps you pick a runner for common workload shapes (remote API calls vs local Python).
 
 Conceptual reference: **[Runners](../concepts/runners.md)** · **[Tasks](../concepts/tasks.md)** · Environment variables: **[`IRONFLOW_TASK_RUNNER`](../reference/env-vars.md)**.
 
@@ -8,32 +8,35 @@ Conceptual reference: **[Runners](../concepts/runners.md)** · **[Tasks](../conc
 
 | Term | What it does |
 | --- | --- |
-| **Task runner** (`ThreadPoolTaskRunner`, …) | Parallelizes **`map()`** inside a flow that is already executing |
+| **Task runner** (`ThreadPoolTaskRunner`, …) | Parallelizes **`submit()`** / **`map()`** inside a flow that is already executing |
 | **Deployment worker** (`ironflow worker start`, embedded server worker) | Claims **deployment runs** and runs the whole `@flow` in a Python process |
 
-You can run API-wrapper flows on a normal **process** work-pool worker and still use **`ThreadPoolTaskRunner`** inside the flow for concurrent `map()` calls.
+You can run API-wrapper flows on a normal **process** work-pool worker and still use **`ThreadPoolTaskRunner`** inside the flow for concurrent `submit` / `map` calls.
 
-## What task runners affect (MVP)
+## What task runners affect
 
-**Only `task.map()` parallelism.** In the current MVP, **`task.submit()` runs the task body synchronously** before returning the future. Dependency chains built with `.submit()` and `wait_for` therefore execute **one task at a time**, regardless of the runner.
+| Runner | `submit()` | `map()` |
+| --- | --- | --- |
+| **`ThreadPoolTaskRunner`** (default) | Non-blocking; bodies overlap in a shared thread pool | Concurrent fan-out |
+| **`SequentialTaskRunner`** | Synchronous / non-overlapping | Sequential |
+| **`ProcessPoolTaskRunner`** | Still synchronous on the caller (limitation) | Concurrent via process pool (picklable tasks) |
 
-For concurrent remote calls or parallel fan-out, use **`map()`** (or structure work so independent branches can run via `map`, not a chain of `submit` calls).
+Independent branches can use either multiple **`submit()`** calls or **`map()`**. Use **`wait_for`** so dependents do not start early.
 
 ## Quick decision table
 
 | Your tasks mostly… | Runner | Typical pattern |
 | --- | --- | --- |
-| Call HTTP APIs, SDKs, queues, or poll remote jobs (I/O-bound) | **`ThreadPoolTaskRunner`** (default) | `call_remote.map(urls)` |
+| Call HTTP APIs, SDKs, queues, or poll remote jobs (I/O-bound) | **`ThreadPoolTaskRunner`** (default) | `a, b = fetch.submit(u1), fetch.submit(u2)` or `fetch.map(urls)` |
 | Run CPU-heavy pure Python (numeric work, compression, …) | **`ProcessPoolTaskRunner`** | Picklable top-level task + `heavy.map(items)` |
-| Need deterministic order or easier debugging | **`SequentialTaskRunner`** | `step.map([1, 2, 3])` runs in order |
-| Are a short dependency chain via `.submit()` | Runner choice **barely matters** | Sequential execution either way |
+| Need deterministic order or easier debugging | **`SequentialTaskRunner`** | `step.map([1, 2, 3])` or sequential `submit` |
 | Fan out once with a single `map` value | Default is fine | Runner falls back to single-threaded path |
 
 **Default:** If you do nothing, IronFlow uses **`ThreadPoolTaskRunner`** via `IRONFLOW_TASK_RUNNER=thread`. That is the right default for most flows, including thin API-wrapper tasks.
 
 ## Mechanism 1 — Thread pool (I/O-bound, default)
 
-Use when tasks spend time **waiting** on network, disk, or external services. Threads release the GIL during many I/O operations, so `map()` can overlap multiple API calls.
+Use when tasks spend time **waiting** on network, disk, or external services. Threads release the GIL during many I/O operations, so `submit()` / `map()` can overlap multiple API calls.
 
 ```python
 from prefect_compat import flow, task, wait
@@ -41,11 +44,16 @@ from prefect_compat.task_runners import ThreadPoolTaskRunner
 
 @task
 def fetch_status(job_id: str) -> dict:
-    # Thin wrapper around a remote API — runs in a worker thread during map()
+    # Thin wrapper around a remote API — runs in a worker thread
     ...
 
 @flow(task_runner=ThreadPoolTaskRunner(max_workers=8))
 def poll_jobs(job_ids: list[str]) -> list[dict]:
+    # Independent submits overlap:
+    a = fetch_status.submit(job_ids[0])
+    b = fetch_status.submit(job_ids[1])
+    wait([a, b])
+    # Or fan out with map:
     futures = fetch_status.map(job_ids)
     wait(futures)
     return [f.result() for f in futures]
@@ -112,10 +120,11 @@ Per-flow overrides always win: `@flow(task_runner=ThreadPoolTaskRunner(max_worke
 
 ## Common mistakes
 
-1. **Expecting `submit()` to run in parallel** — use `map()` for fan-out, or accept sequential `submit` chains.
+1. **Expecting process-pool `submit()` to overlap** — `ProcessPoolTaskRunner` parallelizes **`map()`** only; independent `submit()` still runs synchronously. Prefer threads for concurrent submit, or `map()` for process fan-out.
 2. **Using `ProcessPoolTaskRunner` for API calls** — adds pickling overhead with no I/O benefit; use threads.
-3. **Confusing task runner with work pool** — API flows still need a deployment worker (embedded or `ironflow worker start`); the thread runner only affects in-flow `map()`.
+3. **Confusing task runner with work pool** — API flows still need a deployment worker (embedded or `ironflow worker start`); the thread runner only affects in-flow `submit` / `map`.
 4. **Huge `max_workers` against rate-limited APIs** — cap `max_workers` to respect remote quotas.
+5. **Omitting `wait_for` on dependents** — without `wait_for` (or resolving upstream futures as args), concurrent submits may race; gate with `wait_for=[upstream]`.
 
 ## Related docs
 

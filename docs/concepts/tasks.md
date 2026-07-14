@@ -4,10 +4,10 @@ A **task** is a Python callable decorated with **`@task`** from **`prefect_compa
 
 ## Basics
 
-- **`task.submit(*args, wait_for=...)`** — schedule work and get a **future**; use **`future.result()`** or **`wait([...])`** to block inside the flow function. **`wait_for`** also accepts **`SubflowFuture`** from deployment-backed subflows — see **[How to compose flows with subflows](../how-to/subflows.md)**.
+- **`task.submit(*args, wait_for=...)`** — schedule work and get a **future** immediately under **`ThreadPoolTaskRunner`** (default); use **`future.result()`** / **`future.wait()`** or **`wait([...])`** to block inside the flow function. Independent submits can overlap; **`wait_for`** gates body start. **`wait_for`** also accepts **`SubflowFuture`** from deployment-backed subflows — see **[How to compose flows with subflows](../how-to/subflows.md)**.
 - **`@task(name="custom-name")`** — optional runtime task name (defaults to the function name). The static planner resolves names from task objects in the flow module or closure so forecast/DAG labels match task runs.
-- **`task.map(values, wait_for=...)`** — fan out over inputs; returns a list of futures. Combine with **`wait(mapped)`** before downstream **`submit`** calls. All mapped task runs share one **Aggregated fan-out** DAG node in forecast/UI (fan-out collapsed). Parallelism during `map` is controlled by the flow’s **task runner** — see **[How to choose a task runner](../how-to/choose-task-runners.md)**.
-- **`task.submit()`** — in the current MVP, runs the task body **before** returning the future (sequential execution). For concurrent fan-out (for example overlapping API calls), prefer **`map()`** with **`ThreadPoolTaskRunner`**.
+- **`task.map(values, wait_for=...)`** — fan out over inputs; returns a list of futures. Combine with **`wait(mapped)`** before downstream **`submit`** calls. All mapped task runs share one **Aggregated fan-out** DAG node in forecast/UI (fan-out collapsed). Parallelism during `submit` / `map` is controlled by the flow’s **task runner** — see **[How to choose a task runner](../how-to/choose-task-runners.md)**.
+- **`SequentialTaskRunner`** keeps `submit` non-overlapping; **`ProcessPoolTaskRunner`** still runs `submit` synchronously (process concurrency is via `map` only).
 - Imports and patterns match the subset described in **[Compatibility matrix](../compatibility.md)** and the **[Quick start (demo flow)](../QUICKSTART_DEMO.md)** example.
 
 ## Repeated and aliased tasks

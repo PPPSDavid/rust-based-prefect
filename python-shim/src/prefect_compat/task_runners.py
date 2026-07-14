@@ -24,7 +24,7 @@ class MapTaskRunner(Protocol):
 
 @dataclass
 class SequentialTaskRunner:
-    """Single-threaded map: deterministic in-process ``submit`` chain."""
+    """Single-threaded map/submit: deterministic in-process execution (no overlap)."""
 
     def map_values(
         self,
@@ -41,7 +41,7 @@ class SequentialTaskRunner:
 
 @dataclass
 class ThreadPoolTaskRunner:
-    """Concurrent ``map`` using a thread pool (Prefect 3 default style)."""
+    """Concurrent ``submit`` / ``map`` using a thread pool (Prefect 3 default style)."""
 
     max_workers: int | None = None
 
@@ -77,7 +77,10 @@ class ThreadPoolTaskRunner:
 
 @dataclass
 class ProcessPoolTaskRunner:
-    """Marker for process-pool ``map`` (handled in ``TaskWrapper`` — task callable must be picklable)."""
+    """Process-pool ``map`` (handled in ``TaskWrapper`` — task callable must be picklable).
+
+    Independent ``submit()`` calls stay synchronous on the coordinating thread.
+    """
 
     max_workers: int | None = None
 
