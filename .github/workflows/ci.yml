@@ -122,6 +122,10 @@ jobs:
           done
       - name: Smoke install wheel
         shell: bash
+        # Job env sets IRONFLOW_DATABASE_URL for Postgres tests; clear it so the
+        # bare wheel venv (no psycopg) can import prefect_compat for native smoke.
+        env:
+          IRONFLOW_DATABASE_URL: ""
         run: |
           python -m venv /tmp/ifwh
           . /tmp/ifwh/bin/activate
