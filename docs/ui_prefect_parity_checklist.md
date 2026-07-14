@@ -52,6 +52,6 @@ Side-by-side comparison notes for IronFlow UI vs Prefect OSS 3.x.
 
 1. Start IronFlow API + UI (`scripts/ironflow_server.py`, `npm run dev` in `frontend/`)
 2. Seed data: `python scripts/ui_e2e_seed.py`
-3. For persisted task results: `PYTHONPATH=python-shim/src python scripts/seed_persist_result_ui.py` then point `IRONFLOW_HISTORY_PATH` at that history (or run `frontend/e2e/persist-result-ui.spec.ts`)
+3. For persisted task results: Playwright seeds via `POST /benchmark/run` `flavor=persist_result`, or manually `PYTHONPATH=python-shim/src python scripts/seed_persist_result_ui.py` then point `IRONFLOW_HISTORY_PATH` at that history
 4. Optionally start Prefect OSS for reference: `prefect server start`
 5. Capture screenshots per section and note functional deltas above

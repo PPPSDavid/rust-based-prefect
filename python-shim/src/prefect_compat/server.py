@@ -211,6 +211,29 @@ def failing_flow(n: int) -> int:
     return final.result()
 
 
+@task
+def setup() -> None:
+    return None
+
+
+@task(persist_result=True)
+def expensive(x: int) -> dict:
+    return {"x": x, "n": 42, "items": [1, 2, 3]}
+
+
+@task
+def volatile(x: int) -> int:
+    return x + 1
+
+
+@flow(name="persist_result_demo")
+def persist_result_demo_flow(n: int = 7) -> int:
+    """Seed flow for UI e2e: None marker + JSON-safe persist_result payload."""
+    setup.submit()
+    payload = expensive.submit(n)
+    return volatile.submit(payload.result()["n"]).result()
+
+
 FLOW_REGISTRY = {
     "simple_flow": simple_flow,
     "wide_flow": wide_flow,
@@ -220,6 +243,7 @@ FLOW_REGISTRY = {
     "failing_flow": failing_flow,
     "cancelable_flow": cancelable_flow,
     "gated_flow": gated_flow,
+    "persist_result_demo": persist_result_demo_flow,
 }
 
 
@@ -279,6 +303,7 @@ def benchmark_run(req: BenchmarkRequest) -> dict[str, float | int | str | bool |
         "long_chain": long_chain_flow,
         "failing": failing_flow,
         "gated": gated_flow,
+        "persist_result": persist_result_demo_flow,
         # Backwards-compatible aliases for existing scripts.
         "mapped": wide_flow,
         "chained": long_chain_flow,
@@ -287,7 +312,10 @@ def benchmark_run(req: BenchmarkRequest) -> dict[str, float | int | str | bool |
     if flow_fn is None:
         raise HTTPException(
             status_code=400,
-            detail="Unsupported flavor. Use one of: simple, wide, long_chain, failing, gated",
+            detail=(
+                "Unsupported flavor. Use one of: simple, wide, long_chain, "
+                "failing, gated, persist_result"
+            ),
         )
     start = time.perf_counter()
     error: str | None = None

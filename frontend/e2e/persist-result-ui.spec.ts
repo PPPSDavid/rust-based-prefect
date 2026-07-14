@@ -9,11 +9,17 @@ test.describe("persist result UI", () => {
     page,
     request,
   }) => {
+    // Seed against the live server (same pattern as gate-task-dag.spec.ts).
+    const seeded = await request.post(`${API}/benchmark/run`, {
+      data: { flavor: "persist_result", complexity: 7 },
+    });
+    expect(seeded.ok()).toBeTruthy();
+
     const runs = await request.get(`${API}/api/flow-runs?limit=50`);
     expect(runs.ok()).toBeTruthy();
     const items = (await runs.json()).items as Array<{ id: string; name: string; state: string }>;
     const demo = items.find((r) => r.name === "persist_result_demo" && r.state === "COMPLETED");
-    expect(demo, "persist_result_demo flow run must be seeded").toBeTruthy();
+    expect(demo, "persist_result_demo flow run must exist after seed").toBeTruthy();
 
     await page.goto(`/runs/${demo!.id}`);
     await expect(page.getByRole("heading", { name: "persist_result_demo" })).toBeVisible();

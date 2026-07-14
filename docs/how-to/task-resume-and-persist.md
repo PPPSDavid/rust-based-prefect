@@ -71,7 +71,10 @@ On a completed run’s detail page:
 - **Task Runs** — shows pretty-printed JSON under tasks that persisted a result (`null` for `None`); cache hits may show `· resumed`
 - **Artifacts** — `*-result` rows with the same payload when `persisted`
 
-Visual seed + Playwright check: `scripts/seed_persist_result_ui.py` and `frontend/e2e/persist-result-ui.spec.ts`.
+Visual seed + Playwright check: `POST /benchmark/run` with
+`{"flavor":"persist_result","complexity":7}` (used by
+`frontend/e2e/persist-result-ui.spec.ts`), or offline
+`scripts/seed_persist_result_ui.py` for manual UI checks.
 
 ## Not Prefect cache parity
 
