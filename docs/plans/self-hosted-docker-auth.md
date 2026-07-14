@@ -1,7 +1,7 @@
 # Self-Hosted Docker & Access Control Plan (IronFlow)
 
-**Status:** Draft — not started  
-**Last updated:** 2026-07-12  
+**Status:** Tier A + C **done** (merged [#46](https://github.com/PPPSDavid/rust-based-prefect/pull/46)); Tier B tracked in **[`self-hosted-docker-tier-b.md`](self-hosted-docker-tier-b.md)**  
+**Last updated:** 2026-07-14  
 **Scope:** `deploy/docker/`, `python-shim/`, `rust-engine/`, `frontend/`, `scripts/`, `docs/`, `COMPATIBILITY.md`  
 **User-facing docs (target):** see §13 Documentation matrix  
 **Prefect references (baseline, not parity claims):**
@@ -401,15 +401,16 @@ cargo test --manifest-path rust-engine/Cargo.toml
 
 | PR / branch | Tier | Status | Notes |
 | --- | --- | --- | --- |
-| `cursor/self-hosted-docker-auth-plan-b5da` | — | Plan doc | PR #45 |
-| `cursor/docker-tier-a-c-b5da` | A, C | In progress | Server image + basic auth |
-| *(pending)* | B0 | Not started | RFC + storage abstraction |
+| `cursor/self-hosted-docker-auth-plan-b5da` | — | Plan doc | Merged via parent work |
+| `cursor/docker-tier-a-c-b5da` | A, C | **Merged** [#46](https://github.com/PPPSDavid/rust-based-prefect/pull/46) | Server image + basic auth |
+| `cursor/tier-b-docker-plan-b5da` | B | Plan | Executable Tier B plan |
+| *(pending)* | B0 | Not started | RFC + storage abstraction — see [tier-b plan](self-hosted-docker-tier-b.md) |
 | *(pending)* | B1 | Not started | Postgres + migrations |
 | *(pending)* | B2 | Not started | HTTP worker protocol |
 | *(pending)* | B3 | Not started | Services split |
 | *(pending)* | B4 | Not started | Redis / multi-worker API (optional) |
-| *(pending)* | B5 | Not started | Production compose |
-| *(pending)* | B-fast | Not started | Interim shared-volume compose (optional) |
+| *(pending)* | B5 | Not started | Production compose + CI |
+| *(pending)* | B-fast | Skipped by default | Interim shared-volume compose (optional) |
 
 Update this table as work lands.
 
