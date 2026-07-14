@@ -7,7 +7,7 @@ Last updated: 2026-07-14.
 
 - Name: Project IronFlow (`rust-based-prefect`)
 - Goal: Prefect-compatible orchestration with stronger determinism, performance, and static planning.
-- Status: Hybrid MVP in active use — deployments; subflows; transition hooks; **global + tag concurrency limits** (`docs/how-to/concurrency-limits.md`). **Plans:** self-hosted Docker + basic auth — `docs/plans/self-hosted-docker-auth.md`; concurrency plan marked implemented — `docs/plans/concurrency-limits.md`.
+- Status: Hybrid MVP in active use — deployments; subflows; transition hooks; **global + tag concurrency limits** (`docs/how-to/concurrency-limits.md`). **Self-hosted:** Tier A (server Docker) + Tier C (basic auth) on `main`; Tier B RFC/sequence — `docs/plans/self-hosted-storage-rfc.md`, `docs/plans/self-hosted-docker-tier-b.md` (B0 store extract landed). Concurrency plan implemented — `docs/plans/concurrency-limits.md`.
 
 ## Core Architecture
 
@@ -26,8 +26,8 @@ Last updated: 2026-07-14.
 
 - Dual local persistence in shim runtime:
   - JSONL append history for durable event replay
-  - SQLite read model for query/API/UI reads
-- Query / schedule / claim hot paths prefer Rust when the native bridge is loaded.
+  - SQLite read model for query/API/UI reads via `prefect_compat.persistence` (`SqliteStore` / `ControlPlaneStore`; B0 extract)
+- Query / schedule / claim / GCL hot paths prefer Rust when the native bridge is loaded.
 
 ## Agent tooling (code-review-graph)
 
