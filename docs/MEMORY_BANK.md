@@ -7,7 +7,7 @@ Last updated: 2026-07-12.
 
 - Name: Project IronFlow (`rust-based-prefect`)
 - Goal: Prefect-compatible orchestration with stronger determinism, performance, and static planning.
-- Status: Hybrid MVP in active use — deployments (schedules, CLI/YAML Tier 1); **subflows M1+M2** on `main` (#34/#36) with user guide at `docs/how-to/subflows.md`; transition hooks; agent tooling under `.cursor/` + `docs/agent/`. **Active plan:** self-hosted Docker + basic auth — `docs/plans/self-hosted-docker-auth.md` (not started).
+- Status: Hybrid MVP in active use — deployments (schedules, CLI/YAML Tier 1); **subflows M1+M2**; transition hooks; **Tier A server Docker + Tier C basic auth** on `main` (#46). **Next:** Tier B production compose — `docs/plans/self-hosted-docker-tier-b.md`.
 
 ## Core Architecture
 

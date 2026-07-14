@@ -6,7 +6,8 @@ the short handoff; link the active plan from the task brief.
 | Plan | Status |
 | --- | --- |
 | [subflows.md](subflows.md) | Implemented (Phases 0–5) |
-| [self-hosted-docker-auth.md](self-hosted-docker-auth.md) | Draft — Docker deployment + basic auth |
+| [self-hosted-docker-auth.md](self-hosted-docker-auth.md) | A+C done (#46); B in progress — tracking |
+| [self-hosted-docker-tier-b.md](self-hosted-docker-tier-b.md) | Ready to implement — Postgres, HTTP workers, compose |
 
 When starting a large compatibility feature, add a plan before coding and name it
 in the PR body.
