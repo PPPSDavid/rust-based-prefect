@@ -14,6 +14,7 @@ from starlette.responses import StreamingResponse
 
 from datetime import timedelta
 
+from .auth_middleware import BasicAuthMiddleware
 from .decorators import flow, set_control_plane, task, wait
 from .gates import gate
 from .runtime import InMemoryControlPlane
@@ -97,6 +98,7 @@ LOCAL_WORKER_NAME = os.getenv("IRONFLOW_LOCAL_WORKER_NAME", "local-worker-1")
 LOCAL_WORK_POOL = os.getenv("IRONFLOW_WORK_POOL", "default-process-pool")
 
 app = FastAPI(title="IronFlow Compat Server")
+app.add_middleware(BasicAuthMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[

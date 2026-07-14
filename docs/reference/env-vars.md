@@ -32,6 +32,15 @@ IronFlow configuration uses `IRONFLOW_*` environment variables. Defaults assume 
 | --- | --- | --- |
 | `IRONFLOW_API_URL` | `http://127.0.0.1:8000` | Base URL for `ironflow deploy`, `ironflow serve`, and related CLI commands. |
 
+## Security (self-hosted)
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `IRONFLOW_SERVER_API_AUTH_STRING` | *(unset)* | When set (`user:pass`), require HTTP Basic auth on `/api/*`. `/health` stays open. Mirrors Prefect `PREFECT_SERVER_API_AUTH_STRING`. |
+| `IRONFLOW_API_AUTH_STRING` | *(unset)* | Client credential string for CLI and HTTP clients (`ironflow deploy`, `DeployClient`). Mirrors Prefect `PREFECT_API_AUTH_STRING`. |
+
+See [Secure a self-hosted server](../how-to/secure-self-hosted.md).
+
 ## Task runners
 
 | Variable | Default | Description |
