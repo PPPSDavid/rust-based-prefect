@@ -100,7 +100,7 @@ def test_concurrent_submit_control_plane_uses_rust_fsm_when_available(tmp_path):
     plane = InMemoryControlPlane(history_path=str(tmp_path / "rust.jsonl"))
     set_control_plane(plane)
     if not plane._rust_fsm_active():
-        pytest.skip("native rust FSM not loaded")
+        pytest.skip("native rust FSM not loaded")  # ty: ignore[too-many-positional-arguments]
 
     @task
     def inc(x: int) -> int:
