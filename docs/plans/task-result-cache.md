@@ -3,7 +3,8 @@
 **Status:** Phase 1 implemented (resume + JSON allowlist + UI); Goal B / map hardening / Rust hot path still open  
 **Last updated:** 2026-07-14  
 **Scope (when implemented):** `python-shim/` (authoring + result bridge), `rust-engine/` (lookup/persist hot path), `COMPATIBILITY.md`, tests; UI later  
-**Related:** [MEMORY_BANK cancel/retry gap](../MEMORY_BANK.md), Prefect [Caching](https://docs.prefect.io/v3/concepts/caching), compatibility backlog “Minimal task caching”
+**User-facing docs:** [How to resume tasks and persist results](../how-to/task-resume-and-persist.md) · [Tasks](../concepts/tasks.md) · [Compatibility matrix](../../COMPATIBILITY.md)  
+**Related:** [MEMORY_BANK cancel/retry](../MEMORY_BANK.md), Prefect [Caching](https://docs.prefect.io/v3/concepts/caching), compatibility backlog “Minimal task caching”
 
 This plan separates **what IronFlow needs** from **Prefect’s full cache-policy matrix**, walks concrete cases, then recommends a small phased subset.
 

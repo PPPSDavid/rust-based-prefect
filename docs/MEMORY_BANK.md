@@ -51,21 +51,22 @@ Last updated: 2026-07-12.
 - Perf gate: `python3 benchmarks/perf_matrix.py run --preset lite --repetitions 1 --warmups 0 --jobs 2`
 - CRG setup/verify: `bash scripts/setup_code_review_graph.sh`
 
-## Run lifecycle: cancel / retry (current vs desired)
+## Run lifecycle: cancel / retry
 
-**Current behavior (MVP — do not change without explicit task):**
+**Current behavior:**
 
 - **Cancel** (`POST /api/flow-runs/{id}/cancel`): sets flow run state to `CANCELLED` and marks in-flight task runs `CANCELLED` in the control plane / SQLite read model. Long-running task bodies are not cooperatively interrupted unless they poll cancellation themselves (no default hook yet).
-- **Retry** (`POST /api/flow-runs/{id}/retry`): for deployment-backed runs, calls `trigger_deployment_run` with the same deployment and parameters → **new deployment run → new flow run → full flow re-execution from scratch**. This is **not** Prefect task-resume parity.
+- **Retry** (`POST /api/flow-runs/{id}/retry`): for deployment-backed runs, triggers a **new** deployment run → **new** flow run with **`resume_from_flow_run_id`**. Eligible completed tasks may skip (see below); this is **not** full Prefect task-resume / `cache_policy` parity.
 
-**Known gap (documented, future work):**
+**Task resume (Phase 1 — landed):**
 
-- For multi-task flows where some tasks **completed** before cancel, **retry currently recomputes those completed tasks** unless they participate in **task resume** (see below). Full Prefect task-resume parity (all completed tasks always skipped) is still a gap when authors omit `persist_result` for non-`None` returns.
-- Design + Phase 1 subset: **`docs/plans/task-result-cache.md`**. Supported now: resume lineage on retry / `prepare_resume`; `None` auto-skip; `@task(persist_result=True)` JSON-safe restore; UI result display.
+- Design: **`docs/plans/task-result-cache.md`**. User guide: **`docs/how-to/task-resume-and-persist.md`**.
+- Skip on resume when prior return was **`None`** (auto) or **`@task(persist_result=True)`** stored a JSON-safe payload. Non-persisted non-`None` recomputes. UI shows persisted results on Task Runs / Artifacts.
+- Follow-ups: map-index hardening, parameter-guard, Rust hot-path lookup, subflow/gate policies.
 
 **Useful test scenario (manual / E2E):**
 
-- Flow: fast task → `sleep` ~10s task → downstream task. Trigger → cancel while sleeping → retry → wait for completion. With `persist_result` / `None` markers, expect eligible tasks to skip on retry.
+- Flow: fast task → `sleep` ~10s task → downstream task. Trigger → cancel while sleeping → retry → wait for completion. With `persist_result` / `None` markers, expect eligible tasks to skip on retry. UI visual: `scripts/seed_persist_result_ui.py` + `frontend/e2e/persist-result-ui.spec.ts`.
 
 ## Next High-Value Work
 
@@ -73,5 +74,5 @@ Last updated: 2026-07-12.
 2. Expand Prefect API compatibility matrix with concrete parity tests.
 3. Add migration/versioning path toward PostgreSQL for larger-scale persistence.
 4. Keep CI + `perf_matrix` regression thresholds healthy.
-5. **Task-level resume on flow-run retry** — Phase 1 landed (DAG resume + JSON allowlist + UI). Follow-ups: map-index resume hardening, parameter-guard, Rust hot-path lookup, subflow/gate policies.
+5. **Task-level resume on flow-run retry** — Phase 1 landed. Follow-ups: map-index resume hardening, parameter-guard, Rust hot-path lookup, subflow/gate policies.
 6. Optional: Cloud embeddings path if NL `semantic_search` becomes important; keep decision log current (`docs/agent/DECISION_LOG.md`).

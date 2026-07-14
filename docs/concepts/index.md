@@ -5,11 +5,11 @@ IronFlow splits work into a **Rust orchestration kernel** (`rust-engine`) and **
 Use these pages to learn the IronFlow model end-to-end:
 
 - **[Flows](flows.md)** — `@flow`, flow runs, **subflows (inline + deployment-backed)**, and transition hooks.
-- **[Tasks](tasks.md)** — `@task`, `submit`, `map`, futures, custom names, repeated invocations.
+- **[Tasks](tasks.md)** — `@task`, `submit`, `map`, futures, custom names, repeated invocations, **`persist_result` / resume**.
 - **[Runners](runners.md)** — task runners and concurrent `map`. Practical choice guide: **[How to choose a task runner](../how-to/choose-task-runners.md)**.
 - **[DAG and forecast](dag-and-forecast.md)** — static planner, run DAG UI, subflow node kinds, wide/long graphs.
 - **[States and transitions](states-and-transitions.md)** — `RunState` values and allowed edges (enforced in Rust).
 - **[Prefect → IronFlow](../PREFECT_IRONFLOW_MAPPING.md)** — table mapping Prefect mental models to this project.
 - **[Architecture](../architecture.md)** — how Python calls the engine and where persistence hooks live.
 
-Hands-on nesting: **[How to compose flows with subflows](../how-to/subflows.md)**. For supported features and limits, see **[Compatibility matrix](../compatibility.md)**. For Prefect’s own tutorials, see the upstream [Prefect 3 concepts](https://docs.prefect.io/v3/concepts) (IronFlow implements a **subset**; compatibility is not universal).
+Hands-on nesting: **[How to compose flows with subflows](../how-to/subflows.md)**. Resume / persist: **[How to resume tasks and persist results](../how-to/task-resume-and-persist.md)**. For supported features and limits, see **[Compatibility matrix](../compatibility.md)**. For Prefect’s own tutorials, see the upstream [Prefect 3 concepts](https://docs.prefect.io/v3/concepts) (IronFlow implements a **subset**; compatibility is not universal).
