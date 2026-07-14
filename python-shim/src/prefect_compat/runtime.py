@@ -129,6 +129,7 @@ class InMemoryControlPlane:
         self._latest_flow_run_id: UUID | None = None
         self._pending_resume_from: UUID | None = None
         self._resume_lookups_enabled: bool = False
+        self._resume_schema_ready: bool = False
         self._task_result_cache_ready: bool = False
         self._history_path = Path(history_path) if history_path else None
         self._store: ControlPlaneStore = create_store(history_path=self._history_path)
@@ -656,7 +657,7 @@ class InMemoryControlPlane:
             "SELECT resume_lineage_id FROM flow_runs WHERE id = ? LIMIT 1",
             [str(flow_run_id)],
         )
-        if rows and rows[0].get("resume_lineage_id"):
+        if rows and rows[0]["resume_lineage_id"]:
             return UUID(str(rows[0]["resume_lineage_id"]))
         return flow_run_id
 
@@ -671,6 +672,8 @@ class InMemoryControlPlane:
 
     def _ensure_resume_schema(self) -> None:
         """Lazily add resume columns / cache table (keeps cold create_flow off the critical path)."""
+        if self._resume_schema_ready:
+            return
         flow_cols = {
             c["name"]
             for c in self._sqlite_conn.execute("PRAGMA table_info(flow_runs)").fetchall()
@@ -694,6 +697,7 @@ class InMemoryControlPlane:
                 "ALTER TABLE deployment_runs ADD COLUMN resume_from_flow_run_id TEXT"
             )
         self._ensure_task_result_cache_table()
+        self._resume_schema_ready = True
 
     def _ensure_task_result_cache_table(self) -> None:
         if self._task_result_cache_ready:
@@ -2566,8 +2570,9 @@ class InMemoryControlPlane:
                 err_msg = "concurrency limit reached"
             now = self._now()
             run_id = str(uuid4())
-            if resume_from_flow_run_id is not None:
-                self._ensure_resume_schema()
+            # INSERT always names resume_from_flow_run_id; ensure column exists even
+            # when resume is unset (common deployment / subflow trigger path).
+            self._ensure_resume_schema()
             self._sqlite_conn.execute(
                 """
                 INSERT INTO deployment_runs
