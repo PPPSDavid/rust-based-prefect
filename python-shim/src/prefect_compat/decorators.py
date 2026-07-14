@@ -339,9 +339,12 @@ class TaskWrapper:
             if process_pool is not None:
                 resolved_args = [_resolve(v) for v in args]
                 resolved_kwargs = {k: _resolve(v) for k, v in kwargs.items()}
-                result = process_pool.submit(
-                    self.fn, *resolved_args, **resolved_kwargs
-                ).result()
+                result = cast(
+                    T,
+                    process_pool.submit(
+                        self.fn, *resolved_args, **resolved_kwargs
+                    ).result(),
+                )
             else:
                 result = self(*args, **kwargs)
             if task_run is not None:
