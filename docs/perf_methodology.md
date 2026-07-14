@@ -29,6 +29,11 @@ Concurrency / FSM batch regression gate (FSM batch transitions + multi-reader mi
 
 - `python benchmarks/perf_matrix.py run --preset concurrency --repetitions 2 --warmups 1 --jobs 1`
 
+Global / tag concurrency-limit gate (acquire/release microbench, CM contention, tagged map under slot cap):
+
+- `python benchmarks/perf_matrix.py run --preset gcl --repetitions 2 --warmups 1 --jobs 1`
+- Metrics: `gcl.acquire_release_ms`, `gcl.cm_contention_ms`, `gcl.tag_map_ms`
+
 Subflow regression gate (inline nested depth, deployment wait chain, nested DAG reads; full catalog adds cross-pool, fire-and-forget burst, cancel propagation):
 
 - `python benchmarks/perf_matrix.py run --preset subflow_lite --repetitions 1 --warmups 0 --jobs 2`
@@ -48,7 +53,7 @@ The recipe catalog spans:
 - optional **decorator transition-hook microbench** (`decorator_hook_profile` on select recipes): `flow_count` is timed shim iterations; `tasks_per_flow` is warmup iterations before the timer; profiles `none` / `flow` / `task` / `both` compare baseline vs no-op hooks.
 - optional **subflow microbench** (`subflow_profile` on `subflow_*` recipes): `flow_count` maps to depth/burst/child-count per profile; `tasks_per_flow` maps to fan-out or query iterations; `task_events_per_task` is timed sample iterations. Profiles: `inline_depth`, `deploy_wait_chain`, `deploy_cross_pool`, `fire_forget_burst`, `cancel_propagation`, `query_dag_nested`. Deployment profiles use multiple in-process workers per sample (same as production); Rust `bind_db` path is exercised when `IRONFLOW_USE_RUST_FSM=1` (default).
 
-Use defaults for consistency (`--preset lite`, `--preset pr`, `--preset hook_micro`, `--preset concurrency`, `--preset subflow_lite`, `--preset subflow`, or `--preset full`) or override with:
+Use defaults for consistency (`--preset lite`, `--preset pr`, `--preset hook_micro`, `--preset concurrency`, `--preset gcl`, `--preset subflow_lite`, `--preset subflow`, or `--preset full`) or override with:
 
 - `--recipes small_narrow_few_write_cold,medium_wide_heavy_write_warm`
 - `--repetitions 5 --warmups 2 --seed 20260416`

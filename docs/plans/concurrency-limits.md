@@ -1,9 +1,9 @@
 # Plan: Global & Tag-Based Concurrency Limits
 
-**Status:** Design / investigation (not implemented)  
-**Branch intent:** Document Prefect gaps and a Rust-first implementation path.  
+**Status:** Implemented (Phases 1–3 MVP subset) — see `COMPATIBILITY.md` and `docs/how-to/concurrency-limits.md`.  
+**Branch intent:** Document Prefect gaps and a Rust-first implementation path; Phases 1–3 landed.  
 **Ownership:** `rust-engine/` (slot ledger + acquire/release), `python-shim/` (API + `concurrency`/`rate_limit` + `@task(tags=...)`), optional later `frontend/` (admin UI).  
-**Forbidden areas this plan does not claim:** work-queue priority/concurrency, Cloud tenant isolation, Redis lease backends (see self-hosted Docker B4), full Prefect CLI `prefect gcl` parity.
+**Forbidden areas this plan does not claim:** work-queue priority/concurrency, Cloud tenant isolation, Redis lease backends (see self-hosted Docker B4), full Prefect CLI `prefect gcl` parity, async CM.
 
 **Upstream references (Prefect 3.x):**
 

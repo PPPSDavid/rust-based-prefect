@@ -16,8 +16,8 @@ This project is **not** a drop-in replacement for Prefect Cloud or the full Pref
 | `task.map()` | Supported with moderate fan-out (see `COMPATIBILITY.md`). |
 | Retries, timeouts, cancellation | Enforced at the **control-plane** level for supported flows; semantics are workload-driven—see `COMPATIBILITY.md` for exact boundaries. |
 | Deployment concurrency / collision strategy | **Subset:** `concurrency_limit` + `ENQUEUE` / `CANCEL_NEW` on deployments (claim/trigger path). Caps concurrent runs **of that deployment**, not named global slots. |
-| Global concurrency limits (`concurrency` / `rate_limit`) | **Not yet.** Planned Rust slot ledger + thin Python CM — see **`docs/plans/concurrency-limits.md`**. |
-| Tag-based concurrency (`@task(tags=...)`) | **Not yet.** Prefect now backs tags with global limits named `tag:{name}`; IronFlow has no task tags or Running-gate today. Same plan doc. |
+| Global concurrency limits (`concurrency` / `rate_limit`) | **Subset:** named slots, sync CM, leases, rate-limit decay — **[how-to](how-to/concurrency-limits.md)**. |
+| Tag-based concurrency (`@task(tags=...)`) | **Subset:** tags backed by `tag:{name}` limits; gated on enter `Running`. Same how-to. |
 | Blocks, integrations, secrets | **Not** a focus of the MVP; many patterns are unsupported or stubbed. |
 | State hooks (`on_running`, …) | IronFlow uses **`transition_hooks`** on `@flow` / `@task` with `TransitionHookSpec` / `on_transition`—see `COMPATIBILITY.md`. This is an **extension**, not Prefect’s hook API. |
 | Event stream / observability | Local persistence (JSONL + SQLite) and optional API/SSE; see README **History persistence**. |

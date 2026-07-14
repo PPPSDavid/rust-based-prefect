@@ -7,7 +7,7 @@ Last updated: 2026-07-14.
 
 - Name: Project IronFlow (`rust-based-prefect`)
 - Goal: Prefect-compatible orchestration with stronger determinism, performance, and static planning.
-- Status: Hybrid MVP in active use — deployments (schedules, CLI/YAML Tier 1); **subflows M1+M2** on `main` (#34/#36) with user guide at `docs/how-to/subflows.md`; transition hooks; agent tooling under `.cursor/` + `docs/agent/`. **Plans:** self-hosted Docker + basic auth — `docs/plans/self-hosted-docker-auth.md`; **concurrency limits (global + tag)** — `docs/plans/concurrency-limits.md` (design; Phase 0 docs landed).
+- Status: Hybrid MVP in active use — deployments; subflows; transition hooks; **global + tag concurrency limits** (`docs/how-to/concurrency-limits.md`). **Plans:** self-hosted Docker + basic auth — `docs/plans/self-hosted-docker-auth.md`; concurrency plan marked implemented — `docs/plans/concurrency-limits.md`.
 
 ## Core Architecture
 
@@ -69,10 +69,10 @@ Last updated: 2026-07-14.
 
 ## Next High-Value Work
 
-1. **Global concurrency limits Phase 1** (Rust slot ledger + sync `concurrency` CM) — `docs/plans/concurrency-limits.md`; then tag-based Phase 2.
-2. Move remaining projection write hot paths from Python into Rust-backed implementation.
-3. Expand Prefect API compatibility matrix with concrete parity tests.
-4. Add migration/versioning path toward PostgreSQL for larger-scale persistence.
-5. Keep CI + `perf_matrix` regression thresholds healthy.
-6. **Task-level resume on flow-run retry** (skip recomputation of tasks that completed before cancel) — see section above.
+1. Move remaining projection write hot paths from Python into Rust-backed implementation.
+2. Expand Prefect API compatibility matrix with concrete parity tests.
+3. Add migration/versioning path toward PostgreSQL for larger-scale persistence.
+4. Keep CI + `perf_matrix` regression thresholds healthy (including `--preset gcl`).
+5. **Task-level resume on flow-run retry** (skip recomputation of tasks that completed before cancel) — see section above.
+6. Optional: async `concurrency` / CLI `gcl` / UI admin for concurrency limits.
 7. Optional: Cloud embeddings path if NL `semantic_search` becomes important; keep decision log current (`docs/agent/DECISION_LOG.md`).
