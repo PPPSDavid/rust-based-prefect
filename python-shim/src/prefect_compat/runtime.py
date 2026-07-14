@@ -5,6 +5,7 @@ import logging
 import os
 import sqlite3
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
@@ -81,6 +82,7 @@ class TaskRunRecord:
     child_flow_run_id: UUID | None = None
     child_deployment_run_id: UUID | None = None
     gate_open_at: str | None = None
+    tags: tuple[str, ...] = ()
 
 
 @dataclass
@@ -245,6 +247,155 @@ class InMemoryControlPlane:
             if self._is_unknown_op_error(err, op):
                 return None
         return out
+
+    def _gcl_dispatch(self, op: str, body: dict[str, Any]) -> dict[str, Any] | None:
+        """Invoke Rust GCL ops on the bound SQLite connection. None = Python fallback."""
+        if not self._rust_fsm_active() or not self._rust_db_bound:
+            return None
+        try:
+            out = self._rust_fsm_call(op, body)
+        except Exception:
+            return None
+        if not out.get("ok", True):
+            err = out.get("error") or {}
+            if isinstance(err, dict) and self._is_unknown_op_error(err, op):
+                return None
+            return out
+        return out
+
+    def upsert_concurrency_limit(
+        self,
+        name: str,
+        limit: int,
+        *,
+        slot_decay_per_second: float | None = None,
+        active: bool = True,
+    ) -> dict[str, Any]:
+        from . import concurrency_store as gcl
+
+        body: dict[str, Any] = {
+            "name": name,
+            "limit": limit,
+            "active": active,
+        }
+        if slot_decay_per_second is not None:
+            body["slot_decay_per_second"] = slot_decay_per_second
+        rust = self._gcl_dispatch("gcl_upsert", body)
+        if rust is not None and rust.get("ok") and "limit" in rust:
+            return rust["limit"]
+        with self._lock:
+            return gcl.upsert_limit(self._sqlite_conn, body)
+
+    def delete_concurrency_limit(self, name: str) -> dict[str, Any]:
+        from . import concurrency_store as gcl
+
+        rust = self._gcl_dispatch("gcl_delete", {"name": name})
+        if rust is not None and "deleted" in rust:
+            return rust
+        with self._lock:
+            return gcl.delete_limit(self._sqlite_conn, name)
+
+    def get_concurrency_limit(self, name: str) -> dict[str, Any] | None:
+        from . import concurrency_store as gcl
+
+        rust = self._gcl_dispatch("gcl_get", {"name": name})
+        if rust is not None and "limit" in rust:
+            lim = rust["limit"]
+            return lim if lim is not None else None
+        with self._lock:
+            return gcl.get_limit(self._sqlite_conn, name).get("limit")
+
+    def list_concurrency_limits(self) -> list[dict[str, Any]]:
+        from . import concurrency_store as gcl
+
+        rust = self._gcl_dispatch("gcl_list", {})
+        if rust is not None and "limits" in rust:
+            return list(rust["limits"] or [])
+        with self._lock:
+            return list(gcl.list_limits(self._sqlite_conn).get("limits") or [])
+
+    def acquire_concurrency_slots(
+        self,
+        names: str | list[str],
+        *,
+        occupy: int = 1,
+        mode: str = "concurrency",
+        strict: bool = False,
+        lease_duration: float = 300.0,
+        holder_type: str | None = None,
+        holder_id: str | None = None,
+        now: str | None = None,
+    ) -> dict[str, Any]:
+        from . import concurrency_store as gcl
+
+        body: dict[str, Any] = {
+            "names": names,
+            "occupy": occupy,
+            "mode": mode,
+            "strict": strict,
+            "lease_duration": lease_duration,
+        }
+        if holder_type is not None:
+            body["holder_type"] = holder_type
+        if holder_id is not None:
+            body["holder_id"] = holder_id
+        if now is not None:
+            body["now"] = now
+        rust = self._gcl_dispatch("gcl_acquire", body)
+        if rust is not None and "status" in rust:
+            return rust
+        with self._lock:
+            return gcl.acquire(self._sqlite_conn, body)
+
+    def release_concurrency_slots(
+        self,
+        lease_ids: str | list[str],
+        *,
+        now: str | None = None,
+    ) -> dict[str, Any]:
+        from . import concurrency_store as gcl
+
+        body: dict[str, Any] = {"lease_ids": lease_ids}
+        if now is not None:
+            body["now"] = now
+        rust = self._gcl_dispatch("gcl_release", body)
+        if rust is not None and "released" in rust:
+            return rust
+        with self._lock:
+            return gcl.release(self._sqlite_conn, body)
+
+    def renew_concurrency_slots(
+        self,
+        lease_ids: str | list[str],
+        *,
+        lease_duration: float = 300.0,
+        now: str | None = None,
+    ) -> dict[str, Any]:
+        from . import concurrency_store as gcl
+
+        body: dict[str, Any] = {
+            "lease_ids": lease_ids,
+            "lease_duration": lease_duration,
+        }
+        if now is not None:
+            body["now"] = now
+        rust = self._gcl_dispatch("gcl_renew", body)
+        if rust is not None and "renewed" in rust:
+            return rust
+        with self._lock:
+            return gcl.renew(self._sqlite_conn, body)
+
+    def reclaim_concurrency_leases(self, *, now: str | None = None) -> int:
+        from . import concurrency_store as gcl
+
+        body: dict[str, Any] = {}
+        if now is not None:
+            body["now"] = now
+        rust = self._gcl_dispatch("gcl_reclaim_expired", body)
+        if rust is not None and "reclaimed" in rust:
+            return int(rust["reclaimed"])
+        with self._lock:
+            return gcl.reclaim_expired(self._sqlite_conn, now)
 
     @staticmethod
     def _deployment_from_rust_json(d: dict[str, Any]) -> dict[str, Any]:
@@ -599,7 +750,9 @@ class InMemoryControlPlane:
         child_flow_run_id: UUID | None = None,
         child_deployment_run_id: UUID | None = None,
         gate_open_at: str | None = None,
+        tags: Sequence[str] | None = None,
     ) -> TaskRunRecord:
+        tag_tuple = tuple(str(t) for t in (tags or ()))
         task = TaskRunRecord(
             task_run_id=uuid4(),
             flow_run_id=flow_run_id,
@@ -611,6 +764,7 @@ class InMemoryControlPlane:
             child_flow_run_id=child_flow_run_id,
             child_deployment_run_id=child_deployment_run_id,
             gate_open_at=gate_open_at,
+            tags=tag_tuple,
         )
         with self._lock:
             self._tasks[task.task_run_id] = task
@@ -661,6 +815,7 @@ class InMemoryControlPlane:
                     "planned_node_id": task.planned_node_id,
                     "state": task.state.value,
                     "version": task.version,
+                    "tags": list(task.tags),
                 }
             )
             if (not self._rust_native_persistence) and self._rust_fsm_active():
@@ -3177,8 +3332,8 @@ class InMemoryControlPlane:
         now = self._now()
         self._sqlite_conn.execute(
             "INSERT OR IGNORE INTO task_runs(id,flow_run_id,task_name,planned_node_id,state,version,created_at,updated_at,"
-            "kind,child_flow_run_id,child_deployment_run_id,gate_open_at) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+            "kind,child_flow_run_id,child_deployment_run_id,gate_open_at,tags) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
             [
                 str(task.task_run_id),
                 str(task.flow_run_id),
@@ -3194,6 +3349,7 @@ class InMemoryControlPlane:
                 if task.child_deployment_run_id
                 else None,
                 task.gate_open_at,
+                json.dumps(list(task.tags)) if task.tags else None,
             ],
         )
 
