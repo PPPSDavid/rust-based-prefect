@@ -78,6 +78,19 @@ class WorkerHeartbeatRequest(BaseModel):
     work_pool_id: str | None = None
 
 
+class ConcurrencyLimitCreateRequest(BaseModel):
+    name: str
+    limit: int = Field(ge=0)
+    slot_decay_per_second: float | None = Field(default=None, gt=0)
+    active: bool = True
+
+
+class ConcurrencyLimitPatchRequest(BaseModel):
+    limit: int | None = Field(default=None, ge=0)
+    slot_decay_per_second: float | None = Field(default=None, gt=0)
+    active: bool | None = None
+
+
 class DeploymentRunTriggerRequest(BaseModel):
     parameters: dict | None = None
     idempotency_key: str | None = None
@@ -422,6 +435,51 @@ def list_flows(
 ) -> CursorPage:
     page = control_plane.list_flows(limit=limit, cursor=cursor)
     return CursorPage(items=page.items, next_cursor=page.next_cursor)
+
+
+@app.get("/api/concurrency-limits")
+def list_concurrency_limits() -> dict:
+    return {"limits": control_plane.list_concurrency_limits()}
+
+
+@app.post("/api/concurrency-limits")
+def create_concurrency_limit(req: ConcurrencyLimitCreateRequest) -> dict:
+    return control_plane.upsert_concurrency_limit(
+        name=req.name,
+        limit=req.limit,
+        slot_decay_per_second=req.slot_decay_per_second,
+        active=req.active,
+    )
+
+
+@app.get("/api/concurrency-limits/{name}")
+def get_concurrency_limit(name: str) -> dict:
+    lim = control_plane.get_concurrency_limit(name)
+    if lim is None:
+        raise HTTPException(status_code=404, detail="concurrency limit not found")
+    return lim
+
+
+@app.patch("/api/concurrency-limits/{name}")
+def patch_concurrency_limit(name: str, req: ConcurrencyLimitPatchRequest) -> dict:
+    current = control_plane.get_concurrency_limit(name)
+    if current is None:
+        raise HTTPException(status_code=404, detail="concurrency limit not found")
+    return control_plane.upsert_concurrency_limit(
+        name=name,
+        limit=req.limit if req.limit is not None else int(current["limit"]),
+        slot_decay_per_second=(
+            req.slot_decay_per_second
+            if req.slot_decay_per_second is not None
+            else current.get("slot_decay_per_second")
+        ),
+        active=req.active if req.active is not None else bool(current.get("active", True)),
+    )
+
+
+@app.delete("/api/concurrency-limits/{name}")
+def delete_concurrency_limit(name: str) -> dict:
+    return control_plane.delete_concurrency_limit(name)
 
 
 @app.get("/api/deployments", response_model=CursorPage)

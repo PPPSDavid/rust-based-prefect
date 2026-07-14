@@ -54,6 +54,8 @@ class WorkloadRecipe:
     mixed_reader_count: int = 1
     # Exercise FSM batch APIs (task_pending/running/completed) instead of heartbeat events.
     fsm_task_lifecycle: bool = False
+    # Global concurrency limit microbench profile (``concurrency`` CM or tagged map).
+    gcl_profile: str | None = None
 
 
 @dataclass
@@ -326,6 +328,39 @@ def _recipe_catalog() -> dict[str, WorkloadRecipe]:
             sqlite_enabled=True,
             decorator_submit_width=100,
         ),
+        "gcl_cm_contention": WorkloadRecipe(
+            name="gcl_cm_contention",
+            flow_count=20,
+            tasks_per_flow=8,
+            task_events_per_task=0,
+            read_ratio=0.0,
+            mixed=False,
+            cold_start=True,
+            sqlite_enabled=True,
+            gcl_profile="cm_contention",
+        ),
+        "gcl_tag_map_cap": WorkloadRecipe(
+            name="gcl_tag_map_cap",
+            flow_count=10,
+            tasks_per_flow=16,
+            task_events_per_task=0,
+            read_ratio=0.0,
+            mixed=False,
+            cold_start=True,
+            sqlite_enabled=True,
+            gcl_profile="tag_map",
+        ),
+        "gcl_acquire_micro": WorkloadRecipe(
+            name="gcl_acquire_micro",
+            flow_count=200,
+            tasks_per_flow=1,
+            task_events_per_task=0,
+            read_ratio=0.0,
+            mixed=False,
+            cold_start=True,
+            sqlite_enabled=True,
+            gcl_profile="acquire_micro",
+        ),
         "subflow_inline_depth_3": WorkloadRecipe(
             name="subflow_inline_depth_3",
             flow_count=3,
@@ -424,6 +459,11 @@ def _presets() -> dict[str, list[str]]:
             "medium_narrow_fsm_batch_warm",
             "medium_narrow_heavy_mixed_2readers_warm",
         ],
+        "gcl": [
+            "gcl_acquire_micro",
+            "gcl_cm_contention",
+            "gcl_tag_map_cap",
+        ],
         "subflow_lite": [
             "subflow_inline_depth_3",
             "subflow_deploy_wait_chain",
@@ -444,6 +484,7 @@ def _presets() -> dict[str, list[str]]:
             and not k.startswith("micro_map_")
             and not k.startswith("micro_submit_")
             and not k.startswith("subflow_")
+            and not k.startswith("gcl_")
         ],
     }
 
@@ -982,6 +1023,167 @@ def _run_decorator_submit_micro_iteration(
     )
 
 
+def _run_gcl_iteration(
+    recipe: WorkloadRecipe,
+    seed: int,
+    warmup: bool,
+) -> RecipeRunSample:
+    """Benchmark global / tag concurrency-limit hot paths."""
+    rng = random.Random(seed)
+    _ = rng
+    profile = recipe.gcl_profile
+    if profile is None:
+        raise RuntimeError("gcl microbench requires gcl_profile")
+    if profile not in {"acquire_micro", "cm_contention", "tag_map"}:
+        raise ValueError(f"Unknown gcl_profile: {profile!r}")
+
+    iterations = max(1, int(recipe.flow_count))
+    workers = max(1, int(recipe.tasks_per_flow))
+    if warmup:
+        iterations = max(2, iterations // 4)
+        workers = max(1, workers // 2)
+
+    notes: list[str] = [f"gcl_profile={profile}"]
+    with tempfile.TemporaryDirectory(prefix="perf-matrix-gcl-") as td:
+        history_path = Path(td) / "history.jsonl"
+        db_path = history_path.with_suffix(".db")
+        plane = InMemoryControlPlane(history_path=str(history_path))
+        sqlite_before = float(db_path.stat().st_size) if db_path.exists() else 0.0
+        wal_path = db_path.with_suffix(".db-wal")
+        wal_before = float(wal_path.stat().st_size) if wal_path.exists() else 0.0
+        before_proc = _process_snapshot()
+
+        from prefect_compat import (
+            concurrency,
+            create_concurrency_limit,
+            create_tag_concurrency_limit,
+            flow,
+            set_control_plane,
+            task,
+        )
+        from prefect_compat.task_runners import ThreadPoolTaskRunner
+
+        from benchmarks._task_cast import as_task_wrapper
+
+        set_control_plane(plane)
+        per_ms: list[float] = []
+
+        if profile == "acquire_micro":
+            create_concurrency_limit("bench", limit=max(8, workers), plane=plane)
+            # Warm schema + FFI path.
+            warm = plane.acquire_concurrency_slots(
+                ["bench"], occupy=1, lease_duration=60
+            )
+            if warm.get("status") == "acquired":
+                plane.release_concurrency_slots(warm.get("lease_ids") or [])
+            wall_start = time.perf_counter()
+            for _ in range(iterations):
+                t0 = time.perf_counter()
+                out = plane.acquire_concurrency_slots(
+                    ["bench"], occupy=1, lease_duration=30
+                )
+                if out.get("status") == "acquired":
+                    plane.release_concurrency_slots(out.get("lease_ids") or [])
+                per_ms.append((time.perf_counter() - t0) * 1000.0)
+            wall_seconds = time.perf_counter() - wall_start
+            flows_created = 0
+            tasks_created = iterations
+            latency_key = "gcl.acquire_release_ms"
+        elif profile == "cm_contention":
+            create_concurrency_limit("bench", limit=2, plane=plane)
+
+            def _hold() -> None:
+                with concurrency("bench", plane=plane, poll_seconds=0.01):
+                    time.sleep(0.001)
+
+            wall_start = time.perf_counter()
+            for _ in range(iterations):
+                t0 = time.perf_counter()
+                threads = [
+                    threading.Thread(target=_hold) for _ in range(min(8, workers))
+                ]
+                for th in threads:
+                    th.start()
+                for th in threads:
+                    th.join()
+                per_ms.append((time.perf_counter() - t0) * 1000.0)
+            wall_seconds = time.perf_counter() - wall_start
+            flows_created = 0
+            tasks_created = iterations * min(8, workers)
+            latency_key = "gcl.cm_contention_ms"
+        else:
+            create_tag_concurrency_limit("bench", limit=2, plane=plane)
+
+            @task(tags=["bench"])
+            def _work(x: int) -> int:
+                return x + 1
+
+            work = as_task_wrapper(_work)
+
+            @flow(task_runner=ThreadPoolTaskRunner(max_workers=min(8, workers)))
+            def sample() -> list[int]:
+                return [f.result() for f in work.map(list(range(workers)))]
+
+            for _ in range(2):
+                sample()
+            wall_start = time.perf_counter()
+            for _ in range(iterations):
+                t0 = time.perf_counter()
+                sample()
+                per_ms.append((time.perf_counter() - t0) * 1000.0)
+            wall_seconds = time.perf_counter() - wall_start
+            flows_created = iterations
+            tasks_created = iterations * workers
+            latency_key = "gcl.tag_map_ms"
+
+        after_proc = _process_snapshot()
+        sqlite_after = float(db_path.stat().st_size) if db_path.exists() else sqlite_before
+        wal_after = float(wal_path.stat().st_size) if wal_path.exists() else wal_before
+        _close_plane_footprint(plane)
+
+    counts = {
+        "flows_created": flows_created,
+        "tasks_created": tasks_created,
+        "flow_transitions": 0,
+        "task_events_recorded": 0,
+        "read_queries": 0,
+    }
+    throughput = {
+        "flows_per_sec": flows_created / wall_seconds if wall_seconds else 0.0,
+        "tasks_per_sec": tasks_created / wall_seconds if wall_seconds else 0.0,
+        "transitions_per_sec": 0.0,
+        "task_events_per_sec": 0.0,
+    }
+    latency_ms = {latency_key: _latency_stats_ms(per_ms)}
+    process = {
+        "cpu_seconds_used": max(0.0, after_proc.cpu_seconds - before_proc.cpu_seconds),
+        "rss_bytes_start": float(before_proc.rss_bytes),
+        "rss_bytes_end": float(after_proc.rss_bytes),
+        "rss_bytes_delta": float(after_proc.rss_bytes - before_proc.rss_bytes),
+    }
+    sqlite = {
+        "db_bytes_before": sqlite_before,
+        "db_bytes_after": sqlite_after,
+        "db_bytes_growth": max(0.0, sqlite_after - sqlite_before),
+        "wal_bytes_before": wal_before,
+        "wal_bytes_after": wal_after,
+        "wal_bytes_growth": max(0.0, wal_after - wal_before),
+        "bytes_per_write_op": 0.0,
+        "notes": float(len(notes)),
+    }
+    return RecipeRunSample(
+        recipe=recipe.name,
+        iteration=0,
+        warmup=warmup,
+        seed=seed,
+        wall_clock_seconds=wall_seconds,
+        counts=counts,
+        throughput=throughput,
+        latency_ms=latency_ms,
+        process=process,
+        sqlite=sqlite,
+    )
+
 def _run_subflow_iteration(
     recipe: WorkloadRecipe,
     seed: int,
@@ -1276,6 +1478,8 @@ def _run_recipe_iteration(
         return _run_decorator_map_micro_iteration(recipe, seed, warmup)
     if recipe.decorator_submit_width is not None:
         return _run_decorator_submit_micro_iteration(recipe, seed, warmup)
+    if recipe.gcl_profile is not None:
+        return _run_gcl_iteration(recipe, seed, warmup)
     if recipe.subflow_profile is not None:
         return _run_subflow_iteration(recipe, seed, warmup)
 
