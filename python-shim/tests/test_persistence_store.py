@@ -61,15 +61,35 @@ def test_create_store_sqlite_default(tmp_path: Path, monkeypatch: pytest.MonkeyP
     store.close()
 
 
-def test_create_store_rejects_postgres_until_b1(
+def test_create_store_postgres_when_url_set(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("IRONFLOW_DATABASE_URL", "postgresql://ironflow:ironflow@127.0.0.1/ironflow")
-    with pytest.raises(NotImplementedError, match="Tier B1"):
-        create_store(history_path=None)
+    import os
+
+    url = os.getenv(
+        "IRONFLOW_TEST_DATABASE_URL",
+        "postgresql://ironflow:ironflow@127.0.0.1:5432/ironflow_b1",
+    )
+    try:
+        import psycopg
+
+        with psycopg.connect(url, connect_timeout=2) as conn:
+            conn.execute("SELECT 1")
+    except Exception:
+        pytest.skip("Postgres not available")
+
+    monkeypatch.setenv("IRONFLOW_DATABASE_URL", url)
+    from prefect_compat.persistence import PostgresStore
+
+    store = create_store(history_path=None)
+    assert isinstance(store, PostgresStore)
+    store.close()
 
 
-def test_control_plane_uses_store(tmp_path: Path) -> None:
+def test_control_plane_uses_store(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("IRONFLOW_DATABASE_URL", raising=False)
     history = tmp_path / "hist.jsonl"
     plane = InMemoryControlPlane(history_path=str(history))
     assert plane._store.backend_kind == "sqlite"

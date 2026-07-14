@@ -1,7 +1,8 @@
-"""Control-plane persistence protocol (Tier B0).
+"""Control-plane persistence protocol (Tier B0/B1).
 
-Backends implement a thin connection/schema surface today. Query and mutation
-APIs remain on ``InMemoryControlPlane`` until Postgres (B1) migrates call sites.
+Backends implement a thin connection/schema surface. Query and mutation
+SQL mostly remains on ``InMemoryControlPlane`` with a sqlite-shaped
+execute API (Postgres goes through ``PostgresConnectionAdapter``).
 Hot-path claim/schedule/FSM remains in ``rust-engine``; see
 ``docs/plans/self-hosted-storage-rfc.md``.
 """
@@ -18,7 +19,7 @@ class ControlPlaneStore(Protocol):
 
     @property
     def backend_kind(self) -> str:
-        """``sqlite`` or ``postgres`` (future)."""
+        """``sqlite`` or ``postgres``."""
         ...
 
     @property
@@ -28,7 +29,7 @@ class ControlPlaneStore(Protocol):
 
     @property
     def connection(self) -> Any:
-        """Backend connection object (``sqlite3.Connection`` for SQLite)."""
+        """Backend connection (``sqlite3.Connection`` or adapter)."""
         ...
 
     def ensure_schema(self) -> None:

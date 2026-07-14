@@ -128,7 +128,7 @@ class InMemoryControlPlane:
         self._latest_flow_run_id: UUID | None = None
         self._history_path = Path(history_path) if history_path else None
         self._store: ControlPlaneStore = create_store(history_path=self._history_path)
-        # Keep path/conn attributes for tests and Rust bind_db (SQLite-only today).
+        # Keep path/conn attributes for tests and Rust bind_db (SQLite path / PG adapter).
         self._sqlite_path = self._store.path or resolve_sqlite_path(self._history_path)
         self._sqlite_conn = self._store.connection
         self._manifest_by_task: dict[UUID, dict[str, list[str]]] = {}
@@ -156,9 +156,17 @@ class InMemoryControlPlane:
                 self._rust_fsm_bridge = RustFsmBridge()
                 self._rust_fsm_handle = self._rust_fsm_bridge.engine_new()
                 try:
-                    bind_out = self._rust_fsm_call(
-                        "bind_db", {"db_path": str(self._sqlite_path)}
-                    )
+                    if self._store.backend_kind == "postgres":
+                        pg_url = getattr(self._store, "database_url", None)
+                        if not pg_url:
+                            raise RuntimeError("postgres store missing database_url")
+                        bind_out = self._rust_fsm_call(
+                            "bind_db", {"database_url": str(pg_url)}
+                        )
+                    else:
+                        bind_out = self._rust_fsm_call(
+                            "bind_db", {"db_path": str(self._sqlite_path)}
+                        )
                     self._rust_db_bound = bool(bind_out.get("ok", False))
                 except Exception:
                     self._rust_db_bound = False

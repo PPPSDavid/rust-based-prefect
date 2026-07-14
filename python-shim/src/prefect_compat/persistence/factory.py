@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 
 from .protocol import ControlPlaneStore
+from .store_postgres import PostgresStore
 from .store_sqlite import SqliteStore
 
 
@@ -24,15 +25,16 @@ def create_store(
 ) -> ControlPlaneStore:
     """Create a control-plane store.
 
-    B0: SQLite only. When ``database_url`` is a Postgres DSN, raises
-    ``NotImplementedError`` until Tier B1.
+    ``IRONFLOW_DATABASE_URL`` / ``database_url`` with a Postgres DSN selects
+    ``PostgresStore``; otherwise opens SQLite (local/dev default).
     """
-    url = (database_url if database_url is not None else os.getenv("IRONFLOW_DATABASE_URL", "")).strip()
+    url = (
+        database_url
+        if database_url is not None
+        else os.getenv("IRONFLOW_DATABASE_URL", "")
+    ).strip()
     if url and url.lower().startswith(("postgres://", "postgresql://")):
-        raise NotImplementedError(
-            "Postgres store requires Tier B1 (see docs/plans/self-hosted-storage-rfc.md); "
-            f"got IRONFLOW_DATABASE_URL={url!r}"
-        )
+        return PostgresStore.open(url)
     if url and not url.lower().startswith("sqlite"):
         raise ValueError(
             f"Unsupported IRONFLOW_DATABASE_URL scheme (expected sqlite or postgres): {url!r}"

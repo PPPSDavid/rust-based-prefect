@@ -59,14 +59,44 @@ jobs:
       - name: Rust tests
         run: cargo test --manifest-path rust-engine/Cargo.toml
 
-  wheel-linux:
-    name: Linux wheel (py${{ matrix.python-version }})
+  python-rust-postgres:
+    name: Python + Postgres (B1)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.11", "3.12"]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ironflow
+          POSTGRES_PASSWORD: ironflow
+          POSTGRES_DB: ironflow_b1
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ironflow -d ironflow_b1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      IRONFLOW_DATABASE_URL: postgresql://ironflow:ironflow@127.0.0.1:5432/ironflow_b1
     steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Sync Python deps
+        run: uv sync --frozen --group dev --python 3.12
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install libpq
+        run: sudo apt-get update && sudo apt-get install -y libpq-dev
+      - name: Build rust-engine
+        run: cargo build --manifest-path rust-engine/Cargo.toml
+      - name: Postgres store + claim tests
+        run: >
+          uv run --python 3.12 pytest
+          python-shim/tests/test_postgres_store.py
+          python-shim/tests/test_persistence_store.py
+          -q
+
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:

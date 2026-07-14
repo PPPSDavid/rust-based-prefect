@@ -1,5 +1,6 @@
 pub mod concurrency_ops;
 pub mod deployment_ops;
+pub mod deployment_ops_pg;
 pub mod engine;
 pub mod ffi;
 pub mod gate_ops;
