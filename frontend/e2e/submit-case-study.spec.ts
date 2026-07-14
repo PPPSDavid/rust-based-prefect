@@ -49,6 +49,8 @@ test("case study: runs list and representative run details", async ({ page }) =>
   await page.getByRole("tab", { name: "DAG" }).click();
   await expect(page.getByRole("button", { name: "Task runs" })).toBeVisible();
   await page.getByRole("button", { name: "Task runs" }).click();
+  await expect(page.getByText("Loading DAG...")).toBeHidden({ timeout: 15000 });
+  await expect(page.getByText(/inc|dbl|source:/).first()).toBeVisible({ timeout: 15000 });
   await page.screenshot({
     path: path.join(ARTIFACTS, "wide-dag-expanded.png"),
     fullPage: true
