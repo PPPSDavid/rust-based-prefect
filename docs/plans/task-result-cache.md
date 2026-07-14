@@ -1,6 +1,6 @@
 # Task result cache & deterministic resume (IronFlow)
 
-**Status:** Design exploration (no implementation yet)  
+**Status:** Phase 1 implemented (resume + JSON allowlist + UI); Goal B / map hardening / Rust hot path still open  
 **Last updated:** 2026-07-14  
 **Scope (when implemented):** `python-shim/` (authoring + result bridge), `rust-engine/` (lookup/persist hot path), `COMPATIBILITY.md`, tests; UI later  
 **Related:** [MEMORY_BANK cancel/retry gap](../MEMORY_BANK.md), Prefect [Caching](https://docs.prefect.io/v3/concepts/caching), compatibility backlog “Minimal task caching”

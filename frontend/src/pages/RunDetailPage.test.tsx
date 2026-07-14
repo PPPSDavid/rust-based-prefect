@@ -36,7 +36,17 @@ vi.mock("../api", () => ({
     }),
     listLogs: vi.fn().mockResolvedValue({ items: [], next_cursor: null }),
     listEvents: vi.fn().mockResolvedValue({ items: [], next_cursor: null }),
-    listFlowArtifacts: vi.fn().mockResolvedValue([]),
+    listFlowArtifacts: vi.fn().mockResolvedValue([
+      {
+        id: "art-1",
+        flow_run_id: "run-1",
+        task_run_id: "task-1",
+        artifact_type: "result",
+        key: "inc-result",
+        summary: JSON.stringify({ task_name: "inc", result: 42, persisted: true }),
+        created_at: "2026-04-15T21:00:01+00:00"
+      }
+    ]),
     getFlowRunDag: vi.fn().mockResolvedValue({
       flow_run_id: "run-1",
       mode: "logical",
@@ -71,5 +81,11 @@ describe("RunDetailPage", () => {
     dagButton.click();
     expect(await screen.findByText(/source:/i)).toBeInTheDocument();
     expect(await screen.findByText("inc")).toBeInTheDocument();
+  });
+
+  it("shows persisted JSON task results on the Task Runs tab", async () => {
+    renderPage();
+    expect(await screen.findByText(/inc - COMPLETED/i)).toBeInTheDocument();
+    expect(await screen.findByText("42")).toBeInTheDocument();
   });
 });

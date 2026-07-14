@@ -83,10 +83,12 @@ class TaskWrapper:
         name: str | None = None,
         *,
         transition_hooks: tuple[TransitionHookSpec, ...] | None = None,
+        persist_result: bool = False,
     ) -> None:
         self.fn = fn
         self.name = name or getattr(fn, "__name__", "<task>")
         self._transition_hooks = transition_hooks
+        self.persist_result = bool(persist_result)
         wraps(fn)(self)
 
     def __call__(self, *args: Any, **kwargs: Any) -> T:
@@ -105,10 +107,20 @@ class TaskWrapper:
 
         flow_run_id = _ACTIVE_FLOW_RUN.get()
         task_run = None
+        planned_node_id: str | None = None
         if flow_run_id is not None:
             planned_node_id = _CONTROL_PLANE.next_planned_node_id(
                 flow_run_id, self.name
             )
+            hit, cached = _CONTROL_PLANE.lookup_resumed_task_result(
+                flow_run_id,
+                planned_node_id,
+                persist_result=self.persist_result,
+            )
+            if hit:
+                return self._complete_from_cache(
+                    flow_run_id, planned_node_id, cast(T, cached)
+                )
             task_run = _CONTROL_PLANE.create_task_run(
                 flow_run_id, self.name, planned_node_id=planned_node_id
             )
@@ -128,20 +140,7 @@ class TaskWrapper:
         try:
             result = self(*args, **kwargs)
             if task_run is not None:
-                _CONTROL_PLANE.record_task_event(
-                    task_run.task_run_id, "task_completed", {"task_name": self.name}
-                )
-                th = self._transition_hooks
-                if th:
-                    _emit_task_single_hook_edge(
-                        th,
-                        task_run,
-                        self.name,
-                        RunState.RUNNING,
-                        RunState.COMPLETED,
-                        "task_completed",
-                        {"task_name": self.name},
-                    )
+                self._finalize_completed_task(task_run, result, cache_hit=False)
             return TaskFuture(
                 result,
                 task_run_id=str(task_run.task_run_id) if task_run is not None else None,
@@ -179,6 +178,66 @@ class TaskWrapper:
                         )
             raise
 
+    def _complete_from_cache(
+        self,
+        flow_run_id: UUID,
+        planned_node_id: str | None,
+        value: T,
+    ) -> TaskFuture[T]:
+        task_run = _CONTROL_PLANE.create_task_run(
+            flow_run_id, self.name, planned_node_id=planned_node_id
+        )
+        _CONTROL_PLANE.record_task_events_batch(
+            task_run.task_run_id,
+            [
+                ("task_pending", None),
+                ("task_running", None),
+            ],
+        )
+        th = self._transition_hooks
+        if th:
+            _emit_task_transition_edges(
+                th, task_run, self.name, _TASK_HOOK_START_EDGES
+            )
+        self._finalize_completed_task(task_run, value, cache_hit=True)
+        return TaskFuture(
+            value,
+            task_run_id=str(task_run.task_run_id),
+            planned_node_id=task_run.planned_node_id,
+        )
+
+    def _finalize_completed_task(
+        self,
+        task_run: TaskRunRecord,
+        result: Any,
+        *,
+        cache_hit: bool,
+        map_index: int | None = None,
+    ) -> None:
+        summary_extra = _CONTROL_PLANE.store_task_result_for_resume(
+            task_run.flow_run_id,
+            task_run.task_run_id,
+            self.name,
+            task_run.planned_node_id,
+            result,
+            persist_result=self.persist_result,
+            map_index=map_index,
+        )
+        data: dict[str, Any] = {"task_name": self.name, **summary_extra}
+        if cache_hit:
+            data["cache_hit"] = True
+        _CONTROL_PLANE.record_task_event(task_run.task_run_id, "task_completed", data)
+        th = self._transition_hooks
+        if th:
+            _emit_task_single_hook_edge(
+                th,
+                task_run,
+                self.name,
+                RunState.RUNNING,
+                RunState.COMPLETED,
+                "task_completed",
+                data,
+            )
     def map(
         self,
         values: Iterable[Any],
@@ -243,22 +302,11 @@ class TaskWrapper:
         self, metas: list[tuple[TaskRunRecord | None, Any]], outs: list[Any]
     ) -> list[TaskFuture[T]]:
         out: list[TaskFuture[T]] = []
-        for (task_run, _v), raw in zip(metas, outs, strict=True):
+        for index, ((task_run, _v), raw) in enumerate(zip(metas, outs, strict=True)):
             if task_run is not None:
-                _CONTROL_PLANE.record_task_event(
-                    task_run.task_run_id, "task_completed", {"task_name": self.name}
+                self._finalize_completed_task(
+                    task_run, raw, cache_hit=False, map_index=index
                 )
-                th = self._transition_hooks
-                if th:
-                    _emit_task_single_hook_edge(
-                        th,
-                        task_run,
-                        self.name,
-                        RunState.RUNNING,
-                        RunState.COMPLETED,
-                        "task_completed",
-                        {"task_name": self.name},
-                    )
             out.append(
                 TaskFuture(
                     raw,
@@ -353,6 +401,7 @@ def task(
     *,
     name: str | None = None,
     transition_hooks: Sequence[TransitionHookSpec] | None = None,
+    persist_result: bool = False,
 ) -> TaskWrapper: ...
 
 
@@ -362,6 +411,7 @@ def task(
     *,
     name: str | None = None,
     transition_hooks: Sequence[TransitionHookSpec] | None = None,
+    persist_result: bool = False,
 ) -> Callable[[Callable[..., T]], TaskWrapper]: ...
 
 
@@ -370,10 +420,16 @@ def task(
     *,
     name: str | None = None,
     transition_hooks: Sequence[TransitionHookSpec] | None = None,
+    persist_result: bool = False,
 ) -> TaskWrapper | Callable[[Callable[..., T]], TaskWrapper]:
     def decorate(f: Callable[..., T]) -> TaskWrapper:
         compiled = compile_transition_hooks(transition_hooks)
-        return TaskWrapper(f, name=name, transition_hooks=compiled)
+        return TaskWrapper(
+            f,
+            name=name,
+            transition_hooks=compiled,
+            persist_result=persist_result,
+        )
 
     if fn is None:
         return decorate
@@ -407,6 +463,7 @@ def flow(
                 parent_flow_run_id = None
                 parent_task_run_id = None
                 execution_mode = None
+                resume_from: UUID | None = None
                 if dep_run_id is not None:
                     dep_run = _CONTROL_PLANE.get_deployment_run(dep_run_id)
                     if dep_run:
@@ -418,15 +475,20 @@ def flow(
                             parent_task_run_id = UUID(
                                 str(dep_run["parent_task_run_id"])
                             )
+                        if dep_run.get("resume_from_flow_run_id"):
+                            resume_from = UUID(str(dep_run["resume_from_flow_run_id"]))
                         execution_mode = "deployment"
                 elif parent_active_flow_run is not None:
                     parent_flow_run_id = parent_active_flow_run
                     execution_mode = "inline"
+                if resume_from is None:
+                    resume_from = _CONTROL_PLANE.consume_pending_resume()
                 record = _CONTROL_PLANE.create_flow_run(
                     flow_name,
                     parent_flow_run_id=parent_flow_run_id,
                     parent_task_run_id=parent_task_run_id,
                     execution_mode=execution_mode,
+                    resume_from_flow_run_id=resume_from,
                 )
                 _ACTIVE_FLOW_RUN.set(record.run_id)
                 if dep_run_id is not None:

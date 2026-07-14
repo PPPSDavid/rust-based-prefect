@@ -60,13 +60,12 @@ Last updated: 2026-07-12.
 
 **Known gap (documented, future work):**
 
-- For multi-task flows where some tasks **completed** before cancel, **retry currently recomputes those completed tasks**. Desired Prefect-like semantics: on retry, **already-completed tasks should not be recomputed** (task-level resume / result cache keyed by flow run lineage or equivalent).
-- Implementing this requires architectural work: task result persistence across retry, idempotent resume graph, and UI/API surfacing of which tasks were skipped vs re-run. Track in compatibility matrix before claiming parity.
-- Design exploration (cases, identity, `None` vs opt-in persist, Prefect delta): **`docs/plans/task-result-cache.md`**.
+- For multi-task flows where some tasks **completed** before cancel, **retry currently recomputes those completed tasks** unless they participate in **task resume** (see below). Full Prefect task-resume parity (all completed tasks always skipped) is still a gap when authors omit `persist_result` for non-`None` returns.
+- Design + Phase 1 subset: **`docs/plans/task-result-cache.md`**. Supported now: resume lineage on retry / `prepare_resume`; `None` auto-skip; `@task(persist_result=True)` JSON-safe restore; UI result display.
 
 **Useful test scenario (manual / E2E):**
 
-- Flow: fast task → `sleep` ~10s task → downstream task. Trigger → cancel while sleeping → retry → wait for completion. Today, expect all tasks to run again on retry; use this to validate when resume lands.
+- Flow: fast task → `sleep` ~10s task → downstream task. Trigger → cancel while sleeping → retry → wait for completion. With `persist_result` / `None` markers, expect eligible tasks to skip on retry.
 
 ## Next High-Value Work
 
@@ -74,5 +73,5 @@ Last updated: 2026-07-12.
 2. Expand Prefect API compatibility matrix with concrete parity tests.
 3. Add migration/versioning path toward PostgreSQL for larger-scale persistence.
 4. Keep CI + `perf_matrix` regression thresholds healthy.
-5. **Task-level resume on flow-run retry** (skip recomputation of tasks that completed before cancel) — see section above.
+5. **Task-level resume on flow-run retry** — Phase 1 landed (DAG resume + JSON allowlist + UI). Follow-ups: map-index resume hardening, parameter-guard, Rust hot-path lookup, subflow/gate policies.
 6. Optional: Cloud embeddings path if NL `semantic_search` becomes important; keep decision log current (`docs/agent/DECISION_LOG.md`).
