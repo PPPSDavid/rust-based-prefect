@@ -1287,6 +1287,9 @@ class InMemoryControlPlane:
                 elif event_type == "task_failed":
                     task.state = RunState.FAILED
                     task.version += 1
+                elif event_type == "task_cancelled":
+                    task.state = RunState.CANCELLED
+                    task.version += 1
                 from_state = None
 
             ev: dict[str, Any] = {

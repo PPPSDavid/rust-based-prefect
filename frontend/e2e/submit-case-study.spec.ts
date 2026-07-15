@@ -1,11 +1,26 @@
 /**
- * One-off visual case-study screenshots for deferred-submit E2E review.
+ * Deferred-submit case study: seed demo flavors, then assert UI list/detail/DAG.
  * Run: npx playwright test e2e/submit-case-study.spec.ts
  */
 import { test, expect } from "@playwright/test";
+import fs from "node:fs";
 import path from "node:path";
 
-const ARTIFACTS = "/opt/cursor/artifacts/submit-e2e";
+const ARTIFACTS =
+  process.env.IRONFLOW_E2E_ARTIFACTS ||
+  (fs.existsSync("/opt/cursor/artifacts")
+    ? "/opt/cursor/artifacts/submit-e2e"
+    : path.join("test-results", "submit-e2e"));
+
+test.beforeAll(async ({ request }) => {
+  fs.mkdirSync(ARTIFACTS, { recursive: true });
+  for (const flavor of ["failing", "wide", "simple"] as const) {
+    const res = await request.post("http://127.0.0.1:8000/benchmark/run", {
+      data: { flavor, complexity: 4 },
+    });
+    expect(res.ok()).toBeTruthy();
+  }
+});
 
 test("case study: runs list and representative run details", async ({ page }) => {
   await page.goto("/runs");
@@ -24,23 +39,23 @@ test("case study: runs list and representative run details", async ({ page }) =>
   await expect(page.getByText(/CANCELLED|FAILED|COMPLETED/).first()).toBeVisible();
   await page.screenshot({
     path: path.join(ARTIFACTS, "failing-task-runs.png"),
-    fullPage: true
+    fullPage: true,
   });
 
   await page.getByRole("tab", { name: "Events" }).click();
   await expect(page.getByText(/task_pending|task_failed|task_cancelled/).first()).toBeVisible({
-    timeout: 10000
+    timeout: 10000,
   });
   await page.screenshot({
     path: path.join(ARTIFACTS, "failing-events.png"),
-    fullPage: true
+    fullPage: true,
   });
 
   await page.getByRole("tab", { name: "DAG" }).click();
   await expect(page.getByRole("button", { name: "Aggregated fan-out" })).toBeVisible();
   await page.screenshot({
     path: path.join(ARTIFACTS, "failing-dag.png"),
-    fullPage: true
+    fullPage: true,
   });
 
   // Wide flow DAG
@@ -53,7 +68,7 @@ test("case study: runs list and representative run details", async ({ page }) =>
   await expect(page.getByText(/inc|dbl|source:/).first()).toBeVisible({ timeout: 15000 });
   await page.screenshot({
     path: path.join(ARTIFACTS, "wide-dag-expanded.png"),
-    fullPage: true
+    fullPage: true,
   });
 
   // Simple dependency chain
@@ -64,6 +79,6 @@ test("case study: runs list and representative run details", async ({ page }) =>
   await expect(page.getByText("dbl").first()).toBeVisible();
   await page.screenshot({
     path: path.join(ARTIFACTS, "simple-task-runs.png"),
-    fullPage: true
+    fullPage: true,
   });
 });

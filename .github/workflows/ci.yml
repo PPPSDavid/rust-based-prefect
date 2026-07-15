@@ -52,6 +52,8 @@ jobs:
       - name: Sync Python deps
         run: uv sync --frozen --group dev --python ${{ matrix.python-version }}
       - uses: dtolnay/rust-toolchain@stable
+      - name: Build rust-engine (native FSM/GCL for shim tests)
+        run: cargo build --manifest-path rust-engine/Cargo.toml
       - name: Python tests
         # Pin interpreter explicitly: `uv run` otherwise re-creates .venv from
         # committed `.python-version` (3.12) and ignores the matrix sync.
