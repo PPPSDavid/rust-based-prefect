@@ -187,11 +187,18 @@ dependencies = [
     { name = "pyyaml" },
 ]
 
+[package.optional-dependencies]
+postgres = [
+    { name = "psycopg", extra = ["binary"] },
+]
+
 [package.metadata]
 requires-dist = [
+    { name = "psycopg", extras = ["binary"], marker = "extra == 'postgres'", specifier = ">=3.1,<4" },
     { name = "pydantic", specifier = ">=2,<3" },
     { name = "pyyaml", specifier = ">=6,<7" },
 ]
+provides-extras = ["postgres"]
 
 [[package]]
 name = "ironflow-static-planner"

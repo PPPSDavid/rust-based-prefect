@@ -1,15 +1,28 @@
 from __future__ import annotations
 
+import os
 import threading
 import time
 from collections.abc import Callable
 from importlib import import_module
+from types import SimpleNamespace
 from typing import Any
 from uuid import UUID
 
 from .cancellation import FlowRunCancelled
 from .decorators import _ACTIVE_DEPLOYMENT_RUN
 from .runtime import RunState
+
+
+def resolve_worker_mode(explicit: str | None = None) -> str:
+    """Return ``http`` or ``file`` (default ``file`` for local shared-DB workers)."""
+    raw = (explicit if explicit is not None else os.getenv("IRONFLOW_WORKER_MODE", "file"))
+    mode = str(raw).strip().lower()
+    if mode in ("http", "file"):
+        return mode
+    raise ValueError(
+        f"IRONFLOW_WORKER_MODE must be 'http' or 'file' (got {raw!r})"
+    )
 
 
 def _deployment_run_flow_run_id(
@@ -53,7 +66,9 @@ def execute_claimed_deployment_run(
     claimed: dict,
     flow_registry: dict[str, Callable[..., Any]] | None = None,
 ) -> None:
-    deployment = control_plane.get_deployment(UUID(claimed["deployment_id"]))
+    deployment = claimed.get("deployment")
+    if not isinstance(deployment, dict):
+        deployment = control_plane.get_deployment(UUID(claimed["deployment_id"]))
     if deployment is None:
         control_plane.mark_deployment_run_finished(
             deployment_run_id=UUID(claimed["id"]),
@@ -108,6 +123,47 @@ def execute_claimed_deployment_run(
         )
     finally:
         _ACTIVE_DEPLOYMENT_RUN.reset(dep_token)
+
+
+class HttpWorkerBackend:
+    """Enough control-plane surface for ``execute_claimed_deployment_run`` over HTTP."""
+
+    def __init__(self, client: Any) -> None:
+        self._client = client
+
+    def get_deployment(self, deployment_id: UUID) -> dict[str, Any] | None:
+        return self._client.get_deployment(deployment_id)
+
+    def get_deployment_run(self, deployment_run_id: UUID) -> dict[str, Any] | None:
+        return self._client.get_deployment_run(deployment_run_id)
+
+    def mark_deployment_run_started(self, deployment_run_id: UUID) -> None:
+        self._client.mark_started(deployment_run_id)
+
+    def mark_deployment_run_finished(
+        self,
+        deployment_run_id: UUID,
+        status: str,
+        flow_run_id: UUID | None = None,
+        error: str | None = None,
+    ) -> None:
+        self._client.mark_finished(
+            deployment_run_id,
+            status=status,
+            flow_run_id=flow_run_id,
+            error=error,
+        )
+
+    def get_flow(self, flow_run_id: UUID) -> Any:
+        data = self._client.get_flow_run(flow_run_id)
+        if data is None:
+            raise KeyError(f"flow run not found: {flow_run_id}")
+        state_raw = data.get("state")
+        if isinstance(state_raw, RunState):
+            state = state_raw
+        else:
+            state = RunState(str(state_raw))
+        return SimpleNamespace(state=state)
 
 
 def run_local_deployment_once(
@@ -170,3 +226,43 @@ def run_worker_loop(
             )
             if not handled:
                 time.sleep(0.5)
+
+
+def run_http_worker_loop(
+    client: Any,
+    *,
+    worker_name: str,
+    work_pool_id: str,
+    flow_registry: dict[str, Callable[..., Any]],
+    lease_seconds: int = 30,
+    stop_event: threading.Event,
+    heartbeat_interval: float = 15.0,
+    wait_ms: int = 500,
+) -> None:
+    """Worker loop that never opens the control-plane database (API only)."""
+    backend = HttpWorkerBackend(client)
+    last_heartbeat = 0.0
+
+    while not stop_event.is_set():
+        now_m = time.monotonic()
+        if now_m - last_heartbeat > heartbeat_interval:
+            try:
+                client.heartbeat(worker_name, work_pool_id=work_pool_id)
+            except Exception:
+                pass
+            last_heartbeat = now_m
+
+        try:
+            claimed = client.claim(
+                worker_name,
+                work_pool_id=work_pool_id,
+                lease_seconds=lease_seconds,
+                wait_ms=wait_ms,
+            )
+        except Exception:
+            time.sleep(0.5)
+            continue
+        if not claimed:
+            time.sleep(0.5)
+            continue
+        execute_claimed_deployment_run(backend, claimed, flow_registry)
