@@ -7,7 +7,7 @@ Last updated: 2026-07-14.
 
 - Name: Project IronFlow (`rust-based-prefect`)
 - Goal: Prefect-compatible orchestration with stronger determinism, performance, and static planning.
-- Status: Hybrid MVP in active use — deployments (schedules, CLI/YAML Tier 1); **subflows M1+M2** on `main` (#34/#36) with user guide at `docs/how-to/subflows.md`; transition hooks; **global + tag concurrency limits** (`docs/how-to/concurrency-limits.md`); concurrent `task.submit` via ThreadPoolTaskRunner; agent tooling under `.cursor/` + `docs/agent/`. **Self-hosted:** Tier A (server Docker) + Tier C (basic auth) on `main`; Tier B0 store extract (#49) + Tier B1 Postgres (#52) on `main`. **Active plan:** Tier B2 HTTP workers — `IRONFLOW_WORKER_MODE=http` + claim/started/finished API (`docs/plans/self-hosted-docker-tier-b.md`). Concurrency plan implemented — `docs/plans/concurrency-limits.md`.
+- Status: Hybrid MVP in active use — deployments (schedules, CLI/YAML Tier 1); **subflows M1+M2** on `main` (#34/#36) with user guide at `docs/how-to/subflows.md`; transition hooks; **global + tag concurrency limits** (`docs/how-to/concurrency-limits.md`); concurrent `task.submit` via ThreadPoolTaskRunner; agent tooling under `.cursor/` + `docs/agent/`. **Self-hosted:** Tier A (server Docker) + Tier C (basic auth) on `main`; Tier B0–B2 on `main` (#49/#52/#56). **Active plan:** Tier B3/B5 compose — Postgres + services process + HTTP workers (`docs/plans/self-hosted-docker-tier-b.md`). Concurrency plan implemented — `docs/plans/concurrency-limits.md`.
 
 ## Core Architecture
 

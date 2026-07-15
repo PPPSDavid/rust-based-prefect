@@ -18,6 +18,7 @@ from ..deploy.pull import run_pull_steps
 from ..deploy.spec import DeploymentSpec, PullStepSpec, parse_entrypoint
 from ..deploy.yaml_loader import load_manifest
 from ..runtime import InMemoryControlPlane
+from ..services import run_services_loop
 from ..worker import resolve_worker_mode, run_http_worker_loop, run_worker_loop
 from ..worker_client import WorkerHttpClient
 
@@ -560,7 +561,71 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     worker_start.set_defaults(func=cmd_worker_start)
 
+    server_parser = subparsers.add_parser(
+        "server",
+        help="Server-side processes (API is uvicorn; background services live here).",
+    )
+    server_sub = server_parser.add_subparsers(dest="server_command", required=True)
+    services_parser = server_sub.add_parser(
+        "services",
+        help="Background maintenance (scheduler / lease reclaim).",
+    )
+    services_sub = services_parser.add_subparsers(
+        dest="services_command", required=True
+    )
+    services_start = services_sub.add_parser(
+        "start",
+        help="Run schedule ticks and maintenance (no HTTP listener).",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=_epilog(
+            [
+                "ironflow server services start",
+                "IRONFLOW_DATABASE_URL=postgresql://… ironflow server services start",
+            ]
+        ),
+    )
+    services_start.add_argument(
+        "--interval-ms",
+        type=int,
+        default=None,
+        help="Tick interval ms (default: IRONFLOW_SCHEDULER_INTERVAL_MS or 1000).",
+    )
+    services_start.add_argument(
+        "--stale-seconds",
+        type=int,
+        default=None,
+        help="Stale worker threshold (default: IRONFLOW_SCHEDULER_STALE_SECONDS or 120).",
+    )
+    services_start.set_defaults(func=cmd_server_services_start)
+
     return parser
+
+
+def cmd_server_services_start(args: argparse.Namespace) -> int:
+    plane = _setup_local_control_plane()
+    stop_event = threading.Event()
+    interval = args.interval_ms
+    stale = args.stale_seconds
+    print("ironflow server services start")
+    print(f"history_path: {plane._history_path}")
+    if getattr(plane, "_store", None) is not None:
+        print(f"store_backend: {plane._store.backend_kind}")
+    print(
+        "Note: run a single services replica per stack "
+        "(HA advisory lock deferred).",
+        file=sys.stderr,
+    )
+    try:
+        run_services_loop(
+            plane,
+            interval_ms=interval,
+            stale_after_seconds=stale,
+            stop_event=stop_event,
+        )
+    except KeyboardInterrupt:
+        stop_event.set()
+        print("\nstopped", file=sys.stderr)
+    return 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:

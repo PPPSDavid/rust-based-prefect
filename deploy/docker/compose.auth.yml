@@ -1,0 +1,12 @@
+# Optional basic-auth overlay for deploy/docker/compose.yml (Tier C + B5).
+#
+#   docker compose -f deploy/docker/compose.yml -f deploy/docker/compose.auth.yml up --build
+
+services:
+  server:
+    environment:
+      IRONFLOW_SERVER_API_AUTH_STRING: ${IRONFLOW_SERVER_API_AUTH_STRING:-admin:pass}
+
+  worker:
+    environment:
+      IRONFLOW_API_AUTH_STRING: ${IRONFLOW_API_AUTH_STRING:-admin:pass}

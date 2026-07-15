@@ -1,0 +1,41 @@
+# IronFlow background services (scheduler / maintenance) — Tier B3/B5.
+#
+# Build from repo root after building a local wheel into dist/wheels/:
+#   docker build -f deploy/docker/Dockerfile.services \
+#     --build-arg INSTALL_MODE=local -t ironflow-services:local .
+
+ARG PYTHON_VERSION=3.12
+FROM python:${PYTHON_VERSION}-slim AS runtime
+
+ARG IRONFLOW_VERSION=0.2.0
+ARG INSTALL_MODE=pypi
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt/ironflow
+
+RUN pip install --no-cache-dir "psycopg[binary]>=3.1,<4"
+
+COPY dist/wheels/ /tmp/wheels/
+RUN if [ "$INSTALL_MODE" = "local" ]; then \
+      WHEEL="$(ls /tmp/wheels/ironflow_prefect_compat-*.whl | head -n 1)"; \
+      pip install --no-cache-dir "$WHEEL"; \
+    else \
+      pip install --no-cache-dir "ironflow-prefect-compat[postgres]==${IRONFLOW_VERSION}"; \
+    fi \
+    && rm -rf /tmp/wheels
+
+ENV IRONFLOW_HISTORY_PATH=/data/ironflow_history.jsonl \
+    IRONFLOW_SCHEDULER_INTERVAL_MS=1000 \
+    IRONFLOW_SCHEDULER_STALE_SECONDS=120 \
+    PYTHONUNBUFFERED=1
+
+VOLUME ["/data"]
+
+COPY deploy/docker/entrypoint-server.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["ironflow", "server", "services", "start"]

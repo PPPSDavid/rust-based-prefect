@@ -1,0 +1,28 @@
+name: Docker Compose Smoke
+
+on:
+  pull_request:
+    paths:
+      - "deploy/docker/**"
+      - "scripts/docker_compose_smoke.sh"
+      - ".github/workflows/docker-compose-smoke.yml"
+      - "python-shim/src/prefect_compat/services.py"
+      - "python-shim/src/prefect_compat/cli/main.py"
+      - "python-shim/src/prefect_compat/worker.py"
+      - "python-shim/src/prefect_compat/worker_client.py"
+      - "python-shim/src/prefect_compat/routes/workers.py"
+  workflow_dispatch:
+
+jobs:
+  compose-smoke:
+    name: Compose stack (postgres + server + services + worker)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Run compose smoke
+        run: bash scripts/docker_compose_smoke.sh

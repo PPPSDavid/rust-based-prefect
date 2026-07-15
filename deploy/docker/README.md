@@ -7,34 +7,44 @@ Official container images complement the **`ironflow-prefect-compat`** PyPI pack
 | Channel | What you get | Typical use |
 | --- | --- | --- |
 | **PyPI** (`pip install ironflow-prefect-compat`) | Python library, `ironflow` CLI, bundled Rust engine wheel | Author flows, embed in apps, CI scripts, custom server commands |
-| **Container** (`ghcr.io/<org>/ironflow-server`) | Ready-to-run API server: uvicorn + FastAPI + pinned wheel + `/data` volume defaults | Self-hosted control plane, compose/Kubernetes, no local Python setup |
+| **Container** (`ghcr.io/<org>/ironflow-server`) | Ready-to-run API / services / HTTP worker images | Self-hosted control plane + compose |
 
-The image **installs the same PyPI wheel** (same `VERSION` tag). It adds server runtime dependencies (`fastapi`, `uvicorn`), an entrypoint, healthcheck, and default env vars. You do not need a separate “Docker edition” of the engine.
+Images install the **same PyPI wheel** (same `VERSION` tag). Server/services images also install `psycopg[binary]` for Postgres.
+
+## Images
+
+| Dockerfile | Role | Default `CMD` |
+| --- | --- | --- |
+| `Dockerfile.server` | API (uvicorn) | `uvicorn … --host 0.0.0.0 --port 8000` |
+| `Dockerfile.services` | Background scheduler | `ironflow server services start` |
+| `Dockerfile.worker` | HTTP worker | `ironflow worker start --worker-mode http` |
 
 ## Tags (proposed)
 
 | Tag | Meaning |
 | --- | --- |
-| `ghcr.io/<org>/ironflow-server:0.1.2` | Immutable release (matches `VERSION` / PyPI) |
-| `ghcr.io/<org>/ironflow-server:0.1` | Patch-line float |
+| `ghcr.io/<org>/ironflow-server:0.2.0` | Immutable release (matches `VERSION` / PyPI) |
+| `ghcr.io/<org>/ironflow-server:0.2` | Patch-line float |
 | `ghcr.io/<org>/ironflow-server:latest` | Latest release (avoid in production) |
 
-Worker and UI images are planned under Tier B5 of `docs/plans/self-hosted-docker-auth.md`.
+Same versioning for `ironflow-services` / `ironflow-worker` when published.
 
-## Build
+## Compose
 
-From repository root:
+See `compose.yml` and [docs/how-to/docker-compose.md](../../docs/how-to/docker-compose.md).
 
 ```bash
-# Release-style (pulls wheel from PyPI)
 mkdir -p dist/wheels
-docker build -f deploy/docker/Dockerfile.server \
-  --build-arg INSTALL_MODE=pypi \
-  --build-arg IRONFLOW_VERSION=0.1.2 \
-  -t ironflow-server:0.1.2 .
+python -m build --wheel --outdir dist/wheels --directory python-shim
+docker compose -f deploy/docker/compose.yml up --build
+```
 
+## Build (server example)
+
+```bash
 # Branch validation (wheel from current checkout)
-cd python-shim && python -m build --wheel --outdir ../dist/wheels && cd ..
+mkdir -p dist/wheels
+python -m build --wheel --outdir dist/wheels --directory python-shim
 docker build -f deploy/docker/Dockerfile.server \
   --build-arg INSTALL_MODE=local \
   -t ironflow-server:local .
@@ -42,22 +52,15 @@ docker build -f deploy/docker/Dockerfile.server \
 
 ## Publish (maintainers)
 
-1. Release **`ironflow-prefect-compat`** to PyPI first (existing workflow).
-2. Build and push the server image with the **same version**:
-   - Registry: **GHCR** `ghcr.io/PPPSDavid/ironflow-server` (recommended; pairs with GitHub releases)
-   - Optional mirror: Docker Hub `pppsdavid/ironflow-server`
+1. Release **`ironflow-prefect-compat`** to PyPI first.
+2. Build and push images with the **same version** to GHCR (`ghcr.io/PPPSDavid/ironflow-{server,services,worker}`).
 3. Attach `docker pull …` to the GitHub Release notes.
 
-A `workflow_dispatch` GHCR workflow is planned; until then, maintainers push manually:
+Automated GHCR publish may be added as a follow-up workflow; until then, maintainers push manually.
+
+## Smoke tests
 
 ```bash
-echo "$GITHUB_TOKEN" | docker login ghcr.io -u USERNAME --password-stdin
-docker tag ironflow-server:0.1.2 ghcr.io/pppsdavid/ironflow-server:0.1.2
-docker push ghcr.io/pppsdavid/ironflow-server:0.1.2
-```
-
-## Smoke test
-
-```bash
-bash scripts/docker_server_smoke.sh
+bash scripts/docker_server_smoke.sh      # Tier A single container
+bash scripts/docker_compose_smoke.sh     # Tier B3/B5 compose stack
 ```

@@ -1,22 +1,17 @@
-# IronFlow API server image (Tier A).
+# IronFlow API server image (Tier A / B5 compose).
 #
 # Build from repo root:
 #   docker build -f deploy/docker/Dockerfile.server -t ironflow-server:local .
 #
-# PyPI install (default; matches VERSION at repo root):
-#   docker build -f deploy/docker/Dockerfile.server -t ironflow-server:local .
-#
-# Local wheel from current checkout (for PR/branch validation):
-#   python -m pip install build
-#   cd python-shim && python -m build --wheel --outdir ../dist/wheels
+# Local wheel:
+#   python -m build --wheel --outdir dist/wheels --directory python-shim
 #   docker build -f deploy/docker/Dockerfile.server \
-#     --build-arg INSTALL_MODE=local \
-#     -t ironflow-server:local .
+#     --build-arg INSTALL_MODE=local -t ironflow-server:local .
 
 ARG PYTHON_VERSION=3.12
 FROM python:${PYTHON_VERSION}-slim AS runtime
 
-ARG IRONFLOW_VERSION=0.1.2
+ARG IRONFLOW_VERSION=0.2.0
 ARG INSTALL_MODE=pypi
 
 RUN apt-get update \
@@ -27,14 +22,15 @@ WORKDIR /opt/ironflow
 
 RUN pip install --no-cache-dir \
     "fastapi>=0.115,<1" \
-    "uvicorn[standard]>=0.30,<1"
+    "uvicorn[standard]>=0.30,<1" \
+    "psycopg[binary]>=3.1,<4"
 
 COPY dist/wheels/ /tmp/wheels/
 RUN if [ "$INSTALL_MODE" = "local" ]; then \
       WHEEL="$(ls /tmp/wheels/ironflow_prefect_compat-*.whl | head -n 1)"; \
       pip install --no-cache-dir "$WHEEL"; \
     else \
-      pip install --no-cache-dir "ironflow-prefect-compat==${IRONFLOW_VERSION}"; \
+      pip install --no-cache-dir "ironflow-prefect-compat[postgres]==${IRONFLOW_VERSION}"; \
     fi \
     && rm -rf /tmp/wheels
 
