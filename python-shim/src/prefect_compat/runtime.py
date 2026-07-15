@@ -2317,6 +2317,12 @@ class InMemoryControlPlane:
                     )
                     waited = True
             if not waited:
+                # Promote due temporal gates so wait_all does not hang forever on
+                # after=0 (or past-until) gates that never got GateFuture.result().
+                try:
+                    self.tick_gate_tasks()
+                except Exception:
+                    pass
                 time.sleep(min(poll_seconds, max(0.0, deadline - time.monotonic())))
         raise TimeoutError(
             f"timed out waiting for contributing children of flow run {flow_run_id}"
