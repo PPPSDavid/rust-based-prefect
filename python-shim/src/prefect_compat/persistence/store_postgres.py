@@ -36,7 +36,8 @@ CREATE TABLE IF NOT EXISTS task_runs (
     kind TEXT NOT NULL DEFAULT 'task',
     child_flow_run_id TEXT,
     child_deployment_run_id TEXT,
-    gate_open_at TEXT
+    gate_open_at TEXT,
+    contribute_to_flow_state INTEGER NOT NULL DEFAULT 1
 );
 CREATE TABLE IF NOT EXISTS dag_manifests (
     seq BIGSERIAL PRIMARY KEY,

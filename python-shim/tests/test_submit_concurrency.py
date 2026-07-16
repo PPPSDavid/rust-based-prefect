@@ -7,7 +7,7 @@ import time
 
 import pytest
 
-from prefect_compat import InMemoryControlPlane, flow, set_control_plane, task, wait
+from prefect_compat import InMemoryControlPlane, RunState, flow, set_control_plane, task, wait
 from prefect_compat.task_runners import SequentialTaskRunner, ThreadPoolTaskRunner
 
 
@@ -76,13 +76,19 @@ def test_submit_failure_surfaces_on_result(tmp_path):
     def boom() -> None:
         raise ValueError("submit boom")
 
-    @flow(task_runner=ThreadPoolTaskRunner(max_workers=2))
+    @flow(
+        final_state="explicit",
+        task_runner=ThreadPoolTaskRunner(max_workers=2),
+    )
     def f() -> None:
         fut = boom.submit()
         with pytest.raises(ValueError, match="submit boom"):
             fut.result()
 
     f()
+    run = plane.latest_flow()
+    assert run is not None
+    assert run.state == RunState.COMPLETED
 
 
 def test_sequential_runner_submit_does_not_overlap(tmp_path):

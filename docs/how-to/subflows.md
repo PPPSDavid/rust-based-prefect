@@ -91,12 +91,12 @@ You can also `wait([fut])` explicitly.
 
 ### Fire-and-forget
 
-Omit `.result()` / `wait_for` if the parent should not wait:
+Under the default **`final_state="wait_all"`**, an undeclared `submit()` still counts toward parent completion. Opt out with **`detach=True`** (or `@flow(final_state="explicit")`):
 
 ```python
 @flow
 def parent_fire_and_forget() -> str:
-    deployment_ref("child-deploy").submit(n=1)
+    deployment_ref("child-deploy").submit(n=1, detach=True)
     return "parent_done"  # returns without waiting for the child
 ```
 

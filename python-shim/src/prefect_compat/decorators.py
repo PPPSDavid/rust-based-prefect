@@ -17,13 +17,20 @@ if TYPE_CHECKING:
     from .subflows import SubflowFuture
 
 from .cancellation import FlowRunCancelled
+from .errors import FlowChildrenFailed
 from .hooks import (
     TransitionContext,
     TransitionHookSpec,
     compile_transition_hooks,
     dispatch_transition_hooks,
 )
-from .runtime import InMemoryControlPlane, RunState, SetStateResult, TaskRunRecord
+from .runtime import (
+    FlowRunRecord,
+    InMemoryControlPlane,
+    RunState,
+    SetStateResult,
+    TaskRunRecord,
+)
 from .task_runners import (
     MapTaskRunner,
     ProcessPoolTaskRunner,
@@ -132,7 +139,11 @@ class TaskWrapper:
         return cast(T, self.fn(*resolved_args, **resolved_kwargs))
 
     def _start_task_run(
-        self, flow_run_id: UUID, planned_node_id: str | None
+        self,
+        flow_run_id: UUID,
+        planned_node_id: str | None,
+        *,
+        contribute_to_flow_state: bool = True,
     ) -> tuple[TaskRunRecord, list[str]]:
         """Create task run, PENDING, acquire tag slots, then RUNNING.
 
@@ -143,6 +154,7 @@ class TaskWrapper:
             self.name,
             planned_node_id=planned_node_id,
             tags=self.tags,
+            contribute_to_flow_state=contribute_to_flow_state,
         )
         lease_ids: list[str] = []
         if self.tags:
@@ -223,6 +235,7 @@ class TaskWrapper:
         self,
         *args: Any,
         wait_for: Sequence[TaskFuture[Any] | SubflowFuture[Any] | GateFuture[Any]] | None = None,
+        detach: bool = False,
         **kwargs: Any,
     ) -> TaskFuture[T]:
         # Gate deps on the coordinating thread so tag leases are not held while waiting.
@@ -236,7 +249,11 @@ class TaskWrapper:
             planned_node_id = _CONTROL_PLANE.next_planned_node_id(
                 flow_run_id, self.name
             )
-            task_run, lease_ids = self._start_task_run(flow_run_id, planned_node_id)
+            task_run, lease_ids = self._start_task_run(
+                flow_run_id,
+                planned_node_id,
+                contribute_to_flow_state=not detach,
+            )
 
         executor = _ACTIVE_SUBMIT_EXECUTOR.get()
         if executor is not None:
@@ -672,6 +689,7 @@ def flow(
     name: str | None = None,
     task_runner: MapTaskRunner | ProcessPoolTaskRunner | None = None,
     transition_hooks: Sequence[TransitionHookSpec] | None = None,
+    final_state: str = "wait_all",
 ) -> Callable[..., Any]:
     def decorate(f: Callable[..., T]) -> Callable[..., T]:
         flow_name = name or getattr(f, "__name__", "<flow>")
@@ -679,6 +697,11 @@ def flow(
             task_runner if task_runner is not None else default_task_runner_from_env()
         )
         compiled_flow_hooks = compile_transition_hooks(transition_hooks)
+        completion_mode = str(final_state or "wait_all").strip().lower()
+        if completion_mode not in {"wait_all", "explicit"}:
+            raise ValueError(
+                f"final_state must be 'wait_all' or 'explicit', got {final_state!r}"
+            )
 
         @wraps(f)
         def wrapped(*args: Any, **kwargs: Any) -> T:
@@ -761,19 +784,12 @@ def flow(
                         raise FlowRunCancelled(
                             f"flow run {record.run_id} was cancelled"
                         )
-                    prev = current.state
-                    done = _CONTROL_PLANE.set_flow_state(
-                        record.run_id,
-                        RunState.COMPLETED,
-                        uuid4(),
-                        "complete",
-                        expected_version=current.version,
-                    )
-                    if fh and done.status == "applied":
-                        _emit_flow_transition(
-                            fh, record.run_id, prev, RunState.COMPLETED, "complete"
+                    if completion_mode == "wait_all":
+                        _finalize_wait_all(
+                            record.run_id, result, fh, current
                         )
-                    _CONTROL_PLANE.set_flow_result(record.run_id, result)
+                    else:
+                        _finalize_explicit(record.run_id, result, fh, current)
                     return result
                 except FlowRunCancelled:
                     if (
@@ -792,6 +808,8 @@ def flow(
                             _emit_flow_transition(
                                 fh, record.run_id, prev, RunState.CANCELLED, "cancel"
                             )
+                    raise
+                except FlowChildrenFailed:
                     raise
                 except Exception:
                     if (
@@ -833,6 +851,100 @@ def _drain_submit_executor(
         _ACTIVE_SUBMIT_EXECUTOR.reset(token)
     if executor is not None:
         executor.shutdown(wait=True)
+
+
+def _finalize_explicit(
+    flow_run_id: UUID,
+    result: Any,
+    fh: tuple[TransitionHookSpec, ...] | None,
+    current: FlowRunRecord,
+) -> None:
+    prev = current.state
+    done = _CONTROL_PLANE.set_flow_state(
+        flow_run_id,
+        RunState.COMPLETED,
+        uuid4(),
+        "complete",
+        expected_version=current.version,
+    )
+    if fh and done.status == "applied":
+        _emit_flow_transition(
+            fh, flow_run_id, prev, RunState.COMPLETED, "complete"
+        )
+    _CONTROL_PLANE.set_flow_result(flow_run_id, result)
+
+
+def _finalize_wait_all(
+    flow_run_id: UUID,
+    result: Any,
+    fh: tuple[TransitionHookSpec, ...] | None,
+    current: FlowRunRecord,
+) -> None:
+    _CONTROL_PLANE.wait_contributing_children(flow_run_id)
+    resolved = _CONTROL_PLANE.resolve_flow_terminal_state(flow_run_id)
+    state_name = str(resolved.get("state", "FAILED"))
+    kind = str(resolved.get("kind", "child_failed"))
+    current = _CONTROL_PLANE.get_flow(flow_run_id)
+    prev = current.state
+    if prev == RunState.CANCELLED:
+        raise FlowRunCancelled(f"flow run {flow_run_id} was cancelled")
+
+    if state_name == "COMPLETED":
+        done = _CONTROL_PLANE.set_flow_state(
+            flow_run_id,
+            RunState.COMPLETED,
+            uuid4(),
+            "complete",
+            expected_version=current.version,
+        )
+        if fh and done.status == "applied":
+            _emit_flow_transition(
+                fh, flow_run_id, prev, RunState.COMPLETED, "complete"
+            )
+        _CONTROL_PLANE.set_flow_result(flow_run_id, result)
+        return
+
+    if state_name == "CANCELLED":
+        cancelled = _CONTROL_PLANE.set_flow_state(
+            flow_run_id,
+            RunState.CANCELLED,
+            uuid4(),
+            "child_cancelled",
+            expected_version=current.version,
+        )
+        if fh and cancelled.status == "applied":
+            _emit_flow_transition(
+                fh, flow_run_id, prev, RunState.CANCELLED, "child_cancelled"
+            )
+        raise FlowRunCancelled(
+            f"flow run {flow_run_id} cancelled because a child was cancelled"
+        )
+
+    failed = _CONTROL_PLANE.set_flow_state(
+        flow_run_id,
+        RunState.FAILED,
+        uuid4(),
+        "child_failed",
+        expected_version=current.version,
+    )
+    if fh and failed.status == "applied":
+        _emit_flow_transition(
+            fh, flow_run_id, prev, RunState.FAILED, "child_failed"
+        )
+    samples = resolved.get("sample_failures") or resolved.get("sample_incomplete") or []
+    names = [
+        str(s.get("task_name") or s.get("id"))
+        for s in samples
+        if isinstance(s, dict)
+    ]
+    detail = ", ".join(names[:5]) if names else kind
+    raise FlowChildrenFailed(
+        f"flow run {flow_run_id} failed: {kind} ({detail})",
+        flow_run_id=str(flow_run_id),
+        resolved_state=state_name,
+        kind=kind,
+        details=resolved,
+    )
 
 
 def _emit_flow_transition(

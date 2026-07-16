@@ -56,6 +56,8 @@ class WorkloadRecipe:
     fsm_task_lifecycle: bool = False
     # Global concurrency limit microbench profile (``concurrency`` CM or tagged map).
     gcl_profile: str | None = None
+    # When set, microbench Rust ``resolve_flow_terminal_state`` over N synthetic children.
+    resolve_terminal_children: int | None = None
 
 
 @dataclass
@@ -427,6 +429,17 @@ def _recipe_catalog() -> dict[str, WorkloadRecipe]:
             sqlite_enabled=True,
             subflow_profile="query_dag_nested",
         ),
+        "resolve_terminal_micro": WorkloadRecipe(
+            name="resolve_terminal_micro",
+            flow_count=200,
+            tasks_per_flow=64,
+            task_events_per_task=0,
+            read_ratio=0.0,
+            mixed=False,
+            cold_start=True,
+            sqlite_enabled=True,
+            resolve_terminal_children=64,
+        ),
     }
 
 
@@ -477,6 +490,9 @@ def _presets() -> dict[str, list[str]]:
             "subflow_cancel_propagation",
             "subflow_query_dag_nested",
         ],
+        "final_state": [
+            "resolve_terminal_micro",
+        ],
         "full": [
             k
             for k in _recipe_catalog().keys()
@@ -485,6 +501,7 @@ def _presets() -> dict[str, list[str]]:
             and not k.startswith("micro_submit_")
             and not k.startswith("subflow_")
             and not k.startswith("gcl_")
+            and not k.startswith("resolve_terminal_")
         ],
     }
 
@@ -1184,6 +1201,116 @@ def _run_gcl_iteration(
         sqlite=sqlite,
     )
 
+def _run_resolve_terminal_iteration(
+    recipe: WorkloadRecipe,
+    seed: int,
+    warmup: bool,
+) -> RecipeRunSample:
+    """Microbench ``resolve_flow_terminal_state`` over N synthetic completed children."""
+    _ = seed
+    n_children = int(recipe.resolve_terminal_children or recipe.tasks_per_flow)
+    iterations = max(1, recipe.flow_count)
+    latencies: dict[str, list[float]] = {}
+    notes = [f"resolve_terminal_children={n_children}"]
+
+    with tempfile.TemporaryDirectory(prefix="perf-matrix-resolve-") as td:
+        history_path = Path(td) / "history.jsonl"
+        db_path = history_path.with_suffix(".db")
+        plane = InMemoryControlPlane(history_path=str(history_path))
+        sqlite_before = float(db_path.stat().st_size) if db_path.exists() else 0.0
+        wal_path = db_path.with_suffix(".db-wal")
+        wal_before = float(wal_path.stat().st_size) if wal_path.exists() else 0.0
+        snap_before = _process_snapshot()
+
+        flow = plane.create_flow_run("resolve-terminal-flow")
+        plane.set_flow_states_batch(
+            flow.run_id,
+            [
+                (RunState.PENDING, uuid4(), "bench", 0),
+                (RunState.RUNNING, uuid4(), "bench", 1),
+            ],
+        )
+        for i in range(n_children):
+            task = plane.create_task_run(flow.run_id, f"t-{i}")
+            plane.record_task_events_batch(
+                task.task_run_id,
+                [
+                    ("task_pending", None),
+                    ("task_running", None),
+                    ("task_completed", {"task_name": f"t-{i}"}),
+                ],
+            )
+
+        # Confirm resolve path works once before timing.
+        warm = plane.resolve_flow_terminal_state(flow.run_id)
+        assert warm.get("state") == "COMPLETED", warm
+
+        per_ms: list[float] = []
+        wall0 = time.perf_counter()
+        for _ in range(iterations if not warmup else max(1, iterations // 10)):
+            t0 = time.perf_counter()
+            out = plane.resolve_flow_terminal_state(flow.run_id)
+            t1 = time.perf_counter()
+            assert out.get("state") == "COMPLETED", out
+            per_ms.append((t1 - t0) * 1000.0)
+        wall = time.perf_counter() - wall0
+        latencies["resolve_flow_terminal_state_ms"] = per_ms
+
+        snap_after = _process_snapshot()
+        sqlite_after = float(db_path.stat().st_size) if db_path.exists() else 0.0
+        wal_after = float(wal_path.stat().st_size) if wal_path.exists() else 0.0
+
+    counts = {
+        "resolve_calls": len(per_ms),
+        "children": n_children,
+        "flows_created": 1,
+        "tasks_created": n_children,
+        "flow_transitions": 0,
+        "task_events_recorded": 0,
+        "read_queries": 0,
+    }
+    throughput = {
+        "flows_per_sec": 0.0,
+        "tasks_per_sec": 0.0,
+        "transitions_per_sec": 0.0,
+        "task_events_per_sec": 0.0,
+        "resolve_per_second": (len(per_ms) / wall) if wall > 0 else 0.0,
+    }
+    latency_ms = {
+        "resolve_flow_terminal_state_ms": _latency_stats_ms(
+            latencies["resolve_flow_terminal_state_ms"]
+        ),
+    }
+    process = {
+        "cpu_seconds_used": max(0.0, snap_after.cpu_seconds - snap_before.cpu_seconds),
+        "rss_bytes_start": float(snap_before.rss_bytes),
+        "rss_bytes_end": float(snap_after.rss_bytes),
+        "rss_bytes_delta": float(snap_after.rss_bytes - snap_before.rss_bytes),
+    }
+    sqlite = {
+        "db_bytes_before": sqlite_before,
+        "db_bytes_after": sqlite_after,
+        "db_bytes_growth": max(0.0, sqlite_after - sqlite_before),
+        "wal_bytes_before": wal_before,
+        "wal_bytes_after": wal_after,
+        "wal_bytes_growth": max(0.0, wal_after - wal_before),
+        "bytes_per_write_op": 0.0,
+        "notes": float(len(notes)),
+    }
+    return RecipeRunSample(
+        recipe=recipe.name,
+        iteration=0,
+        warmup=warmup,
+        seed=seed,
+        wall_clock_seconds=wall,
+        counts=counts,
+        throughput=throughput,
+        latency_ms=latency_ms,
+        process=process,
+        sqlite=sqlite,
+    )
+
+
 def _run_subflow_iteration(
     recipe: WorkloadRecipe,
     seed: int,
@@ -1482,6 +1609,8 @@ def _run_recipe_iteration(
         return _run_gcl_iteration(recipe, seed, warmup)
     if recipe.subflow_profile is not None:
         return _run_subflow_iteration(recipe, seed, warmup)
+    if recipe.resolve_terminal_children is not None:
+        return _run_resolve_terminal_iteration(recipe, seed, warmup)
 
     rng = random.Random(seed)
     latencies: dict[str, list[float]] = {}
