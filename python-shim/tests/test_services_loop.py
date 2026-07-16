@@ -26,7 +26,7 @@ def test_services_loop_python_tick_then_stop(tmp_path: Path) -> None:
         ticks.append(result)
         return result
 
-    plane.deployment_maintenance_tick = _counting_tick  # type: ignore[method-assign]
+    plane.deployment_maintenance_tick = _counting_tick  # ty: ignore[invalid-assignment]
     stop = threading.Event()
 
     def _runner() -> None:
