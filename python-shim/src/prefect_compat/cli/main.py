@@ -18,7 +18,8 @@ from ..deploy.pull import run_pull_steps
 from ..deploy.spec import DeploymentSpec, PullStepSpec, parse_entrypoint
 from ..deploy.yaml_loader import load_manifest
 from ..runtime import InMemoryControlPlane
-from ..worker import run_worker_loop
+from ..worker import resolve_worker_mode, run_http_worker_loop, run_worker_loop
+from ..worker_client import WorkerHttpClient
 
 DEFAULT_API_URL = "http://127.0.0.1:8000"
 DEFAULT_MANIFEST = "ironflow.yaml"
@@ -252,27 +253,45 @@ def cmd_serve(args: argparse.Namespace) -> int:
     finally:
         client.close()
 
-    plane = _setup_local_control_plane()
     worker_name = args.worker_name or f"serve-{spec.name}"
     stop_event = threading.Event()
+    mode = resolve_worker_mode(getattr(args, "worker_mode", None))
 
     print(f"worker: {worker_name}")
     print(f"work_pool_id: {work_pool_id}")
-    print(f"history_path: {plane._history_path}")
-    print(
-        "Tip: disable the in-process server worker with IRONFLOW_ENABLE_LOCAL_WORKER=0 "
-        "when running a standalone serve/worker process.",
-        file=sys.stderr,
-    )
+    print(f"worker_mode: {mode}")
 
     try:
-        run_worker_loop(
-            plane,
-            worker_name=worker_name,
-            work_pool_id=work_pool_id,
-            flow_registry=flow_registry,
-            stop_event=stop_event,
-        )
+        if mode == "http":
+            print(f"api_url: {api_url}")
+            print(
+                "Tip: HTTP mode does not open IRONFLOW_HISTORY_PATH; "
+                "set IRONFLOW_ENABLE_LOCAL_WORKER=0 on the API server.",
+                file=sys.stderr,
+            )
+            with WorkerHttpClient(api_url) as worker_client:
+                run_http_worker_loop(
+                    worker_client,
+                    worker_name=worker_name,
+                    work_pool_id=work_pool_id,
+                    flow_registry=flow_registry,
+                    stop_event=stop_event,
+                )
+        else:
+            plane = _setup_local_control_plane()
+            print(f"history_path: {plane._history_path}")
+            print(
+                "Tip: disable the in-process server worker with IRONFLOW_ENABLE_LOCAL_WORKER=0 "
+                "when running a standalone serve/worker process.",
+                file=sys.stderr,
+            )
+            run_worker_loop(
+                plane,
+                worker_name=worker_name,
+                work_pool_id=work_pool_id,
+                flow_registry=flow_registry,
+                stop_event=stop_event,
+            )
     except KeyboardInterrupt:
         print("\nstopped", file=sys.stderr)
     return 0
@@ -293,14 +312,14 @@ def cmd_worker_start(args: argparse.Namespace) -> int:
             print(f"Error running pull steps: {exc}", file=sys.stderr)
             return 1
 
-    plane = _setup_local_control_plane()
     from ..server import FLOW_REGISTRY
 
     pool_name = args.pool or DEFAULT_WORK_POOL_NAME
     worker_name = args.name or "ironflow-worker"
     work_pool_id = pool_name
-
     api_url = args.api_url or _default_api_url()
+    mode = resolve_worker_mode(getattr(args, "worker_mode", None))
+
     if manifest_path is not None:
         try:
             specs = _resolve_deployments(
@@ -319,23 +338,43 @@ def cmd_worker_start(args: argparse.Namespace) -> int:
     stop_event = threading.Event()
     print(f"worker: {worker_name}")
     print(f"work_pool_id: {work_pool_id}")
-    print(f"history_path: {plane._history_path}")
     print(f"lease_seconds: {args.lease_seconds}")
-    print(
-        "Tip: set IRONFLOW_HISTORY_PATH to the server data dir and "
-        "IRONFLOW_ENABLE_LOCAL_WORKER=0 on the API server for split-process workers.",
-        file=sys.stderr,
-    )
+    print(f"worker_mode: {mode}")
 
     try:
-        run_worker_loop(
-            plane,
-            worker_name=worker_name,
-            work_pool_id=work_pool_id,
-            flow_registry=FLOW_REGISTRY,
-            lease_seconds=args.lease_seconds,
-            stop_event=stop_event,
-        )
+        if mode == "http":
+            print(f"api_url: {api_url}")
+            print(
+                "Tip: HTTP mode needs only IRONFLOW_API_URL (+ auth); "
+                "no shared IRONFLOW_HISTORY_PATH. Disable the server embed with "
+                "IRONFLOW_ENABLE_LOCAL_WORKER=0.",
+                file=sys.stderr,
+            )
+            with WorkerHttpClient(api_url) as worker_client:
+                run_http_worker_loop(
+                    worker_client,
+                    worker_name=worker_name,
+                    work_pool_id=work_pool_id,
+                    flow_registry=FLOW_REGISTRY,
+                    lease_seconds=args.lease_seconds,
+                    stop_event=stop_event,
+                )
+        else:
+            plane = _setup_local_control_plane()
+            print(f"history_path: {plane._history_path}")
+            print(
+                "Tip: set IRONFLOW_HISTORY_PATH to the server data dir and "
+                "IRONFLOW_ENABLE_LOCAL_WORKER=0 on the API server for split-process workers.",
+                file=sys.stderr,
+            )
+            run_worker_loop(
+                plane,
+                worker_name=worker_name,
+                work_pool_id=work_pool_id,
+                flow_registry=FLOW_REGISTRY,
+                lease_seconds=args.lease_seconds,
+                stop_event=stop_event,
+            )
     except KeyboardInterrupt:
         print("\nstopped", file=sys.stderr)
     return 0
@@ -456,11 +495,18 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Worker name for claims (default: serve-<deployment-name>).",
     )
+    serve_parser.add_argument(
+        "--worker-mode",
+        default=None,
+        choices=["http", "file"],
+        help="Claim transport: http (API only) or file (shared DB). "
+        "Default: IRONFLOW_WORKER_MODE or file.",
+    )
     serve_parser.set_defaults(func=cmd_serve)
 
     worker_parser = subparsers.add_parser(
         "worker",
-        help="Run a standalone worker process against shared local history.",
+        help="Run a standalone worker (file mode shared DB, or HTTP claim API).",
     )
     worker_sub = worker_parser.add_subparsers(dest="worker_command", required=True)
 
@@ -473,6 +519,8 @@ def _build_parser() -> argparse.ArgumentParser:
                 "ironflow worker start --pool default-process-pool",
                 "ironflow worker start --name worker-1 --lease-seconds 30",
                 "ironflow worker start --file ironflow.yaml",
+                "IRONFLOW_WORKER_MODE=http IRONFLOW_API_URL=http://127.0.0.1:8000 "
+                "ironflow worker start",
                 "IRONFLOW_HISTORY_PATH=data/ironflow_history.jsonl ironflow worker start",
             ]
         ),
@@ -496,12 +544,19 @@ def _build_parser() -> argparse.ArgumentParser:
     worker_start.add_argument(
         "--api-url",
         default=None,
-        help=f"API base URL for resolving work pool IDs (default: {DEFAULT_API_URL}).",
+        help=f"API base URL (HTTP mode + pool resolve; default: {DEFAULT_API_URL}).",
     )
     worker_start.add_argument(
         "--file",
         default=None,
         help="Optional manifest for pull steps before starting the worker.",
+    )
+    worker_start.add_argument(
+        "--worker-mode",
+        default=None,
+        choices=["http", "file"],
+        help="Claim transport: http (API only) or file (shared DB). "
+        "Default: IRONFLOW_WORKER_MODE or file.",
     )
     worker_start.set_defaults(func=cmd_worker_start)
 

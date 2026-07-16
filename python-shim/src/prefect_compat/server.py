@@ -18,6 +18,7 @@ from .auth_middleware import BasicAuthMiddleware
 from .decorators import flow, set_control_plane, task, wait
 from .gates import gate
 from .runtime import InMemoryControlPlane
+from .routes.workers import router as workers_router
 from .worker import run_local_deployment_once, run_worker_loop
 from .task_runners import ThreadPoolTaskRunner
 
@@ -73,11 +74,6 @@ class WorkPoolPatchRequest(BaseModel):
     paused: bool | None = None
 
 
-class WorkerHeartbeatRequest(BaseModel):
-    name: str
-    work_pool_id: str | None = None
-
-
 class ConcurrencyLimitCreateRequest(BaseModel):
     name: str
     limit: int = Field(ge=0)
@@ -111,6 +107,7 @@ LOCAL_WORKER_NAME = os.getenv("IRONFLOW_LOCAL_WORKER_NAME", "local-worker-1")
 LOCAL_WORK_POOL = os.getenv("IRONFLOW_WORK_POOL", "default-process-pool")
 
 app = FastAPI(title="IronFlow Compat Server")
+app.include_router(workers_router)
 app.add_middleware(BasicAuthMiddleware)
 app.add_middleware(
     CORSMiddleware,
@@ -669,22 +666,6 @@ def list_workers(
         work_pool_id=work_pool_id, limit=limit, cursor=cursor
     )
     return CursorPage(items=page.items, next_cursor=page.next_cursor)
-
-
-@app.post("/api/workers/heartbeat")
-def worker_heartbeat(req: WorkerHeartbeatRequest) -> dict:
-    control_plane.worker_heartbeat(req.name, work_pool_id=req.work_pool_id)
-    page = control_plane.list_workers(limit=500)
-    for item in page.items:
-        if item["name"] == req.name:
-            return item
-    rows = control_plane._query_rows(
-        "SELECT name, last_heartbeat, status, updated_at, work_pool_id FROM workers WHERE name = ? LIMIT 1",
-        [req.name],
-    )
-    if not rows:
-        raise HTTPException(status_code=500, detail="worker heartbeat failed")
-    return control_plane._worker_row_to_dict(rows[0])
 
 
 @app.post("/api/deployments/{deployment_id}/run")

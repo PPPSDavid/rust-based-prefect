@@ -32,7 +32,8 @@ IronFlow configuration uses `IRONFLOW_*` environment variables. Defaults assume 
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `IRONFLOW_API_URL` | `http://127.0.0.1:8000` | Base URL for `ironflow deploy`, `ironflow serve`, and related CLI commands. |
+| `IRONFLOW_API_URL` | `http://127.0.0.1:8000` | Base URL for `ironflow deploy`, `ironflow serve`, HTTP workers, and related CLI commands. |
+| `IRONFLOW_WORKER_MODE` | `file` | Worker claim transport: `file` (shared DB / history path) or `http` (API claim only; no local store). Use `http` in multi-host / compose layouts. |
 
 ## Security (self-hosted)
 
