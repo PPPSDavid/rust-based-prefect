@@ -1,4 +1,5 @@
 from .decorators import flow, set_control_plane, task, wait
+from .errors import FlowChildrenFailed
 from .gates import GateFuture, gate
 from .hooks import TransitionContext, TransitionHookSpec, on_transition
 from .concurrency import (
@@ -28,6 +29,7 @@ __all__ = [
     "set_control_plane",
     "InMemoryControlPlane",
     "RunState",
+    "FlowChildrenFailed",
     "TransitionContext",
     "TransitionHookSpec",
     "on_transition",

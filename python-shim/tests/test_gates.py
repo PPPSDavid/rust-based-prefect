@@ -249,7 +249,9 @@ def test_gate_open_at_persisted_in_sqlite(tmp_path: Path) -> None:
     with pytest.raises(GateWaitTooLongError):
         blocked_flow()
 
-    @flow
+    # Persistence-only assertion: use explicit finalization so wait_all does not
+    # block until the future gate opens (default wait_all would hang ~30m / timeout).
+    @flow(final_state="explicit")
     def ok_flow() -> None:
         gate(max_wait=timedelta(hours=3)).submit(
             until=datetime.now(UTC) + timedelta(minutes=30)

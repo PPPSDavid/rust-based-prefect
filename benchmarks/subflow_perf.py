@@ -428,7 +428,7 @@ def run_subflow_profile(
             @flow
             def burst_parent(n: int) -> None:
                 for i in range(n):
-                    deployment_ref(CHILD_DEPLOY_NAME).submit(n=i)
+                    deployment_ref(CHILD_DEPLOY_NAME).submit(n=i, detach=True)
 
             registry["burst_parent"] = burst_parent
             if timed:
@@ -477,7 +477,7 @@ def run_subflow_profile(
                 from prefect_compat.decorators import _ACTIVE_FLOW_RUN
 
                 for _ in range(child_count):
-                    deployment_ref(SLOW_DEPLOY_NAME).submit()
+                    deployment_ref(SLOW_DEPLOY_NAME).submit(detach=True)
                 sleep_cancelable(0.15, poll_seconds=0.05)
                 active = _ACTIVE_FLOW_RUN.get()
                 assert active is not None
