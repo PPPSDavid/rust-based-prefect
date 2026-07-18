@@ -39,6 +39,42 @@ def _start_worker(
     return stop, thread
 
 
+def _cancel_parent_when_ready(
+    plane: InMemoryControlPlane,
+    parent_id_holder: list[UUID | None],
+    *,
+    dep_run_id_holder: list[str] | None = None,
+    require_task_id_holder: list[str] | None = None,
+    require_active_deployment: bool = False,
+    timeout_seconds: float = 5.0,
+) -> None:
+    """Cancel once the parent (and optional child markers) exist; retry FSM races."""
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        parent_id = parent_id_holder[0] if parent_id_holder else None
+        if parent_id is None:
+            time.sleep(0.01)
+            continue
+        if require_task_id_holder is not None and not require_task_id_holder:
+            time.sleep(0.01)
+            continue
+        if dep_run_id_holder is not None and not dep_run_id_holder:
+            time.sleep(0.01)
+            continue
+        if require_active_deployment and dep_run_id_holder:
+            dr = plane.get_deployment_run(UUID(dep_run_id_holder[0]))
+            status = str(dr.get("status")) if dr else ""
+            if status not in {"SCHEDULED", "CLAIMED", "RUNNING"}:
+                time.sleep(0.01)
+                continue
+        try:
+            plane.cancel_flow_run(parent_id)
+            return
+        except ValueError:
+            # Parent may still be mid PENDING→RUNNING under the Rust FSM.
+            time.sleep(0.01)
+
+
 def test_cancel_parent_cancels_scheduled_deployment_subflow(tmp_path: Path) -> None:
     plane = _plane(tmp_path)
     set_control_plane(plane)
@@ -117,12 +153,15 @@ def test_cancel_parent_cancels_running_deployment_subflow(tmp_path: Path) -> Non
     )
     stop, worker = _start_worker(plane, registry)
 
-    def cancel_parent() -> None:
-        time.sleep(0.2)
-        if parent_run_id and parent_run_id[0] is not None:
-            plane.cancel_flow_run(parent_run_id[0])
-
-    threading.Thread(target=cancel_parent, daemon=True).start()
+    threading.Thread(
+        target=_cancel_parent_when_ready,
+        args=(plane, parent_run_id),
+        kwargs={
+            "dep_run_id_holder": dep_run_id,
+            "require_active_deployment": True,
+        },
+        daemon=True,
+    ).start()
     try:
         with pytest.raises((RuntimeError, FlowRunCancelled), match="cancelled"):
             parent_flow()
@@ -208,18 +247,17 @@ def test_cancel_mirrors_surrogate_subflow_task(tmp_path: Path) -> None:
     )
     stop, worker = _start_worker(plane, registry)
 
-    def cancel_parent() -> None:
-        # Wait until the surrogate subflow task exists, then cancel the parent.
-        deadline = time.monotonic() + 2.0
-        while time.monotonic() < deadline:
-            if parent_id and parent_id[0] is not None and task_id:
-                plane.cancel_flow_run(parent_id[0])
-                return
-            time.sleep(0.01)
-
-    threading.Thread(target=cancel_parent, daemon=True).start()
+    threading.Thread(
+        target=_cancel_parent_when_ready,
+        args=(plane, parent_id),
+        kwargs={
+            "require_task_id_holder": task_id,
+            "require_active_deployment": False,
+        },
+        daemon=True,
+    ).start()
     try:
-        with pytest.raises(RuntimeError):
+        with pytest.raises((RuntimeError, FlowRunCancelled), match="cancelled"):
             parent_flow()
 
         # Mirror onto the surrogate task can lag slightly; wait while the
