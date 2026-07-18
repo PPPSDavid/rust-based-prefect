@@ -12,7 +12,7 @@ Last updated: 2026-07-16.
 ## Core Architecture
 
 - `rust-engine/`: deterministic state-machine kernel and append-only event model.
-- `python-shim/`: Prefect-style ergonomics (`@flow`, `@task`, `submit`, `map`, `wait_for`, **`deployment_ref` / subflows**) with compatibility runtime + optional FastAPI server. **`ThreadPoolTaskRunner`**: concurrent `submit` + `map`; process-pool `submit` still sync.
+- `python-shim/`: Prefect-style ergonomics (`@flow`, `@task`, `submit`, `map`, `wait_for`, **`deployment_ref` / subflows**) with compatibility runtime + optional FastAPI server. **`ThreadPoolTaskRunner` / `ProcessPoolTaskRunner`**: concurrent `submit` + `map` with deferred wait_for / tag acquire on workers; sequential `submit` stays sync.
 - `static-planner/`: static graph IR + forecast for supported flow subset (`@flow` body, `submit`/`map`, repeated tasks, `@task(name=...)`, UI DAG logical/expanded).
 - `benchmarks/`: `perf_matrix.py` (control-plane matrix) and `compare_prefect_vs_ironflow.py` (A/B vs Prefect).
 

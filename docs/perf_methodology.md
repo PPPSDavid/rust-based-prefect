@@ -53,7 +53,7 @@ The recipe catalog spans:
 - cold start vs warm run (`cold_start`)
 - optional **decorator transition-hook microbench** (`decorator_hook_profile` on select recipes): `flow_count` is timed shim iterations; `tasks_per_flow` is warmup iterations before the timer; profiles `none` / `flow` / `task` / `both` compare baseline vs no-op hooks.
 - optional **decorator map microbench** (`decorator_map_width` on `micro_map_*`): `@flow` + `ThreadPoolTaskRunner` + `task.map()`.
-- optional **decorator concurrent-submit microbench** (`decorator_submit_width` on `micro_submit_*`): N independent `task.submit()` calls on the shared per-flow thread pool; create / PENDING→RUNNING stay on the coordinating thread (Rust batch); COMPLETED is lock-serialized Rust `record_task_event` from workers. Counts include `rust_fsm_active`.
+- optional **decorator concurrent-submit microbench** (`decorator_submit_width` on `micro_submit_*`): N independent `task.submit()` calls; create + PENDING on the coordinating thread; wait_for / tag acquire / RUNNING and COMPLETED on workers via Rust `record_task_event`. Counts include `rust_fsm_active`.
 - optional **subflow microbench** (`subflow_profile` on `subflow_*` recipes): `flow_count` maps to depth/burst/child-count per profile; `tasks_per_flow` maps to fan-out or query iterations; `task_events_per_task` is timed sample iterations. Profiles: `inline_depth`, `deploy_wait_chain`, `deploy_cross_pool`, `fire_forget_burst`, `cancel_propagation`, `query_dag_nested`. Deployment profiles use multiple in-process workers per sample (same as production); Rust `bind_db` path is exercised when `IRONFLOW_USE_RUST_FSM=1` (default).
 
 Use defaults for consistency (`--preset lite`, `--preset pr`, `--preset hook_micro`, `--preset flow_map`, `--preset flow_submit`, `--preset concurrency`, `--preset gcl`, `--preset subflow_lite`, `--preset subflow`, or `--preset full`) or override with:
@@ -185,8 +185,8 @@ Agents and contributors must preserve this contract when touching `runtime.py` o
 ### Task runners vs control plane
 
 - `ThreadPoolTaskRunner` parallelizes **user task bodies** for both **`submit()`** and **`map()`** (shared per-flow thread pool for submit; map uses its own pool as today).
-- `ProcessPoolTaskRunner` parallelizes **`map()`** only; `submit()` still runs synchronously on the coordinating thread (see **[How to choose a task runner](how-to/choose-task-runners.md)**).
-- Control-plane create / PENDING→RUNNING registration stays on the coordinating thread (or under the control-plane lock); bodies may run in the pool, and COMPLETED/FAILED is recorded after the body finishes (lock-serialized).
+- `ProcessPoolTaskRunner` parallelizes **`submit()`** and **`map()`** for picklable bodies (orchestrator threads + process pool).
+- Control-plane create + PENDING registration stays on the coordinating thread; wait_for / tag acquire / RUNNING and COMPLETED/FAILED happen on workers (lock-serialized Rust `record_task_event`).
 - Do not expect task-runner threads to speed up **transition-heavy** benchmarks unless the workload is dominated by user Python in `submit` / `map` bodies.
 
 ### Batch APIs

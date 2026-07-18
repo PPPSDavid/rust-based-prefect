@@ -77,9 +77,10 @@ class ThreadPoolTaskRunner:
 
 @dataclass
 class ProcessPoolTaskRunner:
-    """Process-pool ``map`` (handled in ``TaskWrapper`` — task callable must be picklable).
+    """Process-pool ``submit`` / ``map`` (task callable must be picklable).
 
-    Independent ``submit()`` calls stay synchronous on the coordinating thread.
+    Independent ``submit()`` calls return futures immediately; wait_for / tag acquire /
+    FSM run on an orchestrator thread pool, and picklable bodies run in child processes.
     """
 
     max_workers: int | None = None

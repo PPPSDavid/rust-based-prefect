@@ -472,15 +472,22 @@ def run_subflow_profile(
                 except FlowRunCancelled:
                     raise
 
-            @flow
+            parent_id_holder: list[UUID] = []
+            errors: list[BaseException] = []
+
+            # explicit: return without wait_all blocking the harness thread; children
+            # use detach=True so fire-and-forget matches cancel-propagation intent.
+            @flow(final_state="explicit")
             def parent_launcher() -> UUID:
                 from prefect_compat.decorators import _ACTIVE_FLOW_RUN
 
-                for _ in range(child_count):
-                    deployment_ref(SLOW_DEPLOY_NAME).submit(detach=True)
-                sleep_cancelable(0.15, poll_seconds=0.05)
                 active = _ACTIVE_FLOW_RUN.get()
                 assert active is not None
+                for _ in range(child_count):
+                    deployment_ref(SLOW_DEPLOY_NAME).submit(detach=True)
+                # Publish only after children exist so cancel has targets.
+                parent_id_holder.append(active)
+                sleep_cancelable(0.15, poll_seconds=0.05)
                 return active
 
             registry["slow_child"] = slow_child
@@ -493,22 +500,22 @@ def run_subflow_profile(
                     paused=False,
                 )
 
-            parent_id_holder: list[UUID] = []
-            errors: list[BaseException] = []
-
             def _run_parent() -> None:
                 try:
-                    parent_id_holder.append(parent_launcher())
+                    parent_launcher()
                 except BaseException as exc:
                     errors.append(exc)
 
             thread = threading.Thread(target=_run_parent, daemon=True)
             thread.start()
-            thread.join(timeout=8.0)
+            # Wait for the body to publish the id (not for full flow finalization).
+            deadline = time.monotonic() + 8.0
+            while time.monotonic() < deadline and not parent_id_holder and not errors:
+                time.sleep(0.01)
             if errors:
                 raise errors[0]
             if not parent_id_holder:
-                raise RuntimeError("parent_launcher did not return a flow run id")
+                raise RuntimeError("parent_launcher did not publish a flow run id")
             parent_id = parent_id_holder[0]
             _timed(
                 latencies,
@@ -516,10 +523,17 @@ def run_subflow_profile(
                 plane.cancel_flow_run,
                 parent_id,
             )
-            dep_rows = plane._query_rows(
-                "SELECT status FROM deployment_runs WHERE parent_flow_run_id = ?",
-                [str(parent_id)],
-            )
+            # Propagation to deployment_runs can lag the parent CANCELLED write.
+            dep_deadline = time.monotonic() + 5.0
+            dep_rows: list[Any] = []
+            while time.monotonic() < dep_deadline:
+                dep_rows = plane._query_rows(
+                    "SELECT status FROM deployment_runs WHERE parent_flow_run_id = ?",
+                    [str(parent_id)],
+                )
+                if dep_rows and all(str(r["status"]) == "CANCELLED" for r in dep_rows):
+                    break
+                time.sleep(0.05)
             if dep_rows and not all(str(r["status"]) == "CANCELLED" for r in dep_rows):
                 raise RuntimeError("expected deployment children cancelled")
 

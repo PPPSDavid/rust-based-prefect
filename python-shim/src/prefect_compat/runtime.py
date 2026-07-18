@@ -1292,6 +1292,9 @@ class InMemoryControlPlane:
                 elif event_type == "task_failed":
                     task.state = RunState.FAILED
                     task.version += 1
+                elif event_type == "task_cancelled":
+                    task.state = RunState.CANCELLED
+                    task.version += 1
                 from_state = None
 
             ev: dict[str, Any] = {
@@ -3169,6 +3172,11 @@ class InMemoryControlPlane:
         flow_run_id: UUID | None = None,
         error: str | None = None,
     ) -> None:
+        # Parent cancel must win over a late worker COMPLETED/FAILED write.
+        current = self.get_deployment_run(deployment_run_id)
+        if current is not None and str(current.get("status")) == "CANCELLED":
+            return
+
         rust = self._rust_deployment_dispatch(
             "deployment_mark_run_finished",
             {
@@ -3186,7 +3194,7 @@ class InMemoryControlPlane:
                 """
                 UPDATE deployment_runs
                 SET status = ?, flow_run_id = ?, error = ?, finished_at = ?, updated_at = ?, lease_until = NULL
-                WHERE id = ?
+                WHERE id = ? AND status != 'CANCELLED'
                 """,
                 [
                     status,

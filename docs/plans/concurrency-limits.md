@@ -138,7 +138,7 @@ Notes:
 
 **When this plan was written**, MVP `submit()` batched `PENDING`+`RUNNING` then ran the body **synchronously**, and `map()` + `ThreadPoolTaskRunner` marked mapped tasks `RUNNING` in `_prepare_map_task_runs` before workers executed bodies.
 
-**Current behavior (post concurrent-submit):** under `ThreadPoolTaskRunner`, independent `submit()` calls return futures immediately and run bodies in a shared pool; tag slots are acquired on the coordinating thread via `_start_task_run` (PENDING → acquire → RUNNING for tagged tasks). See `COMPATIBILITY.md` and **[Tasks](../concepts/tasks.md)**. Untagged submit may still batch PENDING+RUNNING; process-pool `submit` remains synchronous.
+**Current behavior (post deferred-submit):** under `ThreadPoolTaskRunner` / `ProcessPoolTaskRunner`, independent `submit()` calls create a PENDING task run and return futures immediately; workers then `wait_for` → acquire tag slots → RUNNING → body. Sequential submit stays sync (untagged may still batch PENDING+RUNNING). See `COMPATIBILITY.md` and **[Tasks](../concepts/tasks.md)**.
 
 Implications (original analysis):
 
