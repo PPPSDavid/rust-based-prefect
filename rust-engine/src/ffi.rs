@@ -234,6 +234,10 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
             let child_flow_run_id = opt_str_from_field(body, "child_flow_run_id");
             let child_deployment_run_id = opt_str_from_field(body, "child_deployment_run_id");
             let gate_open_at = opt_str_from_field(body, "gate_open_at");
+            let contribute_to_flow_state = body
+                .get("contribute_to_flow_state")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true);
             ctx.engine.register_task_run(task.clone());
             if let Some(conn) = ctx.db_conn.as_ref() {
                 ui_write::persist_task_create_with_conn(
@@ -244,6 +248,7 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                     child_flow_run_id.as_deref(),
                     child_deployment_run_id.as_deref(),
                     gate_open_at.as_deref(),
+                    contribute_to_flow_state,
                 )
                 .map_err(|e| format!("persist task create failed: {e}"))?;
             } else {
@@ -255,6 +260,7 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                     child_flow_run_id.as_deref(),
                     child_deployment_run_id.as_deref(),
                     gate_open_at.as_deref(),
+                    contribute_to_flow_state,
                 )
                 .map_err(|e| format!("persist task create failed: {e}"))?;
             }
@@ -999,6 +1005,20 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
             let now = body.get("now").and_then(|v| v.as_str());
             let n = concurrency_ops::reclaim_expired(conn, now)?;
             Ok(json!({"ok": true, "reclaimed": n}))
+        }
+        "resolve_flow_terminal_state" => {
+            let conn = ctx
+                .db_conn
+                .as_ref()
+                .ok_or_else(|| "resolve_flow_terminal_state requires bind_db".to_string())?;
+            crate::flow_terminal_ops::resolve_flow_terminal_state(conn, body)
+        }
+        "list_contributing_children" => {
+            let conn = ctx
+                .db_conn
+                .as_ref()
+                .ok_or_else(|| "list_contributing_children requires bind_db".to_string())?;
+            crate::flow_terminal_ops::list_contributing_children(conn, body)
         }
         _ => Err(format!("unknown control op: {op}")),
     }

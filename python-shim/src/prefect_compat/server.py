@@ -18,6 +18,7 @@ from .auth_middleware import BasicAuthMiddleware
 from .decorators import flow, set_control_plane, task, wait
 from .gates import gate
 from .runtime import InMemoryControlPlane
+from .routes.workers import router as workers_router
 from .worker import run_local_deployment_once, run_worker_loop
 from .task_runners import ThreadPoolTaskRunner
 
@@ -73,11 +74,6 @@ class WorkPoolPatchRequest(BaseModel):
     paused: bool | None = None
 
 
-class WorkerHeartbeatRequest(BaseModel):
-    name: str
-    work_pool_id: str | None = None
-
-
 class ConcurrencyLimitCreateRequest(BaseModel):
     name: str
     limit: int = Field(ge=0)
@@ -111,6 +107,7 @@ LOCAL_WORKER_NAME = os.getenv("IRONFLOW_LOCAL_WORKER_NAME", "local-worker-1")
 LOCAL_WORK_POOL = os.getenv("IRONFLOW_WORK_POOL", "default-process-pool")
 
 app = FastAPI(title="IronFlow Compat Server")
+app.include_router(workers_router)
 app.add_middleware(BasicAuthMiddleware)
 app.add_middleware(
     CORSMiddleware,
@@ -224,6 +221,42 @@ def failing_flow(n: int) -> int:
     return final.result()
 
 
+@flow(task_runner=ThreadPoolTaskRunner())
+def wait_all_ok_flow(n: int) -> int:
+    """All concurrent submits succeed; wait_all resolves COMPLETED."""
+    a = inc.submit(n)
+    b = dbl.submit(n)
+    wait([a, b])
+    return a.result() + b.result()
+
+
+@flow(task_runner=ThreadPoolTaskRunner())
+def wait_all_orphan_fail_flow(n: int) -> str:
+    """Unobserved failed submit; wait_all must mark the flow FAILED."""
+    explode.submit(n)
+    return "unreachable"
+
+
+@flow
+def wait_all_inline_subflow(n: int) -> int:
+    """Inline subflow success under wait_all aggregation."""
+    return simple_flow(n)
+
+
+@flow(task_runner=ThreadPoolTaskRunner())
+def detach_orphan_fail_flow(n: int) -> int:
+    """Detached failed submit must not fail the parent under wait_all."""
+    explode.submit(n, detach=True)
+    return dbl.submit(n).result()
+
+
+@flow(final_state="explicit", task_runner=ThreadPoolTaskRunner())
+def explicit_orphan_fail_flow(n: int) -> int:
+    """Body-driven completion: unobserved boom stays FAILED while flow COMPLETED."""
+    explode.submit(n)
+    return dbl.submit(n).result()
+
+
 FLOW_REGISTRY = {
     "simple_flow": simple_flow,
     "wide_flow": wide_flow,
@@ -233,6 +266,11 @@ FLOW_REGISTRY = {
     "failing_flow": failing_flow,
     "cancelable_flow": cancelable_flow,
     "gated_flow": gated_flow,
+    "wait_all_ok_flow": wait_all_ok_flow,
+    "wait_all_orphan_fail_flow": wait_all_orphan_fail_flow,
+    "wait_all_inline_subflow": wait_all_inline_subflow,
+    "detach_orphan_fail_flow": detach_orphan_fail_flow,
+    "explicit_orphan_fail_flow": explicit_orphan_fail_flow,
 }
 
 
@@ -292,6 +330,11 @@ def benchmark_run(req: BenchmarkRequest) -> dict[str, float | int | str | bool |
         "long_chain": long_chain_flow,
         "failing": failing_flow,
         "gated": gated_flow,
+        "wait_all_ok": wait_all_ok_flow,
+        "wait_all_orphan_fail": wait_all_orphan_fail_flow,
+        "wait_all_inline_subflow": wait_all_inline_subflow,
+        "detach_orphan_fail": detach_orphan_fail_flow,
+        "explicit_orphan_fail": explicit_orphan_fail_flow,
         # Backwards-compatible aliases for existing scripts.
         "mapped": wide_flow,
         "chained": long_chain_flow,
@@ -300,7 +343,11 @@ def benchmark_run(req: BenchmarkRequest) -> dict[str, float | int | str | bool |
     if flow_fn is None:
         raise HTTPException(
             status_code=400,
-            detail="Unsupported flavor. Use one of: simple, wide, long_chain, failing, gated",
+            detail=(
+                "Unsupported flavor. Use one of: simple, wide, long_chain, failing, "
+                "gated, wait_all_ok, wait_all_orphan_fail, wait_all_inline_subflow, "
+                "detach_orphan_fail, explicit_orphan_fail"
+            ),
         )
     start = time.perf_counter()
     error: str | None = None
@@ -619,22 +666,6 @@ def list_workers(
         work_pool_id=work_pool_id, limit=limit, cursor=cursor
     )
     return CursorPage(items=page.items, next_cursor=page.next_cursor)
-
-
-@app.post("/api/workers/heartbeat")
-def worker_heartbeat(req: WorkerHeartbeatRequest) -> dict:
-    control_plane.worker_heartbeat(req.name, work_pool_id=req.work_pool_id)
-    page = control_plane.list_workers(limit=500)
-    for item in page.items:
-        if item["name"] == req.name:
-            return item
-    rows = control_plane._query_rows(
-        "SELECT name, last_heartbeat, status, updated_at, work_pool_id FROM workers WHERE name = ? LIMIT 1",
-        [req.name],
-    )
-    if not rows:
-        raise HTTPException(status_code=500, detail="worker heartbeat failed")
-    return control_plane._worker_row_to_dict(rows[0])
 
 
 @app.post("/api/deployments/{deployment_id}/run")

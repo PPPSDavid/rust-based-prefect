@@ -79,6 +79,7 @@ class DeploymentSubflowHandle:
         self,
         *,
         wait_for: Sequence[TaskFuture[Any] | SubflowFuture[Any]] | None = None,
+        detach: bool = False,
         **parameters: Any,
     ) -> SubflowFuture[Any]:
         if wait_for:
@@ -99,6 +100,7 @@ class DeploymentSubflowHandle:
             task_name,
             planned_node_id=planned_node_id,
             kind="subflow",
+            contribute_to_flow_state=not detach,
         )
         plane.record_task_event(
             task_run.task_run_id, "task_pending", {"subflow": self.name}

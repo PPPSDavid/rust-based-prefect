@@ -49,6 +49,7 @@ pub fn persist_task_create(
     child_flow_run_id: Option<&str>,
     child_deployment_run_id: Option<&str>,
     gate_open_at: Option<&str>,
+    contribute_to_flow_state: bool,
 ) -> Result<(), String> {
     let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
     persist_task_create_with_conn(
@@ -59,7 +60,27 @@ pub fn persist_task_create(
         child_flow_run_id,
         child_deployment_run_id,
         gate_open_at,
+        contribute_to_flow_state,
     )
+}
+
+fn ensure_contribute_column(conn: &Connection) -> Result<(), String> {
+    let mut stmt = conn
+        .prepare("PRAGMA table_info(task_runs)")
+        .map_err(|e| e.to_string())?;
+    let cols: Vec<String> = stmt
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
+    if !cols.iter().any(|c| c == "contribute_to_flow_state") {
+        conn.execute(
+            "ALTER TABLE task_runs ADD COLUMN contribute_to_flow_state INTEGER NOT NULL DEFAULT 1",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 pub fn persist_task_create_with_conn(
@@ -70,11 +91,14 @@ pub fn persist_task_create_with_conn(
     child_flow_run_id: Option<&str>,
     child_deployment_run_id: Option<&str>,
     gate_open_at: Option<&str>,
+    contribute_to_flow_state: bool,
 ) -> Result<(), String> {
+    ensure_contribute_column(conn)?;
     let ts = now_iso();
     conn.execute(
         "INSERT OR IGNORE INTO task_runs(id,flow_run_id,task_name,planned_node_id,state,version,created_at,updated_at,\
-         kind,child_flow_run_id,child_deployment_run_id,gate_open_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+         kind,child_flow_run_id,child_deployment_run_id,gate_open_at,contribute_to_flow_state) \
+         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
         params![
             task.id.to_string(),
             task.flow_run_id.to_string(),
@@ -88,6 +112,7 @@ pub fn persist_task_create_with_conn(
             child_flow_run_id,
             child_deployment_run_id,
             gate_open_at,
+            if contribute_to_flow_state { 1_i64 } else { 0_i64 },
         ],
     )
     .map_err(|e| e.to_string())?;

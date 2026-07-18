@@ -148,7 +148,8 @@ def test_case_study_upstream_failure_cancels_deferred_dependent(tmp_path):
     def dependent() -> int:
         return 1
 
-    @flow(task_runner=ThreadPoolTaskRunner(max_workers=4))
+    # explicit: body observes child failure/cancel without wait_all aggregating them.
+    @flow(final_state="explicit", task_runner=ThreadPoolTaskRunner(max_workers=4))
     def f() -> None:
         a = boom.submit()
         b = dependent.submit(wait_for=[a])

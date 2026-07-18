@@ -130,7 +130,7 @@ def test_subflow_fire_and_forget(tmp_path: Path) -> None:
 
     @flow
     def parent_flow() -> str:
-        deployment_ref("child-deploy").submit(n=1)
+        deployment_ref("child-deploy").submit(n=1, detach=True)
         seen.append("parent_done")
         return "ok"
 

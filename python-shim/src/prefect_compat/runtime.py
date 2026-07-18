@@ -83,6 +83,7 @@ class TaskRunRecord:
     child_deployment_run_id: UUID | None = None
     gate_open_at: str | None = None
     tags: tuple[str, ...] = ()
+    contribute_to_flow_state: bool = True
 
 
 @dataclass
@@ -759,6 +760,7 @@ class InMemoryControlPlane:
         child_deployment_run_id: UUID | None = None,
         gate_open_at: str | None = None,
         tags: Sequence[str] | None = None,
+        contribute_to_flow_state: bool = True,
     ) -> TaskRunRecord:
         tag_tuple = tuple(str(t) for t in (tags or ()))
         task = TaskRunRecord(
@@ -773,6 +775,7 @@ class InMemoryControlPlane:
             child_deployment_run_id=child_deployment_run_id,
             gate_open_at=gate_open_at,
             tags=tag_tuple,
+            contribute_to_flow_state=contribute_to_flow_state,
         )
         with self._lock:
             self._tasks[task.task_run_id] = task
@@ -795,6 +798,7 @@ class InMemoryControlPlane:
                         if child_deployment_run_id
                         else None,
                         "gate_open_at": gate_open_at,
+                        "contribute_to_flow_state": task.contribute_to_flow_state,
                         "task": {
                             "id": str(task.task_run_id),
                             "flow_run_id": str(task.flow_run_id),
@@ -824,6 +828,7 @@ class InMemoryControlPlane:
                     "state": task.state.value,
                     "version": task.version,
                     "tags": list(task.tags),
+                    "contribute_to_flow_state": task.contribute_to_flow_state,
                 }
             )
             if (not self._rust_native_persistence) and self._rust_fsm_active():
@@ -2250,6 +2255,177 @@ class InMemoryControlPlane:
             time.sleep(min(poll_seconds, max(0.0, deadline - time.monotonic())))
         raise TimeoutError(f"timed out waiting for deployment run {deployment_run_id}")
 
+    _CHILD_TERMINAL = frozenset(
+        {RunState.COMPLETED, RunState.FAILED, RunState.CANCELLED}
+    )
+
+    def list_contributing_children(self, flow_run_id: UUID) -> list[dict[str, Any]]:
+        """Return contributing child task rows (Rust when bound; else SQLite)."""
+        if self._rust_fsm_active() and self._rust_db_bound:
+            out = self._rust_fsm_call(
+                "list_contributing_children",
+                {"flow_run_id": str(flow_run_id)},
+            )
+            if out.get("ok", True) and "items" in out:
+                return list(out.get("items") or [])
+            err = out.get("error", {})
+            if not self._is_unknown_op_error(err, "list_contributing_children"):
+                self._raise_from_rust_fsm_error(err)
+        return self._list_contributing_children_python(flow_run_id)
+
+    def resolve_flow_terminal_state(self, flow_run_id: UUID) -> dict[str, Any]:
+        """Aggregate contributing child states → flow terminal state (Rust hot path)."""
+        if self._rust_fsm_active() and self._rust_db_bound:
+            out = self._rust_fsm_call(
+                "resolve_flow_terminal_state",
+                {"flow_run_id": str(flow_run_id)},
+            )
+            if out.get("ok", True) and "state" in out:
+                return out
+            err = out.get("error", {})
+            if not self._is_unknown_op_error(err, "resolve_flow_terminal_state"):
+                self._raise_from_rust_fsm_error(err)
+        return self._resolve_flow_terminal_state_python(flow_run_id)
+
+    def wait_contributing_children(
+        self,
+        flow_run_id: UUID,
+        *,
+        timeout_seconds: float = 3600.0,
+        poll_seconds: float = 0.05,
+    ) -> None:
+        """Block until all contributing children are terminal (waits deployment subflows)."""
+        deadline = time.monotonic() + max(0.0, timeout_seconds)
+        while time.monotonic() < deadline:
+            items = self.list_contributing_children(flow_run_id)
+            open_items = [
+                item
+                for item in items
+                if str(item.get("state", "")) not in {
+                    s.value for s in self._CHILD_TERMINAL
+                }
+            ]
+            if not open_items:
+                return
+            waited = False
+            for item in open_items:
+                dep = item.get("child_deployment_run_id")
+                if dep:
+                    remaining = max(0.0, deadline - time.monotonic())
+                    self.wait_for_deployment_run_terminal(
+                        UUID(str(dep)),
+                        parent_task_run_id=UUID(str(item["id"])),
+                        timeout_seconds=remaining,
+                        poll_seconds=poll_seconds,
+                    )
+                    waited = True
+            if not waited:
+                # Promote due temporal gates so wait_all does not hang forever on
+                # after=0 (or past-until) gates that never got GateFuture.result().
+                try:
+                    self.tick_gate_tasks()
+                except Exception:
+                    pass
+                time.sleep(min(poll_seconds, max(0.0, deadline - time.monotonic())))
+        raise TimeoutError(
+            f"timed out waiting for contributing children of flow run {flow_run_id}"
+        )
+
+    def _list_contributing_children_python(
+        self, flow_run_id: UUID
+    ) -> list[dict[str, Any]]:
+        rows = self._query_rows(
+            """
+            SELECT id, task_name, state, COALESCE(kind, 'task') AS kind,
+                   child_deployment_run_id,
+                   COALESCE(contribute_to_flow_state, 1) AS contribute_to_flow_state
+            FROM task_runs
+            WHERE flow_run_id = ?
+              AND COALESCE(contribute_to_flow_state, 1) != 0
+            ORDER BY seq ASC
+            """,
+            [str(flow_run_id)],
+        )
+        return [
+            {
+                "id": row["id"],
+                "task_name": row["task_name"],
+                "state": row["state"],
+                "kind": row["kind"],
+                "child_deployment_run_id": row["child_deployment_run_id"],
+            }
+            for row in rows
+        ]
+
+    def _resolve_flow_terminal_state_python(
+        self, flow_run_id: UUID
+    ) -> dict[str, Any]:
+        items = self._list_contributing_children_python(flow_run_id)
+        counts = {
+            "total": len(items),
+            "COMPLETED": 0,
+            "FAILED": 0,
+            "CANCELLED": 0,
+            "non_terminal": 0,
+            "other": 0,
+        }
+        sample_failures: list[dict[str, Any]] = []
+        sample_cancelled: list[dict[str, Any]] = []
+        sample_incomplete: list[dict[str, Any]] = []
+        for item in items:
+            st = str(item.get("state", ""))
+            sample = {
+                "id": item.get("id"),
+                "task_name": item.get("task_name"),
+                "state": st,
+                "kind": item.get("kind"),
+                "child_deployment_run_id": item.get("child_deployment_run_id"),
+            }
+            if st == "COMPLETED":
+                counts["COMPLETED"] += 1
+            elif st == "FAILED":
+                counts["FAILED"] += 1
+                if len(sample_failures) < 8:
+                    sample_failures.append(sample)
+            elif st == "CANCELLED":
+                counts["CANCELLED"] += 1
+                if len(sample_cancelled) < 8:
+                    sample_cancelled.append(sample)
+            elif st in {"SCHEDULED", "PENDING", "RUNNING", "PAUSED", "CANCELLING"}:
+                counts["non_terminal"] += 1
+                if len(sample_incomplete) < 8:
+                    sample_incomplete.append(sample)
+            else:
+                counts["other"] += 1
+                counts["FAILED"] += 1
+                if len(sample_failures) < 8:
+                    sample_failures.append(sample)
+        if not items:
+            kind = "empty"
+            state = "COMPLETED"
+        elif counts["CANCELLED"] > 0:
+            kind = "child_cancelled"
+            state = "CANCELLED"
+        elif counts["FAILED"] > 0:
+            kind = "child_failed"
+            state = "FAILED"
+        elif counts["non_terminal"] > 0:
+            kind = "incomplete_children"
+            state = "FAILED"
+        else:
+            kind = "all_completed"
+            state = "COMPLETED"
+        return {
+            "ok": True,
+            "state": state,
+            "kind": kind,
+            "counts": counts,
+            "sample_failures": sample_failures,
+            "sample_cancelled": sample_cancelled,
+            "sample_incomplete": sample_incomplete,
+            "_via": "python",
+        }
+
     def pause_flow_for_gate(self, flow_run_id: UUID, gate_task_run_id: UUID) -> None:
         flow = self.get_flow(flow_run_id)
         if flow.state == RunState.RUNNING:
@@ -3343,8 +3519,8 @@ class InMemoryControlPlane:
         now = self._now()
         self._sqlite_conn.execute(
             "INSERT OR IGNORE INTO task_runs(id,flow_run_id,task_name,planned_node_id,state,version,created_at,updated_at,"
-            "kind,child_flow_run_id,child_deployment_run_id,gate_open_at,tags) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "kind,child_flow_run_id,child_deployment_run_id,gate_open_at,tags,contribute_to_flow_state) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             [
                 str(task.task_run_id),
                 str(task.flow_run_id),
@@ -3361,6 +3537,7 @@ class InMemoryControlPlane:
                 else None,
                 task.gate_open_at,
                 json.dumps(list(task.tags)) if task.tags else None,
+                1 if task.contribute_to_flow_state else 0,
             ],
         )
 
