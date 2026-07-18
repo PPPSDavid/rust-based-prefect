@@ -15,3 +15,11 @@ def inc(x: int) -> int:
 def sleep_ms(ms: int) -> int:
     time.sleep(ms / 1000.0)
     return ms
+
+
+def const_one() -> int:
+    return 1
+
+
+def raise_value_error(msg: str = "submit boom") -> None:
+    raise ValueError(msg)
