@@ -5,6 +5,10 @@ the short handoff; link the active plan from the task brief.
 
 | Plan | Status |
 | --- | --- |
+| [prefect-gap-canvas.md](prefect-gap-canvas.md) | **Active backlog** — Prefect vs IronFlow gap canvas + sorted session queue (2026-07) |
+| [flow-run-lifecycle-control.md](flow-run-lifecycle-control.md) | Design — cancel terminate + pause drain/terminate + resume (P3.2 expanded) |
+| [ui-ops-experience.md](ui-ops-experience.md) | **Priority** — UI aesthetics + ops-scale UX; iterative render→confirm passes (**PU**) |
+| [transition-hooks-priority.md](transition-hooks-priority.md) | **Priority** — X→Y→Z hooks on `@flow`/`@task` (core shipped; docs/ergonomics/worker gaps) (**PH**) |
 | [subflows.md](subflows.md) | Implemented (Phases 0–5) |
 | [flow-run-final-state.md](flow-run-final-state.md) | Implemented — default wait_all aggregation + detach/explicit escape |
 | [self-hosted-docker-auth.md](self-hosted-docker-auth.md) | Tier A+C + Tier B core shipped (#57); deferred HA/Redis/UI/GHCR/migrator CLI |

@@ -2,7 +2,9 @@
 
 Side-by-side comparison notes for IronFlow UI vs Prefect OSS 3.x.
 
-**Last audited:** 2026-07-25 against `frontend/src/App.tsx` routes and page implementations.
+**Last audited:** 2026-07-25 against `frontend/src/App.tsx` routes and page implementations (P0.3).
+
+**Ops aesthetics / scale UX** (filters, density, visual direction, hundreds of runs) is tracked separately as priority **PU** — see [`docs/plans/ui-ops-experience.md`](plans/ui-ops-experience.md). This checklist is functional parity, not visual redesign.
 
 ## Navigation
 
