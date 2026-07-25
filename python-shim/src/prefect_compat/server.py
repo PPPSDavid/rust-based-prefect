@@ -17,6 +17,7 @@ from datetime import timedelta
 from .auth_middleware import BasicAuthMiddleware
 from .decorators import flow, set_control_plane, task, wait
 from .gates import gate
+from .lifecycle import parse_cancel_mode
 from .runtime import InMemoryControlPlane
 from .routes.workers import router as workers_router
 from .worker import run_local_deployment_once, run_worker_loop
@@ -90,6 +91,18 @@ class ConcurrencyLimitPatchRequest(BaseModel):
 class DeploymentRunTriggerRequest(BaseModel):
     parameters: dict | None = None
     idempotency_key: str | None = None
+
+
+class FlowRunPauseRequest(BaseModel):
+    """Operator pause — ``mode`` is required (``drain`` or ``terminate``)."""
+
+    mode: str
+
+
+class FlowRunCancelRequest(BaseModel):
+    """Cancel always terminates; optional body may only send ``mode=terminate``."""
+
+    mode: str | None = None
 
 
 history_path = os.getenv("IRONFLOW_HISTORY_PATH")
@@ -598,9 +611,36 @@ def get_deployment(deployment_id: UUID) -> dict:
 
 
 @app.post("/api/flow-runs/{flow_run_id}/cancel")
-def cancel_flow_run(flow_run_id: UUID) -> dict:
+def cancel_flow_run(
+    flow_run_id: UUID, req: FlowRunCancelRequest = FlowRunCancelRequest()
+) -> dict:
     try:
+        parse_cancel_mode(req.mode)
         return control_plane.cancel_flow_run(flow_run_id)
+    except ValueError as exc:
+        detail = str(exc)
+        status_code = 404 if "not found" in detail else 400
+        if "mode" in detail:
+            status_code = 422
+        raise HTTPException(status_code=status_code, detail=detail) from exc
+
+
+@app.post("/api/flow-runs/{flow_run_id}/pause")
+def pause_flow_run(flow_run_id: UUID, req: FlowRunPauseRequest) -> dict:
+    try:
+        return control_plane.pause_flow_run(flow_run_id, mode=req.mode)
+    except ValueError as exc:
+        detail = str(exc)
+        if "mode" in detail:
+            raise HTTPException(status_code=422, detail=detail) from exc
+        status_code = 404 if "not found" in detail else 400
+        raise HTTPException(status_code=status_code, detail=detail) from exc
+
+
+@app.post("/api/flow-runs/{flow_run_id}/resume")
+def resume_flow_run(flow_run_id: UUID) -> dict:
+    try:
+        return control_plane.resume_flow_run(flow_run_id)
     except ValueError as exc:
         detail = str(exc)
         status_code = 404 if "not found" in detail else 400

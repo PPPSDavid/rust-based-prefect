@@ -19,7 +19,9 @@ This project is **not** a drop-in replacement for Prefect Cloud or the full Pref
 | Retries, timeouts, cancellation | Enforced at the **control-plane** level for supported flows; semantics are workload-driven—see `COMPATIBILITY.md` for exact boundaries. |
 | Task resume / result cache on retry | **Gap:** cancel→retry currently re-runs completed tasks. Goal A (resume) tracked in PR [#50](https://github.com/PPPSDavid/rust-based-prefect/pull/50) (plan lands with that PR). |
 | Cooperative cancel in task bodies | **Gap:** `POST …/cancel` marks runs `CANCELLED`; long sleeps/CPU work do not stop unless the body polls cancel. No Prefect-style cooperative interrupt helper yet. |
-| `get_run_logger` / `log_prints` | **Gap:** Prefect authoring helpers are not exported. UI/API log tabs show control-plane-inserted rows only — stdlib `logging` / `print` are not captured. |
+| `get_run_logger` / `log_prints` | **Partial:** `get_run_logger()` shipped; rows appear in API/UI Logs. `log_prints=` still missing. |
+| Runtime context / `prefect.runtime` | **Partial:** `get_run_context()` / `RunContext` exported; not a full Prefect runtime module. |
+| Pause / cancel | **Partial:** cancel + operator pause `drain`/`terminate` API; process-kill terminate still open (see `docs/plans/flow-run-lifecycle-control.md`). |
 | Artifacts (`create_markdown`, tables, links) | **Partial:** internal `artifact_type=result` rows + GET APIs / UI Artifacts tab. No Prefect user-facing `create_*` artifact API. |
 | Variables | **Gap:** no Prefect-style variables JSON store / runtime get. Prefer parameters, env vars, or your own config. |
 | Automations / triggers / webhooks | **Gap (design-first):** events + SSE exist; no automation consumers that trigger deployments on state. |

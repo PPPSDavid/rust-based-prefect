@@ -18,14 +18,15 @@ Use this table when a Prefect import fails or behaves differently. Status values
 | `task.submit` / `wait_for` / `wait` | supported | Same patterns; default flow finalization is **`wait_all`** (see matrix) |
 | `task.map` | supported | Moderate fan-out; pick a runner via [how-to](choose-task-runners.md) |
 | `@task(retries=…)` / `retry_delay_seconds` / `timeout_seconds` | unsupported | Decorators do not accept Prefect retry/timeout kwargs; flow-run **cancel + deployment retry** exist via API/UI, which is a different mechanism |
-| `get_run_logger` / `log_prints=` | unsupported | No authoring helpers. The UI/API log list shows control-plane-inserted rows (transitions/events), not arbitrary `logging` / `print` output |
+| `get_run_logger` / `log_prints=` | partial | `from prefect_compat import get_run_logger` writes to the run log store + UI Logs tab. `log_prints=` not supported yet; use the logger instead of bare `print` |
 | `on_running` / `on_failure` / … hooks | deliberate | Map to `transition_hooks=` + `on_transition(...)` edges |
 | `run_deployment` / nested-flow helpers | partial | Use `deployment_ref(...).submit()` or inline `child_flow(...)` — [subflows](subflows.md) |
 | Blocks (`prefect.blocks.*`) | deliberate | Not in scope; use env vars / your own config |
 | `cache_policy` / task result cache | unsupported | Retry re-runs completed tasks today; resume/cache design tracked in PR [#50](https://github.com/PPPSDavid/rust-based-prefect/pull/50) |
 | Variables (`prefect.variables`) | unsupported | Pass parameters or read env / files |
 | Secrets / profiles / settings | unsupported | Env vars + optional [Basic auth](secure-self-hosted.md) |
-| `prefect.runtime` context module | unsupported | No stable `runtime` module; flow/task ids live on control-plane records |
+| `prefect.runtime` context module | partial | Use `get_run_context()` → `RunContext` (flow/task ids, names, parameters, deployment fields when claimed). Not a full `prefect.runtime` module clone |
+| Prefect pause / cancel | partial | Cancel = terminate intent. Operator pause requires explicit `mode=drain` or `mode=terminate` (`POST /api/flow-runs/{id}/pause`). Hard process kill of blind sleeps is not guaranteed on thread runners yet — see lifecycle plan |
 | Artifacts (`create_markdown`, …) | unsupported | Internal result artifacts + GET only; no Prefect `create_*` API |
 | Automations / webhooks | unsupported | Events + SSE exist; no trigger engine |
 | `concurrency` / `rate_limit` (sync) | partial | Sync helpers + GCL CRUD — [concurrency limits](concurrency-limits.md); async helpers not shipped |

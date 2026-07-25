@@ -53,30 +53,24 @@ Last updated: 2026-07-25.
 - Perf gate: `python3 benchmarks/perf_matrix.py run --preset lite --repetitions 1 --warmups 0 --jobs 2`
 - CRG setup/verify: `bash scripts/setup_code_review_graph.sh`
 
-## Run lifecycle: cancel / retry (current vs desired)
+## Run lifecycle: cancel / pause / retry
 
-**Current behavior (MVP — do not change without explicit task):**
+**Current behavior:**
 
-- **Cancel** (`POST /api/flow-runs/{id}/cancel`): sets flow run state to `CANCELLED` and marks in-flight task runs `CANCELLED` in the control plane / SQLite read model. Long-running task bodies are not cooperatively interrupted unless they poll cancellation themselves (no default hook yet).
-- **Retry** (`POST /api/flow-runs/{id}/retry`): for deployment-backed runs, calls `trigger_deployment_run` with the same deployment and parameters → **new deployment run → new flow run → full flow re-execution from scratch**. This is **not** Prefect task-resume parity.
+- **Cancel** (`POST /api/flow-runs/{id}/cancel`): `CANCELLED` + in-flight task rows cancelled; records `lifecycle_action=cancel`, `interrupt_mode=terminate`. Thread-pool bodies are **not** OS-killed yet (P3.2c process registry still open).
+- **Pause** (`POST …/pause` with required `mode=drain|terminate`): drain blocks new starts and settles `PAUSED`; terminate marks RUNNING tasks cancelled and holds `PAUSED`. Resume is operator-pause only (`POST …/resume`). Plan: `docs/plans/flow-run-lifecycle-control.md`.
+- **Retry** (`POST /api/flow-runs/{id}/retry`): deployment-backed → new run / full re-execution today (task resume Goal A still in flight on PR #50/#62).
 
-**Known gap (documented, future work):**
-
-- For multi-task flows where some tasks **completed** before cancel, **retry currently recomputes those completed tasks**. Desired Prefect-like semantics: on retry, **already-completed tasks should not be recomputed** (task-level resume / result cache keyed by flow run lineage or equivalent).
-- Implementing this requires architectural work: task result persistence across retry, idempotent resume graph, and UI/API surfacing of which tasks were skipped vs re-run. Track in compatibility matrix before claiming parity.
-
-**Useful test scenario (manual / E2E):**
-
-- Flow: fast task → `sleep` ~10s task → downstream task. Trigger → cancel while sleeping → retry → wait for completion. Today, expect all tasks to run again on retry; use this to validate when resume lands.
+**Known gap:** hard terminate via process workers; UI pause chooser; P1 resume of interrupted tasks on hard-pause resume.
 
 ## Next High-Value Work
 
-**P0 docs truth (nav / `llms.txt` / matrix / UI checklist / port guide)** is the current docs-hygiene bar; gap-canvas backlog proposal lives in PR [#60](https://github.com/PPPSDavid/rust-based-prefect/pull/60) (`docs/plans/prefect-gap-canvas.md` when merged).
+Gap canvas: `docs/plans/prefect-gap-canvas.md` (from PR #60 lineage).
 
-1. **P1 task resume on retry** — finish/land PR [#50](https://github.com/PPPSDavid/rust-based-prefect/pull/50) Goal A; then map-key / Rust / UI hardening (see section above).
-2. **P3 logging helpers** (`get_run_logger` / `log_prints`) + cooperative cancel polling.
-3. Postgres Rust schedule/gate (Tier B follow-up) + optional Alembic upgrade CLI / HA services.
-4. Keep CI + `perf_matrix` regression thresholds healthy (including `--preset gcl`).
-5. Optional: async `concurrency` / CLI `gcl` / UI admin for concurrency limits.
+1. **P1 task resume on retry** — land PR [#62](https://github.com/PPPSDavid/rust-based-prefect/pull/62) / [#50](https://github.com/PPPSDavid/rust-based-prefect/pull/50) Goal A.
+2. **P3.2c–e** — process worker terminate + UI/CLI pause chooser; `log_prints=` optional.
+3. **P4** concurrency ops (lease-on-cancel, CLI `gcl`, UI admin).
+4. Postgres Rust schedule/gate + HA follow-ups (P2).
+5. Keep CI + `perf_matrix` lite gate healthy.
 6. Move remaining projection write hot paths from Python into Rust-backed implementation.
 7. Optional: Cloud embeddings path if NL `semantic_search` becomes important; keep decision log current (`docs/agent/DECISION_LOG.md`).
