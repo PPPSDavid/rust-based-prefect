@@ -28,7 +28,7 @@ Collapse the earlier B0–B5 checklist into **four shippable PRs**. Prefer this 
 | **1 — B0** | `cursor/tier-b0-store-*` | Storage RFC + `persistence/` SQLite extract | Merged (#49) |
 | **2 — B1** | `cursor/tier-b1-postgres-*` | Postgres store + dialect adapter; Rust `bind_db` DSN + claim/lease; CI Postgres job | Merged (#52) |
 | **3 — B2** | `cursor/tier-b2-http-workers-*` | Claim / started / finished HTTP API; worker mode without file DB | Merged (#56) |
-| **4 — B3/B5** | `cursor/tier-b-compose-*` | Compose file(s), images, GHA compose smoke, GHCR docs | Merged (#57) |
+| **4 — B3/B5** | `cursor/tier-b-compose-*` | Compose file(s), images, GHA compose smoke, how-to docs | Merged (#57) |
 
 ## PR 2 detail (B1)
 
@@ -57,7 +57,7 @@ Collapse the earlier B0–B5 checklist into **four shippable PRs**. Prefer this 
 - Tests: `test_http_worker.py` (exclusivity, pool filter, lease reclaim, execute roundtrip)
 - Docs: `docs/how-to/worker-http-mode.md`, env-vars, COMPATIBILITY
 
-**Deferred (still open after B2)**
+**Still open (follow-ups)**
 
 - Removing `file` worker mode (semver major)
 

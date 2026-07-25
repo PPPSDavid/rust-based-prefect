@@ -80,7 +80,7 @@ When the FastAPI app loads, it:
 2. Starts a **scheduler thread** (unless disabled) that periodically runs `deployment_maintenance_tick()` — reclaims stale leases, marks stale workers offline, and **fires due interval, cron, or RRule schedules**.
 3. Starts a **local worker thread** (unless disabled) that repeatedly **claims** the next `SCHEDULED` deployment run and runs the flow **in that process**.
 
-So a single `ironflow_server.py start` gives you API + **embedded worker + scheduler** for local development. This is **not** the same as Prefect’s separate `prefect worker` process model; it is a deliberate **single-process** convenience for the MVP.
+So a single `ironflow_server.py start` gives you API + **embedded worker + scheduler** for local development. This is a deliberate **single-process** convenience — not the only model. For Prefect-shaped multi-process / Compose layouts, disable the embeds and use [background services](how-to/run-background-services.md) + [HTTP workers](how-to/worker-http-mode.md).
 
 ### Environment toggles (local worker / scheduler)
 
@@ -171,13 +171,13 @@ IronFlow ships a **Tier 1** deployment CLI and manifest format (not full Prefect
 | `ironflow init` | Write a starter **`ironflow.yaml`** if missing. |
 | `ironflow deploy` | Create or update deployment(s) from the manifest via the API. |
 | `ironflow serve` | Deploy one entry, run pull steps, then execute a local worker loop for that flow. |
-| `ironflow worker start` | Poll shared local history for queued deployment runs (standalone process). |
+| `ironflow worker start` | Claim deployment runs — default **`file`** mode (shared history/SQLite) or **`--worker-mode http`** / `IRONFLOW_WORKER_MODE=http` (API claim only). |
 
 Full examples, manifest schema, and Python **`deploy()`** / **`serve()`** helpers: **[How to deploy with the CLI and `ironflow.yaml`](how-to/deploy-with-cli.md)**.
 
 ### Split API and worker (two terminals)
 
-For production-style separation, disable the embedded worker on the server and run a dedicated worker that shares the same **`IRONFLOW_HISTORY_PATH`**:
+**Dev / single-host (`file` mode):** disable the embedded worker and share **`IRONFLOW_HISTORY_PATH`**:
 
 **Terminal 1 — API + scheduler only:**
 
@@ -193,7 +193,9 @@ ironflow deploy --file ironflow.yaml --all
 ironflow worker start --file ironflow.yaml --name worker-1 --pool default-process-pool
 ```
 
-The worker process uses the same JSONL/SQLite persistence as the API; both must agree on **`IRONFLOW_HISTORY_PATH`**. Multiple workers with **distinct `--name`** values can claim from the same pool for horizontal scale (same lease/heartbeat model as the embedded worker).
+Both processes must agree on **`IRONFLOW_HISTORY_PATH`**. Multiple workers with **distinct `--name`** values can claim from the same pool.
+
+**Production-shaped (HTTP / Compose):** disable embeds on the API, run [background services](how-to/run-background-services.md), and start workers with `IRONFLOW_WORKER_MODE=http` (no shared DB volume) — see **[Docker Compose](how-to/docker-compose.md)** and **[HTTP workers](how-to/worker-http-mode.md)**.
 
 ### Expectations vs Prefect
 

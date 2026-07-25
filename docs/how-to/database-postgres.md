@@ -28,6 +28,6 @@ On first connect IronFlow creates the control-plane tables (flow/task runs, depl
 
 - Rust `bind_db` accepts the Postgres DSN for **claim / lease / mark started|finished / attach**.
 - Schedule ticks and most CRUD use the Python path on Postgres in this slice (sqlite-shaped SQL via an adapter).
-- File-mode workers that open the SQLite file directly are **not** a Postgres substitute — wait for HTTP workers (B2).
+- File-mode workers that open the SQLite file directly are **not** a Postgres substitute — use [HTTP workers](worker-http-mode.md) for multi-process / Compose (do not share a SQLite file with the API).
 
-See also: [self-hosted storage RFC](../plans/self-hosted-storage-rfc.md), [environment variables](../reference/env-vars.md).
+See also: [Docker Compose](docker-compose.md), [self-hosted storage RFC](../plans/self-hosted-storage-rfc.md), [environment variables](../reference/env-vars.md).
