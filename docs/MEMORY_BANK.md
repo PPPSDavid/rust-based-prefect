@@ -63,8 +63,8 @@ Last updated: 2026-07-25.
 **Task resume (Phase 1 — landed):**
 
 - Design: **`docs/plans/task-result-cache.md`**. User guide: **`docs/how-to/task-resume-and-persist.md`**.
-- Skip on resume when prior return was **`None`** (auto) or **`@task(persist_result=True)`** stored a JSON-safe payload. Non-persisted non-`None` recomputes. UI shows persisted results on Task Runs / Artifacts.
-- Follow-ups: map-index hardening, parameter-guard, Rust hot-path lookup, subflow/gate policies.
+- Skip on resume when prior return was **`None`** (auto) or **`@task(persist_result=True)`** stored a JSON-safe payload, **and** flow/deployment params + submit/`map` input fingerprints match. `map` uses `map_index`. Cache hits do not re-fire transition hooks. Non-persisted non-`None` recomputes. UI shows persisted results on Task Runs / Artifacts.
+- Follow-ups: native Rust `resume_from` on deployment ops (Python merge bridge today), subflow/gate policies, clearer UI skipped-vs-rerun.
 
 **Useful test scenario (manual / E2E):**
 

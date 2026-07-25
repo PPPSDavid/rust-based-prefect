@@ -86,7 +86,8 @@ class SqliteStore:
                 execution_mode TEXT,
                 depth INTEGER NOT NULL DEFAULT 0,
                 resume_from_flow_run_id TEXT,
-                resume_lineage_id TEXT
+                resume_lineage_id TEXT,
+                parameters_fingerprint TEXT
             );
             CREATE TABLE IF NOT EXISTS task_runs (
                 seq INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -284,6 +285,10 @@ class SqliteStore:
             )
         if "resume_lineage_id" not in flow_cols:
             conn.execute("ALTER TABLE flow_runs ADD COLUMN resume_lineage_id TEXT")
+        if "parameters_fingerprint" not in flow_cols:
+            conn.execute(
+                "ALTER TABLE flow_runs ADD COLUMN parameters_fingerprint TEXT"
+            )
         if "kind" not in col_names:
             conn.execute(
                 "ALTER TABLE task_runs ADD COLUMN kind TEXT NOT NULL DEFAULT 'task'"

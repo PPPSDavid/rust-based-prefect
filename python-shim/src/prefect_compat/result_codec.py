@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 from typing import Any
@@ -33,6 +34,27 @@ def encode_task_result(value: Any) -> str:
 def decode_task_result(raw: str) -> Any:
     """Decode a previously encoded JSON-safe task result."""
     return json.loads(raw)
+
+
+def fingerprint_task_inputs(args: list[Any] | tuple[Any, ...], kwargs: dict[str, Any]) -> str | None:
+    """Stable SHA-256 of JSON-safe submit/map inputs, or ``None`` if not fingerprintable.
+
+    ``None`` means the call must not resume-skip (cannot prove inputs match).
+    """
+    try:
+        payload = {
+            "args": list(args),
+            "kwargs": {str(k): kwargs[k] for k in sorted(kwargs.keys(), key=str)},
+        }
+        raw = encode_task_result(payload)
+    except ResultEncodeError:
+        return None
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def fingerprint_parameters(parameters: dict[str, Any] | None) -> str | None:
+    """Fingerprint flow/deployment parameters for resume param-guard."""
+    return fingerprint_task_inputs((), dict(parameters or {}))
 
 
 def _validate(value: Any, *, depth: int) -> None:

@@ -50,3 +50,19 @@ def test_encode_rejects_oversized_payload() -> None:
     huge = "x" * (65 * 1024)
     with pytest.raises(ResultEncodeError):
         encode_task_result(huge)
+
+
+def test_fingerprint_stable_and_sensitive() -> None:
+    from prefect_compat.result_codec import fingerprint_task_inputs
+
+    a = fingerprint_task_inputs([1, {"x": 2}], {"b": 3})
+    b = fingerprint_task_inputs([1, {"x": 2}], {"b": 3})
+    c = fingerprint_task_inputs([1, {"x": 9}], {"b": 3})
+    assert a is not None and a == b
+    assert a != c
+
+
+def test_fingerprint_rejects_non_json() -> None:
+    from prefect_compat.result_codec import fingerprint_task_inputs
+
+    assert fingerprint_task_inputs([object()], {}) is None

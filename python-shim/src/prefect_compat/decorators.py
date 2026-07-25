@@ -24,6 +24,7 @@ from .hooks import (
     compile_transition_hooks,
     dispatch_transition_hooks,
 )
+from .result_codec import fingerprint_parameters, fingerprint_task_inputs
 from .runtime import (
     FlowRunRecord,
     InMemoryControlPlane,
@@ -247,6 +248,7 @@ class TaskWrapper:
         flow_run_id = _ACTIVE_FLOW_RUN.get()
         task_run = None
         lease_ids: list[str] = []
+        input_fp = _fingerprint_resolved_inputs(args, kwargs)
         if flow_run_id is not None:
             planned_node_id = _CONTROL_PLANE.next_planned_node_id(
                 flow_run_id, self.name
@@ -255,6 +257,7 @@ class TaskWrapper:
                 flow_run_id,
                 planned_node_id,
                 persist_result=self.persist_result,
+                input_fingerprint=input_fp,
             )
             if hit:
                 # Resume skip does not consume tag concurrency slots.
@@ -263,6 +266,7 @@ class TaskWrapper:
                     planned_node_id,
                     cast(T, cached),
                     contribute_to_flow_state=not detach,
+                    input_fingerprint=input_fp,
                 )
             task_run, lease_ids = self._start_task_run(
                 flow_run_id,
@@ -280,6 +284,7 @@ class TaskWrapper:
                 kwargs,
                 task_run,
                 lease_ids,
+                input_fp,
             )
             return TaskFuture(
                 task_run_id=str(task_run.task_run_id) if task_run is not None else None,
@@ -287,7 +292,9 @@ class TaskWrapper:
                 _cfuture=cfuture,
             )
         # Sequential / process / no shared pool: run body on the caller thread.
-        return self._run_submitted_body_sync(args, kwargs, task_run, lease_ids)
+        return self._run_submitted_body_sync(
+            args, kwargs, task_run, lease_ids, input_fp
+        )
 
     def _run_submitted_body_sync(
         self,
@@ -295,9 +302,10 @@ class TaskWrapper:
         kwargs: dict[str, Any],
         task_run: TaskRunRecord | None,
         lease_ids: list[str] | None = None,
+        input_fingerprint: str | None = None,
     ) -> TaskFuture[T]:
         result = self._execute_and_finalize_submit(
-            args, kwargs, task_run, lease_ids or []
+            args, kwargs, task_run, lease_ids or [], input_fingerprint
         )
         return TaskFuture(
             result,
@@ -311,6 +319,7 @@ class TaskWrapper:
         kwargs: dict[str, Any],
         task_run: TaskRunRecord | None,
         lease_ids: list[str] | None = None,
+        input_fingerprint: str | None = None,
     ) -> T:
         """Run the task body, then record COMPLETED/FAILED via the control plane.
 
@@ -321,7 +330,12 @@ class TaskWrapper:
         try:
             result = self(*args, **kwargs)
             if task_run is not None:
-                self._finalize_completed_task(task_run, result, cache_hit=False)
+                self._finalize_completed_task(
+                    task_run,
+                    result,
+                    cache_hit=False,
+                    input_fingerprint=input_fingerprint,
+                )
             return result
         except Exception as exc:
             if isinstance(exc, FlowRunCancelled):
@@ -360,6 +374,8 @@ class TaskWrapper:
         value: T,
         *,
         contribute_to_flow_state: bool = True,
+        map_index: int | None = None,
+        input_fingerprint: str | None = None,
     ) -> TaskFuture[T]:
         task_run = _CONTROL_PLANE.create_task_run(
             flow_run_id,
@@ -375,12 +391,15 @@ class TaskWrapper:
                 ("task_running", None),
             ],
         )
-        th = self._transition_hooks
-        if th:
-            _emit_task_transition_edges(
-                th, task_run, self.name, _TASK_HOOK_START_EDGES
-            )
-        self._finalize_completed_task(task_run, value, cache_hit=True)
+        # Cache hits advance the FSM for observability but do not re-fire user hooks.
+        self._finalize_completed_task(
+            task_run,
+            value,
+            cache_hit=True,
+            map_index=map_index,
+            input_fingerprint=input_fingerprint,
+            fire_hooks=False,
+        )
         return TaskFuture(
             value,
             task_run_id=str(task_run.task_run_id),
@@ -394,6 +413,8 @@ class TaskWrapper:
         *,
         cache_hit: bool,
         map_index: int | None = None,
+        input_fingerprint: str | None = None,
+        fire_hooks: bool = True,
     ) -> None:
         summary_extra = _CONTROL_PLANE.store_task_result_for_resume(
             task_run.flow_run_id,
@@ -403,13 +424,14 @@ class TaskWrapper:
             result,
             persist_result=self.persist_result,
             map_index=map_index,
+            input_fingerprint=input_fingerprint,
         )
         data: dict[str, Any] = {"task_name": self.name, **summary_extra}
         if cache_hit:
             data["cache_hit"] = True
         _CONTROL_PLANE.record_task_event(task_run.task_run_id, "task_completed", data)
         th = self._transition_hooks
-        if th:
+        if th and fire_hooks:
             _emit_task_single_hook_edge(
                 th,
                 task_run,
@@ -451,17 +473,38 @@ class TaskWrapper:
 
     def _prepare_map_task_runs(
         self, vals: list[Any]
-    ) -> list[tuple[TaskRunRecord | None, Any]]:
+    ) -> tuple[
+        list[tuple[TaskRunRecord | None, Any, int, str | None]],
+        list[TaskFuture[T] | None],
+    ]:
+        """Partition map values into resume cache-hits vs tasks that must execute."""
         flow_run_id = _ACTIVE_FLOW_RUN.get()
-        metas: list[tuple[TaskRunRecord | None, Any]] = []
+        to_run: list[tuple[TaskRunRecord | None, Any, int, str | None]] = []
+        futures: list[TaskFuture[T] | None] = [None] * len(vals)
         planned_node_id: str | None = None
-        for v in vals:
-            task_run = None
+        for index, v in enumerate(vals):
+            input_fp = fingerprint_task_inputs([_resolve(v)], {})
             if flow_run_id is not None:
                 if planned_node_id is None:
                     planned_node_id = _CONTROL_PLANE.next_planned_node_id(
                         flow_run_id, self.name
                     )
+                hit, cached = _CONTROL_PLANE.lookup_resumed_task_result(
+                    flow_run_id,
+                    planned_node_id,
+                    map_index=index,
+                    persist_result=self.persist_result,
+                    input_fingerprint=input_fp,
+                )
+                if hit:
+                    futures[index] = self._complete_from_cache(
+                        flow_run_id,
+                        planned_node_id,
+                        cast(T, cached),
+                        map_index=index,
+                        input_fingerprint=input_fp,
+                    )
+                    continue
                 task_run = _CONTROL_PLANE.create_task_run(
                     flow_run_id,
                     self.name,
@@ -496,35 +539,41 @@ class TaskWrapper:
                         _emit_task_transition_edges(
                             th, task_run, self.name, _TASK_HOOK_START_EDGES
                         )
-            metas.append((task_run, v))
-        return metas
+                to_run.append((task_run, v, index, input_fp))
+            else:
+                to_run.append((None, v, index, input_fp))
+        return to_run, futures
 
     def _finalize_map_task_runs(
-        self, metas: list[tuple[TaskRunRecord | None, Any]], outs: list[Any]
+        self,
+        to_run: list[tuple[TaskRunRecord | None, Any, int, str | None]],
+        outs: list[Any],
+        futures: list[TaskFuture[T] | None],
     ) -> list[TaskFuture[T]]:
-        out: list[TaskFuture[T]] = []
-        for index, ((task_run, _v), raw) in enumerate(zip(metas, outs, strict=True)):
+        for (task_run, _v, index, input_fp), raw in zip(to_run, outs, strict=True):
             if task_run is not None:
                 self._finalize_completed_task(
-                    task_run, raw, cache_hit=False, map_index=index
-                )
-            out.append(
-                TaskFuture(
+                    task_run,
                     raw,
-                    task_run_id=str(task_run.task_run_id)
-                    if task_run is not None
-                    else None,
-                    planned_node_id=task_run.planned_node_id
-                    if task_run is not None
-                    else None,
+                    cache_hit=False,
+                    map_index=index,
+                    input_fingerprint=input_fp,
                 )
+            futures[index] = TaskFuture(
+                raw,
+                task_run_id=str(task_run.task_run_id) if task_run is not None else None,
+                planned_node_id=task_run.planned_node_id
+                if task_run is not None
+                else None,
             )
-        return out
+        return [f for f in futures if f is not None]
 
     def _fail_map_task_runs(
-        self, metas: list[tuple[TaskRunRecord | None, Any]], exc: Exception
+        self,
+        to_run: list[tuple[TaskRunRecord | None, Any, int, str | None]],
+        exc: Exception,
     ) -> None:
-        for task_run, _v in metas:
+        for task_run, _v, _index, _fp in to_run:
             if task_run is None:
                 continue
             try:
@@ -603,8 +652,10 @@ class TaskWrapper:
             wait(wait_for)
         if not vals:
             return []
-        metas = self._prepare_map_task_runs(vals)
-        mx = min(len(vals), runner.resolve_max_workers())
+        to_run, futures = self._prepare_map_task_runs(vals)
+        if not to_run:
+            return [f for f in futures if f is not None]
+        mx = min(len(to_run), runner.resolve_max_workers())
 
         with ThreadPoolExecutor(max_workers=mx) as pool:
             try:
@@ -612,15 +663,15 @@ class TaskWrapper:
                     outs = list(
                         pool.map(
                             lambda m: self._run_tagged_map_body(m[0], m[1]),
-                            metas,
+                            to_run,
                         )
                     )
                 else:
-                    outs = list(pool.map(self.fn, [m[1] for m in metas]))
+                    outs = list(pool.map(self.fn, [m[1] for m in to_run]))
             except Exception as exc:
-                self._fail_map_task_runs(metas, exc)
+                self._fail_map_task_runs(to_run, exc)
                 raise
-        return self._finalize_map_task_runs(metas, outs)
+        return self._finalize_map_task_runs(to_run, outs, futures)
 
     def _map_process_pool(
         self,
@@ -633,8 +684,10 @@ class TaskWrapper:
             wait(wait_for)
         if not vals:
             return []
-        metas = self._prepare_map_task_runs(vals)
-        mx = min(len(vals), runner.resolve_max_workers())
+        to_run, futures = self._prepare_map_task_runs(vals)
+        if not to_run:
+            return [f for f in futures if f is not None]
+        mx = min(len(to_run), runner.resolve_max_workers())
         fn = self.fn
         if self.tags:
             # Tag slots on the parent; bodies run in children (process pool cannot share GCL).
@@ -643,8 +696,10 @@ class TaskWrapper:
 
             with ProcessPoolExecutor(max_workers=mx) as pool:
 
-                def _one(item: tuple[TaskRunRecord | None, Any]) -> Any:
-                    task_run, v = item
+                def _one(
+                    item: tuple[TaskRunRecord | None, Any, int, str | None],
+                ) -> Any:
+                    task_run, v, _index, _fp = item
                     lease_ids: list[str] = []
                     if task_run is not None:
                         from .concurrency import (
@@ -689,19 +744,19 @@ class TaskWrapper:
 
                 with ThreadPoolExecutor(max_workers=mx) as orchestrator:
                     try:
-                        outs = list(orchestrator.map(_one, metas))
+                        outs = list(orchestrator.map(_one, to_run))
                     except Exception as exc:
-                        self._fail_map_task_runs(metas, exc)
+                        self._fail_map_task_runs(to_run, exc)
                         raise
-            return self._finalize_map_task_runs(metas, outs)
+            return self._finalize_map_task_runs(to_run, outs, futures)
 
         with ProcessPoolExecutor(max_workers=mx) as pool:
             try:
-                outs = list(pool.map(fn, [m[1] for m in metas]))
+                outs = list(pool.map(fn, [m[1] for m in to_run]))
             except Exception as exc:
-                self._fail_map_task_runs(metas, exc)
+                self._fail_map_task_runs(to_run, exc)
                 raise
-        return self._finalize_map_task_runs(metas, outs)
+        return self._finalize_map_task_runs(to_run, outs, futures)
 
 
 @overload
@@ -792,6 +847,7 @@ def flow(
                 parent_task_run_id = None
                 execution_mode = None
                 resume_from: UUID | None = None
+                dep_run: dict[str, Any] | None = None
                 if dep_run_id is not None:
                     dep_run = _CONTROL_PLANE.get_deployment_run(dep_run_id)
                     if dep_run:
@@ -811,12 +867,23 @@ def flow(
                     execution_mode = "inline"
                 if resume_from is None:
                     resume_from = _CONTROL_PLANE.consume_pending_resume()
+                # Prefer deployment resolved parameters for Case 6 param-guard.
+                if dep_run is not None and isinstance(
+                    dep_run.get("resolved_parameters"), dict
+                ):
+                    params_obj = cast(dict[str, Any], dep_run["resolved_parameters"])
+                else:
+                    params_obj = dict(kwargs)
+                    if args:
+                        params_obj = {**params_obj, "__args__": list(args)}
+                parameters_fingerprint = fingerprint_parameters(params_obj)
                 record = _CONTROL_PLANE.create_flow_run(
                     flow_name,
                     parent_flow_run_id=parent_flow_run_id,
                     parent_task_run_id=parent_task_run_id,
                     execution_mode=execution_mode,
                     resume_from_flow_run_id=resume_from,
+                    parameters_fingerprint=parameters_fingerprint,
                 )
                 _ACTIVE_FLOW_RUN.set(record.run_id)
                 if dep_run_id is not None:
@@ -1131,6 +1198,18 @@ def _resolve(value: Any) -> Any:
     if isinstance(value, SubflowFuture):
         return value.result()
     return value
+
+
+def _fingerprint_resolved_inputs(
+    args: tuple[Any, ...], kwargs: dict[str, Any]
+) -> str | None:
+    """Fingerprint submit inputs after resolving nested futures."""
+    try:
+        resolved_args = [_resolve(v) for v in args]
+        resolved_kwargs = {k: _resolve(v) for k, v in kwargs.items()}
+    except Exception:
+        return None
+    return fingerprint_task_inputs(resolved_args, resolved_kwargs)
 
 
 def _compile_forecast_for_flow(
