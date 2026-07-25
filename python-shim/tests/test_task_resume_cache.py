@@ -1,14 +1,29 @@
 from __future__ import annotations
 
 from pathlib import Path
+from uuid import UUID
 
 from prefect_compat import InMemoryControlPlane, flow, set_control_plane, task
+from prefect_compat.worker import execute_claimed_deployment_run
 
 
 def _plane(tmp_path: Path, name: str = "resume") -> InMemoryControlPlane:
     plane = InMemoryControlPlane(history_path=str(tmp_path / f"{name}.jsonl"))
     set_control_plane(plane)
     return plane
+
+
+def _run_claimed(plane: InMemoryControlPlane, registry: dict) -> dict:
+    claimed = plane.claim_next_deployment_run(
+        worker_name="resume-worker", lease_seconds=30
+    )
+    assert claimed is not None
+    execute_claimed_deployment_run(plane, claimed, registry)
+    finished = plane.get_deployment_run(UUID(str(claimed["id"])))
+    assert finished is not None
+    assert finished["status"] == "COMPLETED"
+    assert finished["flow_run_id"]
+    return finished
 
 
 def test_none_result_auto_skips_on_resume(tmp_path: Path) -> None:
@@ -180,3 +195,57 @@ def test_fresh_run_without_prepare_resume_does_not_skip(tmp_path: Path) -> None:
     pipeline()
     assert calls["setup"] == 2
     assert plane.latest_flow() is not None
+
+
+def test_deployment_retry_skips_eligible_completed_tasks(tmp_path: Path) -> None:
+    """P1.1 acceptance: deployment-backed cancel→retry skips None / persist_result nodes."""
+    plane = _plane(tmp_path, "deploy-retry")
+    calls = {"setup": 0, "expensive": 0, "volatile": 0}
+
+    @task
+    def setup() -> None:
+        calls["setup"] += 1
+
+    @task(persist_result=True)
+    def expensive(x: int) -> dict:
+        calls["expensive"] += 1
+        return {"x": x, "n": 42}
+
+    @task
+    def volatile(x: int) -> int:
+        calls["volatile"] += 1
+        return x + 1
+
+    @flow(name="resume_retry_pipeline")
+    def pipeline(n: int = 1) -> int:
+        setup.submit()
+        payload = expensive.submit(n)
+        return volatile.submit(payload.result()["n"]).result()
+
+    registry = {"resume_retry_pipeline": pipeline}
+    dep = plane.create_deployment(
+        name="resume-retry-dep",
+        flow_name="resume_retry_pipeline",
+        default_parameters={"n": 1},
+        paused=False,
+    )
+    first_dep = plane.trigger_deployment_run(UUID(dep["id"]), parameters={"n": 1})
+    assert first_dep["status"] == "SCHEDULED"
+    first_finished = _run_claimed(plane, registry)
+    first_flow_id = UUID(str(first_finished["flow_run_id"]))
+    assert calls == {"setup": 1, "expensive": 1, "volatile": 1}
+
+    plane.cancel_flow_run(first_flow_id)
+    retry_dep = plane.retry_flow_run(first_flow_id)
+    assert retry_dep.get("resume_from_flow_run_id") == str(first_flow_id)
+
+    second_finished = _run_claimed(plane, registry)
+    second_flow_id = UUID(str(second_finished["flow_run_id"]))
+    assert second_flow_id != first_flow_id
+    # None + persist_result skip; volatile recomputes.
+    assert calls == {"setup": 1, "expensive": 1, "volatile": 2}
+
+    second_tasks = plane.list_task_runs(second_flow_id).items
+    expensive_rows = [t for t in second_tasks if t["task_name"] == "expensive"]
+    assert len(expensive_rows) == 1
+    assert expensive_rows[0]["state"] == "COMPLETED"

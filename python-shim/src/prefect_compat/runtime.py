@@ -2317,6 +2317,27 @@ class InMemoryControlPlane:
         with self._lock:
             return self._flow_results.get(run_id)
 
+    def _merge_resume_from_flow_run_id(
+        self, run: dict[str, Any] | None
+    ) -> dict[str, Any] | None:
+        """Attach SQLite ``resume_from_flow_run_id`` when Rust ops omit the column."""
+        if run is None or run.get("resume_from_flow_run_id"):
+            return run
+        run_id = run.get("id")
+        if not run_id:
+            return run
+        with self._lock:
+            self._ensure_resume_schema()
+        rows = self._query_rows(
+            "SELECT resume_from_flow_run_id FROM deployment_runs WHERE id = ? LIMIT 1",
+            [str(run_id)],
+        )
+        if not rows:
+            return run
+        merged = dict(run)
+        merged["resume_from_flow_run_id"] = rows[0]["resume_from_flow_run_id"]
+        return merged
+
     def get_deployment_run(self, deployment_run_id: UUID) -> dict[str, Any] | None:
         rust = self._rust_deployment_dispatch(
             "deployment_get_run", {"deployment_run_id": str(deployment_run_id)}
@@ -2325,14 +2346,17 @@ class InMemoryControlPlane:
             if rust.get("ok"):
                 run = rust.get("run")
                 if run is not None:
-                    return run
+                    return self._merge_resume_from_flow_run_id(run)
             else:
                 err = rust.get("error") or {}
                 raise RuntimeError(str(err.get("message", "deployment get run failed")))
+        with self._lock:
+            self._ensure_resume_schema()
         rows = self._query_rows(
             """
             SELECT seq,id,deployment_id,status,requested_parameters,resolved_parameters,idempotency_key,
                    worker_name,lease_until,flow_run_id,error,parent_flow_run_id,parent_task_run_id,parent_deployment_run_id,
+                   resume_from_flow_run_id,
                    created_at,updated_at,started_at,finished_at
             FROM deployment_runs
             WHERE id = ?
@@ -2946,6 +2970,7 @@ class InMemoryControlPlane:
                 """
                 SELECT seq,id,deployment_id,status,requested_parameters,resolved_parameters,idempotency_key,
                        worker_name,lease_until,flow_run_id,error,parent_flow_run_id,parent_task_run_id,parent_deployment_run_id,
+                       resume_from_flow_run_id,
                        created_at,updated_at,started_at,finished_at
                 FROM deployment_runs
                 WHERE id = ?
@@ -2961,9 +2986,12 @@ class InMemoryControlPlane:
         limit: int = 200,
         cursor: str | None = None,
     ) -> PageResult:
+        with self._lock:
+            self._ensure_resume_schema()
         query = (
             "SELECT seq,id,deployment_id,status,requested_parameters,resolved_parameters,idempotency_key,"
             " worker_name,lease_until,flow_run_id,error,parent_flow_run_id,parent_task_run_id,parent_deployment_run_id,"
+            " resume_from_flow_run_id,"
             " created_at,updated_at,started_at,finished_at "
             "FROM deployment_runs"
         )
@@ -3300,7 +3328,7 @@ class InMemoryControlPlane:
         if rust is not None:
             if rust.get("ok"):
                 run = rust.get("run")
-                return None if run is None else run
+                return None if run is None else self._merge_resume_from_flow_run_id(run)
             err = rust.get("error") or {}
             raise RuntimeError(str(err.get("message", "deployment claim failed")))
 
@@ -3358,6 +3386,7 @@ class InMemoryControlPlane:
                 """
                 SELECT seq,id,deployment_id,status,requested_parameters,resolved_parameters,idempotency_key,
                        worker_name,lease_until,flow_run_id,error,parent_flow_run_id,parent_task_run_id,parent_deployment_run_id,
+                       resume_from_flow_run_id,
                        created_at,updated_at,started_at,finished_at
                 FROM deployment_runs
                 WHERE id = ? AND status = 'CLAIMED'
