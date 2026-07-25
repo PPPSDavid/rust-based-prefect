@@ -1,12 +1,14 @@
 # Use Postgres for the control plane (Tier B1)
 
-**Audience:** operators testing multi-process / compose prep  
+**Audience:** operators running multi-process or Compose stacks  
 **Default remains SQLite** for local zero-config.
+
+**Prefect example to borrow from:** [Local Prefect server — database](https://docs.prefect.io/v3/how-to-guides/self-hosted/server-cli) (SQLite default; Postgres for multi-process). IronFlow uses `IRONFLOW_DATABASE_URL` instead of Prefect’s asyncpg URL setting; there is no `ironflow server database upgrade` CLI yet.
 
 ## When to use it
 
-- You need a networked database shared by an API process (workers still need HTTP claim in B2).
-- You want to validate `IRONFLOW_DATABASE_URL` before shipping compose images.
+- You need a networked database for the API + services process (compose default).
+- HTTP workers still talk to the **API**, not the DB — see [HTTP workers](worker-http-mode.md).
 
 ## Setup
 

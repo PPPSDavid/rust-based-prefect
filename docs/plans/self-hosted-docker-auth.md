@@ -1,10 +1,10 @@
 # Self-Hosted Docker & Access Control Plan (IronFlow)
 
-**Status:** Tier A + C shipped; Tier B in progress (see tier-b + storage RFC)  
-**Last updated:** 2026-07-14  
+**Status:** Tier A + C + Tier B **core** shipped (#57); deferred items remain (HA services, B4 Redis, UI image, GHCR automation, migrator CLI) — see [tier-b plan](self-hosted-docker-tier-b.md)  
+**Last updated:** 2026-07-25  
 **Scope:** `deploy/docker/`, `python-shim/`, `rust-engine/`, `frontend/`, `scripts/`, `docs/`, `COMPATIBILITY.md`  
 **User-facing docs (target):** see §13 Documentation matrix  
-**Prefect references (baseline, not parity claims):**
+**Prefect references (good examples to borrow / enhance from — not parity claims):**
 
 - [Run a local Prefect server (CLI)](https://docs.prefect.io/v3/how-to-guides/self-hosted/server-cli)
 - [Run the Prefect server in Docker](https://docs.prefect.io/v3/how-to-guides/self-hosted/server-docker)
@@ -36,15 +36,16 @@ IronFlow already supports a **split control plane / worker** model in code and d
 
 | Piece | Location | Notes |
 | --- | --- | --- |
-| API server | `python-shim/src/prefect_compat/server.py` | FastAPI; embedded scheduler + optional embedded worker on startup |
-| Scheduler | Same process (thread or Rust background) | `deployment_maintenance_tick()` |
-| Standalone worker | `ironflow worker start` / `ironflow serve` | Opens `InMemoryControlPlane` at `IRONFLOW_HISTORY_PATH`; **claims via SQLite**, not HTTP |
+| API server | `python-shim/src/prefect_compat/server.py` | FastAPI; embedded scheduler + optional embedded worker on startup (dev). Compose disables embeds. |
+| Background services | `ironflow server services start` (`prefect_compat.services`) | Schedule ticks / lease reclaim when API has embeds off |
+| Standalone worker | `ironflow worker start` / `ironflow serve` | **`file`** mode: shared history/SQLite. **`http`** mode: claim API only (compose / multi-host) |
 | Deploy CLI | `ironflow deploy` | HTTP to API (`DeployClient`) |
-| Persistence | JSONL + SQLite sidecar | Path from `IRONFLOW_HISTORY_PATH` (default `data/ironflow_history.jsonl`) |
+| Persistence | JSONL + SQLite **or** Postgres | `IRONFLOW_HISTORY_PATH` (file default); `IRONFLOW_DATABASE_URL` for Postgres |
 | Native engine | Bundled in PyPI wheel `ironflow-prefect-compat` | Prefer wheel-based images over repo clone |
+| Compose | `deploy/docker/compose.yml` | Postgres + API + services + HTTP worker; GHA smoke |
 | Launcher | `scripts/ironflow_server.py` | Dev helper; starts uvicorn + optional Vite |
 
-**Key constraint (today):** Server and standalone workers share a **local SQLite file** derived from `IRONFLOW_HISTORY_PATH`. Workers **claim via direct DB access**, not HTTP. Tier **B** removes this constraint; until B5 lands, only **B-fast** (shared volume) is available for split containers.
+**Dev vs production:** File/SQLite + embedded worker remains the fast local path. Production-shaped compose uses Postgres + HTTP workers + a dedicated services process — no shared worker filesystem (Prefect compose-shaped; Redis still deferred).
 
 ---
 
@@ -401,16 +402,16 @@ cargo test --manifest-path rust-engine/Cargo.toml
 
 | PR / branch | Tier | Status | Notes |
 | --- | --- | --- | --- |
-| `cursor/self-hosted-docker-auth-plan-b5da` | — | Plan doc | PR #45 |
-| `cursor/docker-tier-a-c-b5da` | A, C | In progress | Server image + basic auth |
-| *(this PR / B0)* | B0 | In progress | RFC + SQLite persistence extract |
-| *(pending)* | B1 | Not started | Postgres + Rust bind + migrations |
-| *(pending)* | B2 | Merged (#56) | HTTP worker protocol |
-| *(pending)* | B3/B5 | In flight | Services split + compose stack |
-| *(pending)* | B4 | Not started | Redis / multi-worker API (optional) |
-| *(pending)* | B-fast | Not started | Interim shared-volume compose (optional) |
+| `cursor/self-hosted-docker-auth-plan-b5da` | — | Merged | Plan doc (#45) |
+| `cursor/docker-tier-a-c-b5da` | A, C | Merged | Server image + basic auth |
+| B0 | B0 | Merged (#49) | RFC + SQLite persistence extract |
+| B1 | B1 | Merged (#52) | Postgres + Rust claim bind (migrator CLI still deferred) |
+| B2 | B2 | Merged (#56) | HTTP worker protocol |
+| B3/B5 | B3/B5 | Merged (#57) | Services split + compose stack + GHA smoke |
+| *(follow-up)* | B4 | Not started | Redis / multi-worker API (optional) |
+| *(skipped)* | B-fast | Skipped | Prefer HTTP-worker compose over shared-volume interim |
 
-Update this table as work lands.
+Update this table as follow-up work lands.
 
 ---
 

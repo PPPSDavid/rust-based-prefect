@@ -42,6 +42,8 @@ Expect **`True`** when a matching wheel loaded. **Developing the repo**, integra
 | Performance vs Prefect (expectations, caveats) | [Performance overview](https://pppsdavid.github.io/rust-based-prefect/PERFORMANCE_OVERVIEW/) |
 | Quick start (demo flow) | [Quick start](https://pppsdavid.github.io/rust-based-prefect/QUICKSTART_DEMO/) |
 | Self-hosted server (API, workers, deployments, schedules) | [Self-hosted server](https://pppsdavid.github.io/rust-based-prefect/SELF_HOSTED_SERVER/) |
+| Docker (single container) | [Docker quickstart](https://pppsdavid.github.io/rust-based-prefect/how-to/docker-quickstart/) |
+| Docker Compose (Postgres + services + HTTP workers) | [Docker Compose](https://pppsdavid.github.io/rust-based-prefect/how-to/docker-compose/) |
 | Map Prefect concepts to this repo | [Prefect → IronFlow](https://pppsdavid.github.io/rust-based-prefect/PREFECT_IRONFLOW_MAPPING/) |
 | Supported behavior & gaps vs Prefect | [Compatibility matrix](https://pppsdavid.github.io/rust-based-prefect/compatibility/) |
 | PyPI / conda packaging notes (contributors) | [DISTRIBUTION.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/DISTRIBUTION.md) |

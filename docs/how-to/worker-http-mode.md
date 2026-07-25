@@ -4,6 +4,8 @@ Tier **B2** workers claim and finish deployment runs over the API. They never op
 the control-plane SQLite/Postgres files. Use this mode for multi-host / compose
 layouts (no shared volume).
 
+**Prefect example to borrow from:** the worker service in [Prefect Docker Compose](https://docs.prefect.io/v3/how-to-guides/self-hosted/docker-compose) — workers talk to the API, not a shared DB volume. IronFlow’s `IRONFLOW_WORKER_MODE=http` is that shape.
+
 ## Modes
 
 | Mode | Env / flag | Opens DB? | Needs |

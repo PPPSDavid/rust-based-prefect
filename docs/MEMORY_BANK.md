@@ -1,13 +1,13 @@
 # Memory Bank
 
 Compact context handoff for future sessions. Process/validation contract: root `AGENTS.md`.
-Last updated: 2026-07-16.
+Last updated: 2026-07-25.
 
 ## Project Snapshot
 
 - Name: Project IronFlow (`rust-based-prefect`)
 - Goal: Prefect-compatible orchestration with stronger determinism, performance, and static planning.
-- Status: Hybrid MVP in active use — deployments (schedules, CLI/YAML Tier 1); **subflows M1+M2** on `main` (#34/#36) with user guide at `docs/how-to/subflows.md`; transition hooks; **global + tag concurrency limits** (`docs/how-to/concurrency-limits.md`); concurrent `task.submit` via ThreadPoolTaskRunner; **flow-run final state `wait_all`** (Rust `resolve_flow_terminal_state`, `detach` / `final_state="explicit"` escape); agent tooling under `.cursor/` + `docs/agent/`. **Self-hosted:** Tier A (server Docker) + Tier C (basic auth) on `main`; Tier B0–B2 on `main` (#49/#52/#56). **Active plan:** Tier B3/B5 compose — Postgres + services process + HTTP workers (`docs/plans/self-hosted-docker-tier-b.md`). Flow-run final state plan implemented — `docs/plans/flow-run-final-state.md`. Concurrency plan implemented — `docs/plans/concurrency-limits.md`.
+- Status: Hybrid MVP in active use — deployments (schedules, CLI/YAML Tier 1); **subflows M1+M2** on `main` (#34/#36) with user guide at `docs/how-to/subflows.md`; transition hooks; **global + tag concurrency limits** (`docs/how-to/concurrency-limits.md`); concurrent `task.submit` via ThreadPoolTaskRunner; **flow-run final state `wait_all`** (Rust `resolve_flow_terminal_state`, `detach` / `final_state="explicit"` escape); agent tooling under `.cursor/` + `docs/agent/`. **Self-hosted (core shipped):** Tier A server Docker + Tier C basic auth + Tier B0–B3/B5 (#49/#52/#56/#57) — Postgres, HTTP workers, `ironflow server services start`, `deploy/docker/compose.yml`, GHA compose smoke. Guides: `docs/how-to/docker-compose.md`, `docs/SELF_HOSTED_SERVER.md`. **Follow-ups (not blocking):** HA services leader election, Alembic-style DB upgrade CLI, Redis/multi-worker API (B4), UI compose image, GHCR publish automation — see `docs/plans/self-hosted-docker-tier-b.md`. Flow-run final state and concurrency plans implemented.
 
 ## Core Architecture
 
@@ -24,10 +24,12 @@ Last updated: 2026-07-16.
 
 ## Persistence Status
 
-- Dual local persistence in shim runtime:
+- Dual local persistence in shim runtime (dev / single-node default):
   - JSONL append history for durable event replay
   - SQLite read model for query/API/UI reads via `prefect_compat.persistence` (`SqliteStore` / `ControlPlaneStore`; B0 extract)
+- **Postgres** via `IRONFLOW_DATABASE_URL` (`PostgresStore`); Rust `bind_db` for claim/lease on both backends. Schedule ticks / most CRUD on Postgres may still fall back to Python until follow-ups.
 - Query / schedule / claim / GCL hot paths prefer Rust when the native bridge is loaded.
+- Production compose uses Postgres + HTTP workers (no shared worker filesystem).
 
 ## Agent tooling (code-review-graph)
 

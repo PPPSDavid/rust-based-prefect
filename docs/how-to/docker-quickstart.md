@@ -1,8 +1,8 @@
 # How to run the IronFlow server in Docker
 
-Quick path for a **single-container** API server with embedded scheduler and local worker (Tier A). For production compose (Postgres, split workers), see the [self-hosted server](../SELF_HOSTED_SERVER.md) guide; longer-term roadmap lives in `docs/plans/self-hosted-docker-auth.md` in the repository (not published to the MkDocs site).
+Quick path for a **single-container** API server with embedded scheduler and local worker (Tier A). For production-shaped **Postgres + services + HTTP workers**, use **[Docker Compose](docker-compose.md)**. Overview: [Self-hosted server](../SELF_HOSTED_SERVER.md).
 
-**Prefect reference:** [Run the Prefect server in Docker](https://docs.prefect.io/v3/how-to-guides/self-hosted/server-docker)
+**Prefect example to borrow from:** [Run the Prefect server in Docker](https://docs.prefect.io/v3/how-to-guides/self-hosted/server-docker) — same “one container, publish the API port” shape; IronFlow serves the API on **8000** (Prefect’s UI/API default is **4200**).
 
 ## Pull a release image (when published)
 

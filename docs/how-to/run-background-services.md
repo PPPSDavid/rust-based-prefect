@@ -2,7 +2,10 @@
 
 The API process can run schedule ticks embedded (`IRONFLOW_ENABLE_SCHEDULER=1`,
 default for Tier A). In production compose, disable the embedded scheduler on
-the API and run a dedicated **services** process:
+the API and run a dedicated **services** process — same split as Prefect’s
+`prefect server start --no-services` plus
+[`prefect server services start`](https://docs.prefect.io/v3/how-to-guides/self-hosted/docker-compose)
+(borrow that guide’s process layout; IronFlow does not yet elect a multi-replica leader).
 
 ```bash
 # Point at the same store as the API (Postgres recommended).
