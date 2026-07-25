@@ -19,7 +19,7 @@ You can run API-wrapper flows on a normal **process** work-pool worker and still
 | --- | --- | --- |
 | **`ThreadPoolTaskRunner`** (default) | Non-blocking; bodies overlap in a shared thread pool | Concurrent fan-out |
 | **`SequentialTaskRunner`** | Synchronous / non-overlapping | Sequential |
-| **`ProcessPoolTaskRunner`** | Still synchronous on the caller (limitation) | Concurrent via process pool (picklable tasks) |
+| **`ProcessPoolTaskRunner`** | Non-blocking futures; body in a registered child process | Concurrent registered children (picklable tasks) |
 
 Independent branches can use either multiple **`submit()`** calls or **`map()`**. Use **`wait_for`** so dependents do not start early.
 
@@ -28,7 +28,8 @@ Independent branches can use either multiple **`submit()`** calls or **`map()`**
 | Your tasks mostly… | Runner | Typical pattern |
 | --- | --- | --- |
 | Call HTTP APIs, SDKs, queues, or poll remote jobs (I/O-bound) | **`ThreadPoolTaskRunner`** (default) | `a, b = fetch.submit(u1), fetch.submit(u2)` or `fetch.map(urls)` |
-| Run CPU-heavy pure Python (numeric work, compression, …) | **`ProcessPoolTaskRunner`** | Picklable top-level task + `heavy.map(items)` |
+| Run CPU-heavy pure Python (numeric work, compression, …) | **`ProcessPoolTaskRunner`** | Picklable top-level task + `heavy.map(items)` / `submit` |
+| Need **hard cancel / terminate-pause** (stop blind `sleep`) | **`ProcessPoolTaskRunner`** | Registered children are SIGTERM→SIGKILL’d — [cancel/pause guide](cancel-pause-resume.md) |
 | Need deterministic order or easier debugging | **`SequentialTaskRunner`** | `step.map([1, 2, 3])` or sequential `submit` |
 | Fan out once with a single `map` value | Default is fine | Runner falls back to single-threaded path |
 
@@ -84,10 +85,11 @@ def crunch(nums: list[int]) -> int:
 **Gotchas:**
 
 - Closures, lambdas, and tasks defined inside test modules often **fail to pickle**.
-- **Windows** multiprocessing from pytest is unreliable; process-pool `map` is primarily validated on Linux/macOS.
-- Process startup has overhead — not worth it for thin API wrappers.
+- **Windows** multiprocessing from pytest is unreliable; process runners are primarily validated on Linux/macOS.
+- Process startup has overhead — not worth it for thin API wrappers unless you need **hard terminate**.
+- Process-isolated bodies do **not** inherit ContextVars — `get_run_logger()` task association is best from the coordinating thread.
 
-**Tuning:** `max_workers` on the runner or **`IRONFLOW_TASK_RUNNER_PROCESS_POOL_MAX_WORKERS`**.
+**Tuning:** `max_workers` on the runner or **`IRONFLOW_TASK_RUNNER_PROCESS_POOL_MAX_WORKERS`**. Terminate grace: **`IRONFLOW_TASK_TERMINATE_GRACE_SECONDS`** (default `2`).
 
 ## Mechanism 3 — Sequential (deterministic)
 
@@ -120,9 +122,9 @@ Per-flow overrides always win: `@flow(task_runner=ThreadPoolTaskRunner(max_worke
 
 ## Common mistakes
 
-1. **Expecting process-pool `submit()` to overlap** — `ProcessPoolTaskRunner` parallelizes **`map()`** only; independent `submit()` still runs synchronously. Prefer threads for concurrent submit, or `map()` for process fan-out.
-2. **Using `ProcessPoolTaskRunner` for API calls** — adds pickling overhead with no I/O benefit; use threads.
-3. **Confusing task runner with work pool** — API flows still need a deployment worker (embedded or `ironflow worker start`); the thread runner only affects in-flow `submit` / `map`.
+1. **Expecting thread-pool cancel to kill `time.sleep`** — threads are cooperative-only; use **`ProcessPoolTaskRunner`** for SIGTERM→SIGKILL ([cancel/pause guide](cancel-pause-resume.md)).
+2. **Using `ProcessPoolTaskRunner` for thin API calls** — adds pickling overhead with no I/O benefit unless you need hard terminate; prefer threads for I/O.
+3. **Confusing task runner with work pool** — API flows still need a deployment worker (embedded or `ironflow worker start`); the task runner only affects in-flow `submit` / `map`.
 4. **Huge `max_workers` against rate-limited APIs** — cap `max_workers` to respect remote quotas.
 5. **Omitting `wait_for` on dependents** — without `wait_for` (or resolving upstream futures as args), concurrent submits may race; gate with `wait_for=[upstream]`.
 

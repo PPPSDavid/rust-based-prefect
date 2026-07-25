@@ -51,6 +51,7 @@ See [Secure a self-hosted server](../how-to/secure-self-hosted.md).
 | `IRONFLOW_TASK_RUNNER` | `thread` | Default runner kind: `sequential`, `thread`, or `process`. |
 | `IRONFLOW_TASK_RUNNER_THREAD_POOL_MAX_WORKERS` | *(unset)* | Cap thread-pool workers when using the thread runner. |
 | `IRONFLOW_TASK_RUNNER_PROCESS_POOL_MAX_WORKERS` | *(unset)* | Cap process-pool workers when using the process runner. |
+| `IRONFLOW_TASK_TERMINATE_GRACE_SECONDS` | `2` | After SIGTERM on a registered process worker, seconds to wait before SIGKILL (cancel / terminate-pause). |
 
 See [Runners](../concepts/runners.md) for behavior details and **[How to choose a task runner](../how-to/choose-task-runners.md)** for workload-based selection.
 

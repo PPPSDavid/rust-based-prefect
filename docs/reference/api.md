@@ -38,7 +38,9 @@ Monotonic `seq` in storage backs cursors.
 | `GET` | `/api/flow-runs/{flow_run_id}/logs` | Logs (`task_run_id`, `level`, `limit`, `cursor`) |
 | `GET` | `/api/flow-runs/{flow_run_id}/events` | Control-plane events |
 | `GET` | `/api/flow-runs/{flow_run_id}/dag` | DAG payload for UI |
-| `POST` | `/api/flow-runs/{flow_run_id}/cancel` | Cancel (idempotent for terminal states) |
+| `POST` | `/api/flow-runs/{flow_run_id}/cancel` | Cancel (terminate semantics; process workers SIGTERM→SIGKILL when registered) |
+| `POST` | `/api/flow-runs/{flow_run_id}/pause` | Operator pause — **requires** JSON `{"mode":"drain"}` or `{"mode":"terminate"}` (`422` if missing/invalid). Not for gate-only `PAUSED`. |
+| `POST` | `/api/flow-runs/{flow_run_id}/resume` | Resume an operator pause only (`400` for gate-only pause). See **[cancel / pause / resume](../how-to/cancel-pause-resume.md)**. |
 | `POST` | `/api/flow-runs/{flow_run_id}/retry` | Retry deployment-backed runs (`409` otherwise). New run carries resume lineage so eligible completed tasks may skip — see **[task resume how-to](../how-to/task-resume-and-persist.md)**. |
 
 ## Flows and tasks (registry)

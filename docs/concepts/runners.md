@@ -12,7 +12,7 @@ Task runners are **not** deployment **workers** or **work pools**. Workers claim
 | --- | --- |
 | **`SequentialTaskRunner`** | Single-threaded `submit` / `map`; bodies run on the coordinating thread (no overlap). |
 | **`ThreadPoolTaskRunner`** | Concurrent `submit` and `map` via `ThreadPoolExecutor` (Prefect 3–style default). Optional `max_workers`; pool size can also follow **`IRONFLOW_TASK_RUNNER_THREAD_POOL_MAX_WORKERS`**. |
-| **`ProcessPoolTaskRunner`** | Process-pool `map` for picklable tasks; optional **`IRONFLOW_TASK_RUNNER_PROCESS_POOL_MAX_WORKERS`**. Independent `submit()` calls remain **synchronous** on the caller (process-pool submit concurrency is not wired yet). |
+| **`ProcessPoolTaskRunner`** | Picklable task bodies in **registered child processes** (cancel / terminate-pause can SIGTERM→SIGKILL). `submit` and `map` return futures; helper threads wait on children. Optional **`IRONFLOW_TASK_RUNNER_PROCESS_POOL_MAX_WORKERS`**. |
 
 ## Choosing a runner
 
@@ -25,6 +25,6 @@ Task runners are **not** deployment **workers** or **work pools**. Workers claim
 
 With **`ThreadPoolTaskRunner`** (the default), independent **`task.submit()`** calls return a future immediately and run task bodies concurrently in the flow’s shared thread pool. Use **`wait_for`** (or pass upstream futures as args) so dependents start only after upstream work finishes. **`map()`** remains the preferred fan-out for many inputs; both paths share the same runner semantics for threads.
 
-**`SequentialTaskRunner`** keeps `submit` / `map` non-overlapping. **`ProcessPoolTaskRunner`** parallelizes **`map()`** only; `submit()` stays synchronous until process-pool submit is supported.
+**`SequentialTaskRunner`** keeps `submit` / `map` non-overlapping. **`ProcessPoolTaskRunner`** parallelizes both **`submit()`** and **`map()`** across registered child processes (use when hard terminate/cancel must stop blind sleeps).
 
 For execution semantics of `submit` / `map` themselves, see **[Tasks](tasks.md)** and **[Compatibility matrix](../compatibility.md)**.

@@ -57,8 +57,8 @@ Last updated: 2026-07-25.
 
 **Current behavior:**
 
-- **Cancel** (`POST /api/flow-runs/{id}/cancel`): `CANCELLED` + in-flight task rows cancelled; records `lifecycle_action=cancel`, `interrupt_mode=terminate`. Under **`ProcessPoolTaskRunner`**, registered children get SIGTERM→grace→SIGKILL (`process_workers.py`). Thread-pool bodies remain cooperative-only.
-- **Pause** (`POST …/pause` with required `mode=drain|terminate`): drain blocks new starts and settles `PAUSED`; terminate cancels RUNNING rows then kills process workers and holds `PAUSED`. Resume is operator-pause only (`POST …/resume`) — after terminate, in-process runs call `prepare_resume` (P1); deployment-backed use retry-with-`resume_from`. Plan: `docs/plans/flow-run-lifecycle-control.md`.
+- **Cancel** (`POST /api/flow-runs/{id}/cancel`): `CANCELLED` + in-flight task rows cancelled; records `lifecycle_action=cancel`, `interrupt_mode=terminate`. Under **`ProcessPoolTaskRunner`**, registered children get SIGTERM→grace→SIGKILL (`process_workers.py`). Thread-pool bodies remain cooperative-only. User guide: **`docs/how-to/cancel-pause-resume.md`**.
+- **Pause** (`POST …/pause` with required `mode=drain|terminate`): drain blocks new starts and settles `PAUSED`; terminate cancels RUNNING rows then kills process workers and holds `PAUSED`. Resume is operator-pause only (`POST …/resume`) — after terminate, in-process runs call `prepare_resume` (P1) and terminalize the prior attempt; deployment-backed use retry-with-`resume_from`. Plan: `docs/plans/flow-run-lifecycle-control.md`.
 - **Retry** (`POST /api/flow-runs/{id}/retry`): for deployment-backed runs, triggers a **new** deployment run → **new** flow run with **`resume_from_flow_run_id`**. Eligible completed tasks may skip (see below).
 
 **Task resume (Phase 1 — landed):**

@@ -8,7 +8,7 @@ A **task** is a Python callable decorated with **`@task`** from **`prefect_compa
 - **`@task(name="custom-name")`** — optional runtime task name (defaults to the function name). The static planner resolves names from task objects in the flow module or closure so forecast/DAG labels match task runs.
 - **Tags / concurrency limits** — `@task(tags=...)` with `create_tag_concurrency_limit` / named `concurrency` / `rate_limit`. Guide: **[How to use concurrency limits](../how-to/concurrency-limits.md)**. Deployment-level concurrency caps are separate.
 - **`task.map(values, wait_for=...)`** — fan out over inputs; returns a list of futures. Combine with **`wait(mapped)`** before downstream **`submit`** calls. All mapped task runs share one **Aggregated fan-out** DAG node in forecast/UI (fan-out collapsed). Parallelism during `submit` / `map` is controlled by the flow’s **task runner** — see **[How to choose a task runner](../how-to/choose-task-runners.md)**.
-- **`SequentialTaskRunner`** keeps `submit` non-overlapping; **`ProcessPoolTaskRunner`** still runs `submit` synchronously (process concurrency is via `map` only).
+- **`SequentialTaskRunner`** keeps `submit` non-overlapping. **`ProcessPoolTaskRunner`** runs each task body in a **registered child process** (picklable callable); `submit` / `map` return futures while helper threads wait on children — required for hard cancel / terminate-pause kill.
 - Imports and patterns match the subset described in **[Compatibility matrix](../compatibility.md)** and the **[Quick start (demo flow)](../QUICKSTART_DEMO.md)** example.
 
 ## Repeated and aliased tasks

@@ -23,11 +23,11 @@ Use this table when a Prefect import fails or behaves differently. Status values
 | `on_running` / `on_failure` / … hooks | deliberate | Map to `transition_hooks=` + `on_transition(...)` edges |
 | `run_deployment` / nested-flow helpers | partial | Use `deployment_ref(...).submit()` or inline `child_flow(...)` — [subflows](subflows.md) |
 | Blocks (`prefect.blocks.*`) | deliberate | Not in scope; use env vars / your own config |
-| `cache_policy` / task result cache | unsupported | Retry re-runs completed tasks today; resume/cache design tracked in PR [#50](https://github.com/PPPSDavid/rust-based-prefect/pull/50) |
+| `cache_policy` / task result cache | unsupported | Different model: lineage resume + `@task(persist_result=True)` / `None` markers — [task resume](task-resume-and-persist.md). Not Prefect `cache_policy` |
 | Variables (`prefect.variables`) | unsupported | Pass parameters or read env / files |
 | Secrets / profiles / settings | unsupported | Env vars + optional [Basic auth](secure-self-hosted.md) |
 | `prefect.runtime` context module | partial | Use `get_run_context()` → `RunContext` (flow/task ids, names, parameters, deployment fields when claimed). Not a full `prefect.runtime` module clone |
-| Prefect pause / cancel | partial | Cancel = terminate intent. Operator pause requires explicit `mode=drain` or `mode=terminate` (`POST /api/flow-runs/{id}/pause`). Hard process kill of blind sleeps is not guaranteed on thread runners yet — see lifecycle plan |
+| Prefect pause / cancel | partial | Cancel = terminate. Operator pause requires explicit `mode=drain` or `mode=terminate`. Hard OS-kill needs **`ProcessPoolTaskRunner`**; thread runners are cooperative-only. Guide: [cancel / pause / resume](cancel-pause-resume.md) |
 | Artifacts (`create_markdown`, …) | unsupported | Internal result artifacts + GET only; no Prefect `create_*` API |
 | Automations / webhooks | unsupported | Events + SSE exist; no trigger engine |
 | `concurrency` / `rate_limit` (sync) | partial | Sync helpers + GCL CRUD — [concurrency limits](concurrency-limits.md); async helpers not shipped |
