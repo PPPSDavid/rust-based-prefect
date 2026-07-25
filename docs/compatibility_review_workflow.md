@@ -91,14 +91,21 @@ Recommendation:
 
 ## Current Candidate Backlog
 
-These are not commitments; they are starting points from the May 2026 pass (updated July 2026 for concurrency).
+Canonical sorted backlog (gap vs deliberate vs park): **`docs/plans/prefect-gap-canvas.md`** (2026-07 canvas).
+
+These are not commitments; shortlist retained for quick scanning (updated July 2026).
 
 | Candidate | Current Prefect surface | IronFlow status | Why it fits |
 | --- | --- | --- | --- |
-| Global + tag concurrency limits | Named slot ledger, `concurrency` / `rate_limit`, leases, decay; tags as `tag:{name}` on enter `Running`. | **Implemented** subset — how-to `docs/how-to/concurrency-limits.md`; plan retained for follow-ups (async CM, CLI, UI). | Core control-plane feature; Rust lease/acquire fits existing claim patterns. |
-| RRule deployment schedules | Prefect supports Cron, Interval, and RRule schedules. | Limited Rust-first RRule subset implemented; advanced calendar rules remain missing. | Bounded scheduling feature that fits existing Rust deployment scheduler paths. |
-| Minimal task caching | Prefect task caching uses cache keys, policies, expiration, storage, and isolation. | No documented cache API. | Good determinism/idempotency story, but result serialization and storage scope must stay narrow. |
-| `task.delay()` background tasks | Prefect supports fire-and-forget background task execution via workers. | `.submit()` and `.map()` exist; `.delay()` is missing. | Aligns with existing deployment queue/worker concepts, but needs careful future and queue semantics. |
-| Variables JSON store | Prefect variables support structured JSON configuration. | No documented variable API. | Small API/storage feature, but lower value than control-plane alignment. |
-| Events/automations subset | Prefect 3 OSS includes events and automations. | IronFlow records events and has transition hooks, but no automation engine. | Strong conceptual fit, but broader product surface; design before implementation. |
+| Docs sitemap / matrix honesty | Prefect `llms.txt` + concept IA | **Partial** — nav/`llms.txt` drift; matrix under-lists open gaps (P0 in canvas) | Cheap; unblocks every later session |
+| Task resume / result store | Retry + caching overlap | **In flight** — PR #50 / `docs/plans/task-result-cache.md`; `main` still re-runs all tasks | Determinism + cancel/retry UX |
+| Runtime DX (context, logging, lifecycle) | Logger/context; **force cancel + pause drain/terminate + resume** | Design: `docs/plans/flow-run-lifecycle-control.md` (**P3.2**); today cancel is state-only | Core after P0–P1; before P2 |
+| UI ops experience & aesthetics | Operate hundreds of flows; modern shell | Surfaces exist; polish lagging — **PU** track `docs/plans/ui-ops-experience.md` (render→confirm) | Parallel priority; not Prefect clone |
+| Custom transition hooks (X→Y→Z) | Side effects on state edges at definition time | **Core shipped** (`transition_hooks` / `on_transition` on `@flow`/`@task`); **PH** = docs/sugar/workers | High leverage polish, not greenfield |
+| Global + tag concurrency polish | Async CM, CLI `gcl`, UI admin, perf gate | Core sync subset shipped; ops surface open (**P4** deep dive) | Productize existing Rust ledger |
+| Postgres Rust schedule/gate | Self-hosted scale | Claim/lease on Postgres shipped; schedule/gate may Python-fallback | After P3/P4 core DX |
+| RRule deployment schedules | Cron, Interval, RRule | Limited Rust-first RRule; advanced rules missing | Only if a real workload needs it |
+| `task.delay()` background tasks | Worker-backed delay | Missing | Design before queue semantics |
+| Variables JSON store | Structured JSON variables | No API | Small; lower priority than resume/logging |
+| Events/automations subset | Events + automations OSS | Events/SSE only; no automation engine | Design-first (P7 in canvas) |
 

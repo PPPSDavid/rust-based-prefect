@@ -53,30 +53,34 @@ Last updated: 2026-07-25.
 - Perf gate: `python3 benchmarks/perf_matrix.py run --preset lite --repetitions 1 --warmups 0 --jobs 2`
 - CRG setup/verify: `bash scripts/setup_code_review_graph.sh`
 
-## Run lifecycle: cancel / retry (current vs desired)
+## Run lifecycle: cancel / pause / retry (current vs desired)
 
-**Current behavior (MVP — do not change without explicit task):**
+**Current behavior (MVP):**
 
-- **Cancel** (`POST /api/flow-runs/{id}/cancel`): sets flow run state to `CANCELLED` and marks in-flight task runs `CANCELLED` in the control plane / SQLite read model. Long-running task bodies are not cooperatively interrupted unless they poll cancellation themselves (no default hook yet).
-- **Retry** (`POST /api/flow-runs/{id}/retry`): for deployment-backed runs, calls `trigger_deployment_run` with the same deployment and parameters → **new deployment run → new flow run → full flow re-execution from scratch**. This is **not** Prefect task-resume parity.
+- **Cancel** (`POST /api/flow-runs/{id}/cancel`): sets flow run state to `CANCELLED` and marks in-flight task runs `CANCELLED` in the control plane. Task **bodies** keep running unless they poll (`prefect_compat.cancellation.sleep_cancelable` / `assert_flow_not_cancelled` — not yet public DX).
+- **Retry** (`POST /api/flow-runs/{id}/retry`): deployment-backed → new deployment/flow run; full re-execution today (P1 resume Goal A in flight on PR #50).
+- **Operator pause/resume of flow runs:** not supported. `PAUSED` is used for temporal **gates**; deployment `paused` only stops scheduling new deployment runs.
 
-**Known gap (documented, future work):**
+**Desired (design locked in `docs/plans/flow-run-lifecycle-control.md`, canvas P3.2):**
 
-- For multi-task flows where some tasks **completed** before cancel, **retry currently recomputes those completed tasks**. Desired Prefect-like semantics: on retry, **already-completed tasks should not be recomputed** (task-level resume / result cache keyed by flow run lineage or equivalent).
-- Implementing this requires architectural work: task result persistence across retry, idempotent resume graph, and UI/API surfacing of which tasks were skipped vs re-run. Track in compatibility matrix before claiming parity.
+- **Cancel = terminate** running task workers ASAP (process-isolated kill + fence), then terminal `CANCELLED`.
+- **Pause `drain`:** block new starts; let RUNNING tasks finish; settle `PAUSED`; resume continues.
+- **Pause `terminate`:** kill in-flight like cancel, but flow stays `PAUSED`; resume **retries interrupted** tasks (P1 lineage).
+- Modes must be explicit and clearly labeled in API/UI (no ambiguous single “pause”).
 
-**Useful test scenario (manual / E2E):**
-
-- Flow: fast task → `sleep` ~10s task → downstream task. Trigger → cancel while sleeping → retry → wait for completion. Today, expect all tasks to run again on retry; use this to validate when resume lands.
+**Also:** P1 task-level resume on retry (skip completed / restore persisted results) remains a separate track that hard-pause resume reuses.
 
 ## Next High-Value Work
 
-**P0 docs truth (nav / `llms.txt` / matrix / UI checklist / port guide)** is the current docs-hygiene bar; gap-canvas backlog proposal lives in PR [#60](https://github.com/PPPSDavid/rust-based-prefect/pull/60) (`docs/plans/prefect-gap-canvas.md` when merged).
+Canonical prioritized gap list: **`docs/plans/prefect-gap-canvas.md`** (PR [#60](https://github.com/PPPSDavid/rust-based-prefect/pull/60)).
 
-1. **P1 task resume on retry** — finish/land PR [#50](https://github.com/PPPSDavid/rust-based-prefect/pull/50) Goal A; then map-key / Rust / UI hardening (see section above).
-2. **P3 logging helpers** (`get_run_logger` / `log_prints`) + cooperative cancel polling.
-3. Postgres Rust schedule/gate (Tier B follow-up) + optional Alembic upgrade CLI / HA services.
-4. Keep CI + `perf_matrix` regression thresholds healthy (including `--preset gcl`).
-5. Optional: async `concurrency` / CLI `gcl` / UI admin for concurrency limits.
-6. Move remaining projection write hot paths from Python into Rust-backed implementation.
-7. Optional: Cloud embeddings path if NL `semantic_search` becomes important; keep decision log current (`docs/agent/DECISION_LOG.md`).
+**P0 docs truth landed** ([#61](https://github.com/PPPSDavid/rust-based-prefect/pull/61) — nav/`llms.txt`, matrix, UI checklist, port-guide API table).
+
+1. **P1 task resume on retry** — finish/land PR [#50](https://github.com/PPPSDavid/rust-based-prefect/pull/50) Goal A; then map-key / Rust / UI hardening.
+2. **P3 runtime DX** — logging/context; **P3.2 lifecycle control** (`docs/plans/flow-run-lifecycle-control.md`).
+3. **PU UI ops/aesthetics** — iterative render→confirm (`docs/plans/ui-ops-experience.md`).
+4. **PH transition hooks** — core shipped; polish how-to/sugar/workers (`docs/plans/transition-hooks-priority.md`).
+5. **P4 concurrency productization** — lease-on-cancel, CLI `gcl`, UI admin, async CM, perf gate.
+6. Postgres Rust schedule/gate (Tier B follow-up) + optional Alembic upgrade CLI / HA services.
+7. Keep CI + `perf_matrix` regression thresholds healthy (including `--preset gcl`).
+8. Optional: Cloud embeddings path if NL `semantic_search` becomes important; keep decision log current (`docs/agent/DECISION_LOG.md`).
