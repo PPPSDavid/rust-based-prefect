@@ -1,6 +1,6 @@
 # Flow-run lifecycle control: cancel, pause, resume
 
-**Status:** Design accepted — **P3.2a–d implemented** (mode-required pause, drain/resume, process-kill terminate under `ProcessPoolTaskRunner`, hard-pause resume via P1 `prepare_resume` / deployment retry). **P3.2e** UI pause chooser still open.  
+**Status:** Design accepted — **P3.2a–d + P3.2f implemented** (mode-required pause, drain/resume, process-kill terminate under `ProcessPoolTaskRunner`, hard-pause resume via P1 `prepare_resume` / deployment retry, user guide `docs/how-to/cancel-pause-resume.md`). **P3.2e** UI pause chooser still open.  
 **Canvas ID:** **P3.2** (expanded) — see `docs/plans/prefect-gap-canvas.md`  
 **Last updated:** 2026-07-25  
 **Depends on:** P1.1 resume lineage (interrupted-task retry on hard pause / cancel→retry); P3.0 context helpful  
@@ -186,7 +186,7 @@ Task runs interrupted by terminate get:
 | Prior action | Resume behavior |
 | --- | --- |
 | Pause drain | Flow `PAUSED` → `RUNNING`; start next PENDING tasks; completed tasks untouched |
-| Pause terminate | Flow `PAUSED` → `RUNNING`; **re-create/re-run** task runs with `interrupted=true`; skip COMPLETED per P1 persist/resume rules; pending run as normal |
+| Pause terminate | In-process: `prepare_resume` for next `@flow()` invoke; prior attempt terminalized `CANCELLED` (`superseded_by_terminate_resume`). Deployment-backed: retry-with-`resume_from`. Skip COMPLETED per P1; interrupted work re-runs |
 | After cancel | No resume — use deployment **retry** (P1 lineage) |
 
 Resume must be rejected unless `lifecycle_action=pause` and state=`PAUSED` (not gate-only pause without operator action — or allow resume only when `interrupt_mode` is set).
@@ -219,7 +219,7 @@ Update `docs/concepts/states-and-transitions.md` (today’s published table omit
 | **P3.2c** | Terminate path for cancel + hard pause via process worker registry + SIGTERM/SIGKILL fence | Blind `time.sleep` in child process stops; thread-pool limitation documented or removed for terminate |
 | **P3.2d** | Hard-pause resume re-runs interrupted tasks (P1 integration) | Interrupted tasks re-execute; completed skipped per P1 |
 | **P3.2e** | UI/CLI: pause chooser, cancel copy, badges for mode | Impossible to “just pause” without choosing mode |
-| **P3.2f** | Docs how-to + port guide; MEMORY_BANK rewrite of cancel section | Users understand drain vs terminate |
+| **P3.2f** | Docs how-to + port guide; MEMORY_BANK rewrite of cancel section | ✅ `docs/how-to/cancel-pause-resume.md` + port/mapping updates |
 
 Cooperative helpers (`sleep_cancelable`, etc.) still exported as **supplement** for library code that opts in — never the only cancel story.
 

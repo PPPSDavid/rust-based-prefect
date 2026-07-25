@@ -1,6 +1,6 @@
 # How to resume tasks and persist results
 
-On **flow-run retry** (or an in-process resume), IronFlow can skip DAG nodes that already **COMPLETED** in a prior attempt. This is **resume-within-lineage**, not Prefect’s full `cache_policy` matrix.
+On **flow-run retry**, **operator terminate-pause resume**, or an in-process **`prepare_resume`**, IronFlow can skip DAG nodes that already **COMPLETED** in a prior attempt. This is **resume-within-lineage**, not Prefect’s full `cache_policy` matrix. For pause/cancel operators, see **[How to cancel, pause, and resume](cancel-pause-resume.md)**.
 
 Normative limits: **[Compatibility matrix](../compatibility.md)**. Design notes: `docs/plans/task-result-cache.md` (in-repo).
 

@@ -55,8 +55,10 @@ def pipeline(n: int) -> int:
 
 ## Operator pause / cancel (subset)
 
-- **Cancel** — `POST /api/flow-runs/{id}/cancel` (always terminate semantics for the control plane).
+- **Cancel** — `POST /api/flow-runs/{id}/cancel` (always terminate semantics).
 - **Pause** — `POST /api/flow-runs/{id}/pause` with required JSON `{"mode": "drain"}` or `{"mode": "terminate"}` (no ambiguous default).
 - **Resume** — `POST /api/flow-runs/{id}/resume` for operator pauses only (gate waits are different).
 
-`drain` lets in-flight tasks finish then holds `PAUSED`; further `submit` in the same in-process body raises `FlowRunSchedulingHeld`. `terminate` cancels RUNNING task rows (late `COMPLETED` is fenced) and holds `PAUSED`, but does **not** OS-kill thread-pool bodies yet. Resume does not re-enter an already-exited `@flow()` body — if a result was stored, resume completes the run. See **[lifecycle plan](../plans/flow-run-lifecycle-control.md)**.
+**Drain** lets in-flight tasks finish then holds `PAUSED`; further `submit` in the same in-process body raises `FlowRunSchedulingHeld`. **Terminate** / cancel cancel RUNNING rows (late `COMPLETED` fenced) and, under **`ProcessPoolTaskRunner`**, SIGTERM→SIGKILL registered child processes. Thread-pool bodies remain cooperative-only. After terminate pause, in-process resume prepares P1 lineage for the **next** `@flow()` invoke (prior attempt is terminalized); deployment-backed resume uses retry-with-`resume_from`.
+
+Step-by-step: **[How to cancel, pause, and resume](../how-to/cancel-pause-resume.md)**. Design: **[lifecycle plan](../plans/flow-run-lifecycle-control.md)**.

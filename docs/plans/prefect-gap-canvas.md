@@ -1,7 +1,7 @@
 # Prefect ↔ IronFlow gap canvas (2026-07)
 
-**Status:** Proposal for review — P0/P1 agents in flight; **P3/P4 expanded**; **P3.2 lifecycle redesign accepted**  
-**Date:** 2026-07-25 (rev: P3.2 cancel/pause/resume)  
+**Status:** Living backlog — **P0/P1/P3.0–P3.2d/f landed on `main`** (#61/#62/#65); **P3.2e UI chooser**, **P3.3–P3.5**, **P4+** still open  
+**Date:** 2026-07-25 (rev: P3 docs truth after #65)  
 **Audience:** Maintainers choosing the next 1-feature sessions  
 **Sources checked:**
 
@@ -93,8 +93,8 @@ Prefect concept pages from https://docs.prefect.io/v3/concepts (plus adjacent ge
 | Runtime context | Implicit control-plane context | partial | No Prefect `runtime` module parity |
 | Events | Control-plane events + SSE | partial | Emit/query only; no automation consumers |
 | Automations / triggers / webhooks | None | gap (design-first) | Large surface; subset later |
-| Interactive pause / input | Temporal `gate` only today | gap → **P3.2 plan** | Operator pause `drain`/`terminate` + resume (not Prefect human-input forms — those stay park) |
-| Logging (`get_run_logger`, `log_prints`) | Log list API exists; no Prefect logger helpers | gap | High DX value for porting |
+| Interactive pause / input | Operator pause `drain`/`terminate` + resume API; UI chooser open | partial → **P3.2e** | Human-input forms stay park; guide: `docs/how-to/cancel-pause-resume.md` |
+| Logging (`get_run_logger`, `log_prints`) | `get_run_logger` → log store/UI; `log_prints=` open | partial | High DX value for porting |
 | Assets / SLAs / telemetry | None | park | Cloud-leaning / advanced |
 | Server / self-hosted scale | Compose shipped; HA/Redis deferred | partial | See Tier B follow-ups |
 | UI | Runs/Flows/Deployments/Work pools + DAG | partial | Checklist stale; concurrency admin missing |
@@ -169,7 +169,7 @@ These are **authoring/runtime fundamentals**, not polish. Prefects’ get-starte
 | --- | --- | --- | --- |
 | **P3.0** | Stable **runtime context** helpers (`flow_run_id`, `task_run_id`, deployment id/name, parameters) — foundation for logging/cancel | ✅ `get_run_context` / `RunContext` exported + tests | shim |
 | **P3.1** | Prefect-shaped **logging**: `get_run_logger()` (+ optional `log_prints=` on `@flow`/`@task`) → existing log rows / UI Logs tab | ✅ `get_run_logger` → log store/UI; `log_prints=` still open | shim (+ tiny UI if needed) |
-| **P3.2** | **Lifecycle control (expanded):** (1) **Cancel terminates** running tasks (killable workers, not poll-only); (2) **Pause `drain`** — pause scheduling, let in-flight finish; (3) **Pause `terminate`** — hard brake, kill in-flight, resume retries interrupted. Modes explicit in API/UI. Plan: [`flow-run-lifecycle-control.md`](flow-run-lifecycle-control.md) | 🟨 P3.2a–d: pause modes + drain/resume + process kill (`ProcessPoolTaskRunner`) + hard-pause `prepare_resume`; **P3.2e** UI chooser still open | shim + engine + frontend |
+| **P3.2** | **Lifecycle control (expanded):** (1) **Cancel terminates** running tasks (killable workers, not poll-only); (2) **Pause `drain`** — pause scheduling, let in-flight finish; (3) **Pause `terminate`** — hard brake, kill in-flight, resume retries interrupted. Modes explicit in API/UI. Plan: [`flow-run-lifecycle-control.md`](flow-run-lifecycle-control.md) | ✅ P3.2a–d + how-to (**P3.2f**); 🟨 **P3.2e** UI chooser still open | shim + engine + frontend |
 | **P3.3** | Concept pages: Deployments, Schedules, Work pools, Concurrency, Server (thin, link to how-tos) | Nav Concepts mirrors Prefect IA for supported subset | docs |
 | **P3.4** | Retries / timeouts **authoring clarity**: document exact `@task`/`@flow` knobs that exist today; add missing thin knobs only if code already half-supports them | Port guide + concepts state truth; no silent Prefect-looking kwargs | shim + docs |
 | **P3.5** | Lifecycle **E2E smoke**: soft pause, hard pause+resume, cancel-terminate + logs visible | Scripts/tests for all three paths | shim (+ frontend optional) |
@@ -287,7 +287,7 @@ Full design: [`flow-run-lifecycle-control.md`](flow-run-lifecycle-control.md).
 | **P3.2c** | Process worker registry + terminate for **cancel** and **hard pause** |
 | **P3.2d** | Hard-pause resume ↔ P1 interrupted re-run |
 | **P3.2e** | UI/CLI chooser + run badges |
-| **P3.2f** | How-to + MEMORY_BANK; export cooperative helpers as optional aid |
+| **P3.2f** | How-to + MEMORY_BANK — ✅ `docs/how-to/cancel-pause-resume.md` |
 
 **Out of scope:** Prefect human-input approval pauses; guaranteeing `finally` after SIGKILL.
 
