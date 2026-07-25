@@ -38,12 +38,20 @@ Maintainers should use `docs/compatibility_review_workflow.md` before changing t
   - **Subflows (subset):** two mechanisms only — (1) **blocking inline** via direct `child_flow(...)` from an active parent `@flow` (same process; linked child flow run with `execution_mode=inline`, parent/root/depth metadata); (2) **deployment-backed subflow as task** via `deployment_ref(name_or_id).submit(**params)` returning `SubflowFuture` (surrogate parent task `kind=subflow`, child deployment run + child flow run linkage). `wait_for=[subflow_future]` and `wait([...])` gate downstream tasks; **fire-and-forget** requires `submit(..., detach=True)` (or `@flow(final_state="explicit")`) so the child is excluded from parent final-state aggregation. Nesting of either mechanism inside either mechanism is supported (depth capped, currently 32). Parent cancel propagates to **active** deployment-backed children. UI: DAG node kinds `inline_subflow` / `subflow_task`; parent run detail exposes `children[]` and child-run navigation. User guide: **`docs/how-to/subflows.md`**.
   - **Flow-run final state (IronFlow extension):** default `@flow(final_state="wait_all")` waits for all non-detached task / gate / subflow children, then resolves the flow terminal state in **Rust** (`resolve_flow_terminal_state`: `CANCELLED` > `FAILED` > all `COMPLETED`). Unobserved failed concurrent `submit`s fail the flow (`FlowChildrenFailed`). Escape hatches: `submit(..., detach=True)` and `@flow(final_state="explicit")` (body return/exception remains authoritative). Not Prefect return-value / `State`-object finalization.
   - **Temporal gate tasks (IronFlow extension):** `gate(name=..., max_wait=...)` inside an active `@flow`; call `.submit(until=datetime | after=timedelta, wait_for=[...])` to insert a **zero-op barrier** task (`kind=gate`, real task-run UUID) that blocks downstream `wait_for` until `open_at`. Default **`max_wait`** safeguard is **`timedelta(days=1)`** (Python definitional default; override per gate). While waiting, the flow run may enter **`PAUSED`**; gate promotion ticks prefer **Rust** (`task_tick_gate_tasks` / bundled in `deployment_maintenance`) with Python fallback. UI: DAG node kind **`gate_task`** with `gate_open_at`. Not Prefect API parity — Prefect has no first-class in-flow calendar gate.
-- Not yet supported:
+- Not yet supported (honest open gaps — not parity claims):
   - full API parity for every Prefect state rule edge case.
-  - advanced cloud/tenant features.
-  - all blocks and integrations.
+  - advanced cloud/tenant features (RBAC, SSO, workspaces) — **deliberate park** for MVP.
+  - all blocks, secrets managers, and integration packs — **deliberate park**.
   - Prefect `SubflowTask` / `run_deployment` name parity, automatic deployment creation from `@flow`, or subflow parameter schema validation beyond deployment defaults.
+  - **Task-level resume on flow-run retry** / opt-in result cache (retry today re-executes completed tasks; design/impl tracked in PR [#50](https://github.com/PPPSDavid/rust-based-prefect/pull/50) / `docs/plans/task-result-cache.md`).
+  - Prefect-shaped logging helpers (`get_run_logger`, `log_prints`); log list/API/UI exist without those authoring helpers.
+  - Cooperative cancel of long-running task bodies (control-plane cancel is recorded; bodies must poll unless instrumented — see `docs/MEMORY_BANK.md`).
+  - User-facing artifacts API (`create_markdown` / tables); internal result artifact rows + GET APIs only.
+  - Variables JSON store; settings/profiles module; runtime-context module parity.
+  - Events → automations / webhooks engine (events + SSE exist; no trigger actions).
+  - `task.delay()` background tasks; Dask/Ray runners; non-process work pool types — **park** near-term.
   - Async `concurrency` / `rate_limit` helpers, CLI `ironflow gcl` parity, UI concurrency admin page, work-queue / work-pool concurrency.
+  - Advanced RRule calendar filters / `COUNT`; human-in-the-loop pause/input (temporal `gate` is a different, deliberate mechanism).
 
 ## Phase 2 static planning compatibility
 

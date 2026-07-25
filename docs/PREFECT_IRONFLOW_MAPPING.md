@@ -17,12 +17,18 @@ This project is **not** a drop-in replacement for Prefect Cloud or the full Pref
 | Subflows / nested flows / `run_deployment` | **Two mechanisms (subset):** (1) **inline** — call `child_flow(...)` inside a parent `@flow` (blocking, same process, linked child run); (2) **deployment-backed** — `deployment_ref("name").submit(...).result()` with `SubflowFuture` and `wait_for`. Fire-and-forget uses **`detach=True`**. Not full Prefect subflow / `run_deployment` API parity. Guide: **[How to compose flows with subflows](how-to/subflows.md)**. |
 | `task.map()` | Supported with moderate fan-out (see `COMPATIBILITY.md`). |
 | Retries, timeouts, cancellation | Enforced at the **control-plane** level for supported flows; semantics are workload-driven—see `COMPATIBILITY.md` for exact boundaries. |
+| Task resume / result cache on retry | **Gap:** cancel→retry currently re-runs completed tasks. Goal A (resume) tracked in PR [#50](https://github.com/PPPSDavid/rust-based-prefect/pull/50) / `docs/plans/task-result-cache.md`. |
+| Cooperative cancel in task bodies | **Gap:** `POST …/cancel` marks runs `CANCELLED`; long sleeps/CPU work do not stop unless the body polls cancel. No Prefect-style cooperative interrupt helper yet. |
+| `get_run_logger` / `log_prints` | **Gap:** logs are stored and shown in the UI/API; Prefect authoring helpers are not exported. Use stdlib logging or write via your own sink until helpers land. |
+| Artifacts (`create_markdown`, tables, links) | **Partial:** internal `artifact_type=result` rows + GET APIs / UI Artifacts tab. No Prefect user-facing `create_*` artifact API. |
+| Variables | **Gap:** no Prefect-style variables JSON store / runtime get. Prefer parameters, env vars, or your own config. |
+| Automations / triggers / webhooks | **Gap (design-first):** events + SSE exist; no automation consumers that trigger deployments on state. |
 | Deployment concurrency / collision strategy | **Subset:** `concurrency_limit` + `ENQUEUE` / `CANCEL_NEW` on deployments (claim/trigger path). Caps concurrent runs **of that deployment**, not named global slots. |
 | Global concurrency limits (`concurrency` / `rate_limit`) | **Subset:** named slots, sync CM, leases, rate-limit decay — **[how-to](how-to/concurrency-limits.md)**. |
 | Tag-based concurrency (`@task(tags=...)`) | **Subset:** tags backed by `tag:{name}` limits; gated on enter `Running`. Same how-to. |
-| Blocks, integrations, secrets | **Not** a focus of the MVP; many patterns are unsupported or stubbed. |
+| Blocks, integrations, secrets | **Deliberate park** for the MVP; many patterns are unsupported. Use env + optional Basic auth. |
 | State hooks (`on_running`, …) | IronFlow uses **`transition_hooks`** on `@flow` / `@task` with `TransitionHookSpec` / `on_transition`—see `COMPATIBILITY.md`. This is an **extension**, not Prefect’s hook API. |
-| Event stream / observability | Local persistence (JSONL + SQLite) and optional API/SSE; see README **History persistence**. |
+| Event stream / observability | Local persistence (JSONL + SQLite) and optional API/SSE; see README **History persistence**. Automations on those events are not supported. |
 | Static DAG / compile-time insights | `static-planner/` analyzes `@flow` bodies (`submit`, `map`, `wait_for`, repeated tasks, `@task(name=...)`) and stores a per-run manifest + forecast. See **[DAG and forecast](concepts/dag-and-forecast.md)**. Dynamic regions fall back to runtime-inferred DAGs. |
 | Run DAG UI | Local UI **DAG** tab: **Aggregated fan-out** (planned graph, fan-out collapsed) vs **Task runs**; dependencies always left→right, parallel top→bottom; zoom/pan, search, path highlight. API: `mode=logical|expanded`. |
 

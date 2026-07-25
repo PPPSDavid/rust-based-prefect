@@ -71,10 +71,12 @@ Last updated: 2026-07-25.
 
 ## Next High-Value Work
 
-1. Move remaining projection write hot paths from Python into Rust-backed implementation.
-2. Expand Prefect API compatibility matrix with concrete parity tests.
-3. Add migration/versioning path toward PostgreSQL for larger-scale persistence.
+**P0 docs truth (nav / `llms.txt` / matrix / UI checklist / port guide)** is the current docs-hygiene bar; gap-canvas backlog proposal lives in PR [#60](https://github.com/PPPSDavid/rust-based-prefect/pull/60) (`docs/plans/prefect-gap-canvas.md` when merged).
+
+1. **P1 task resume on retry** — finish/land PR [#50](https://github.com/PPPSDavid/rust-based-prefect/pull/50) Goal A; then map-key / Rust / UI hardening (see section above).
+2. **P3 logging helpers** (`get_run_logger` / `log_prints`) + cooperative cancel polling.
+3. Postgres Rust schedule/gate (Tier B follow-up) + optional Alembic upgrade CLI / HA services.
 4. Keep CI + `perf_matrix` regression thresholds healthy (including `--preset gcl`).
-5. **Task-level resume on flow-run retry** (skip recomputation of tasks that completed before cancel) — see section above.
-6. Optional: async `concurrency` / CLI `gcl` / UI admin for concurrency limits.
+5. Optional: async `concurrency` / CLI `gcl` / UI admin for concurrency limits.
+6. Move remaining projection write hot paths from Python into Rust-backed implementation.
 7. Optional: Cloud embeddings path if NL `semantic_search` becomes important; keep decision log current (`docs/agent/DECISION_LOG.md`).
