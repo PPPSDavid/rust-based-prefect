@@ -10,7 +10,7 @@ Project IronFlow is a **hybrid MVP** built around a **Rust orchestration kernel*
 
 ## Install from PyPI
 
-The published package is **`ironflow-prefect-compat`** on [PyPI](https://pypi.org/project/ironflow-prefect-compat/). On supported platforms, **prebuilt wheels include the Rust engine** — install like any other wheel-backed package (**no Rust toolchain required** for those wheels). Use **CPython 3.11 or 3.12** for the published wheel matrix; other versions may fall back to **sdist** (needs `cargo`) — see [COMPATIBILITY.md](COMPATIBILITY.md) and [docs/INSTALL.md](docs/INSTALL.md).
+The published package is **`ironflow-prefect-compat`** on [PyPI](https://pypi.org/project/ironflow-prefect-compat/). On supported platforms, **prebuilt wheels include the Rust engine** — install like any other wheel-backed package (**no Rust toolchain required** for those wheels). Use **CPython 3.11 or 3.12** for the published wheel matrix; other versions may fall back to **sdist** (needs `cargo`) — see the [compatibility matrix](https://pppsdavid.github.io/rust-based-prefect/compatibility/) and [Installation](https://pppsdavid.github.io/rust-based-prefect/INSTALL/) guides.
 
 ```bash
 python -m pip install --upgrade pip
@@ -31,22 +31,22 @@ python -c "from prefect_compat.rust_bridge import native_library_available; prin
 
 Expect **`True`** when a matching wheel loaded. **Developing the repo**, integrating from **git**, or running on an **unsupported ABI** may still require a **source checkout** and `cargo build` — see **Quickstart** below and the hosted [Installation](https://pppsdavid.github.io/rust-based-prefect/INSTALL/) guide.
 
-**Hosted docs (MkDocs):** [https://pppsdavid.github.io/rust-based-prefect/](https://pppsdavid.github.io/rust-based-prefect/) — the site is organized into **Get started**, **Concepts**, **How-to guides**, and **Reference** (see [docs/index.md](docs/index.md)); the [Prefect → IronFlow mapping](https://pppsdavid.github.io/rust-based-prefect/PREFECT_IRONFLOW_MAPPING/) remains the main Prefect-oriented entry. Enable GitHub Pages per [RELEASING.md](RELEASING.md).
+**Hosted docs (MkDocs / GitHub Pages):** [https://pppsdavid.github.io/rust-based-prefect/](https://pppsdavid.github.io/rust-based-prefect/) — organized into **Get started**, **Concepts**, **How-to guides**, and **Reference**. The [Prefect → IronFlow mapping](https://pppsdavid.github.io/rust-based-prefect/PREFECT_IRONFLOW_MAPPING/) is the main Prefect-oriented entry. Markdown sources live under `docs/`; Pages deploy is described in [RELEASING.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/RELEASING.md).
 
 | If you want… | Go to… |
 | --- | --- |
-| Layered doc home (hosted) | [docs/index.md](docs/index.md) |
-| How Rust and Python fit together | [docs/architecture.md](docs/architecture.md) |
-| **Install (hosted docs; PyPI first)** | [docs/INSTALL.md](docs/INSTALL.md) |
+| Doc home | [Hosted docs](https://pppsdavid.github.io/rust-based-prefect/) |
+| How Rust and Python fit together | [Architecture](https://pppsdavid.github.io/rust-based-prefect/architecture/) |
+| **Install (PyPI first)** | [Installation](https://pppsdavid.github.io/rust-based-prefect/INSTALL/) |
 | **PyPI (`ironflow-prefect-compat`)** | [https://pypi.org/project/ironflow-prefect-compat/](https://pypi.org/project/ironflow-prefect-compat/) — `pip install ironflow-prefect-compat` (see INSTALL for CPython versions shipped as wheels). |
-| PyPI / conda packaging notes (contributors) | [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) |
-| Performance vs Prefect (expectations, caveats) | [docs/PERFORMANCE_OVERVIEW.md](docs/PERFORMANCE_OVERVIEW.md) |
-| Quick start (demo flow, hosted docs) | [docs/QUICKSTART_DEMO.md](docs/QUICKSTART_DEMO.md) |
-| Self-hosted server (API, workers, deployments, schedules; hosted docs) | [docs/SELF_HOSTED_SERVER.md](docs/SELF_HOSTED_SERVER.md) |
-| Map Prefect concepts to this repo | [docs/PREFECT_IRONFLOW_MAPPING.md](docs/PREFECT_IRONFLOW_MAPPING.md) |
-| Supported behavior & gaps vs Prefect | [COMPATIBILITY.md](COMPATIBILITY.md) |
-| Releases & version bumps | [RELEASING.md](RELEASING.md) |
-| Change history | [CHANGELOG.md](CHANGELOG.md) |
+| Performance vs Prefect (expectations, caveats) | [Performance overview](https://pppsdavid.github.io/rust-based-prefect/PERFORMANCE_OVERVIEW/) |
+| Quick start (demo flow) | [Quick start](https://pppsdavid.github.io/rust-based-prefect/QUICKSTART_DEMO/) |
+| Self-hosted server (API, workers, deployments, schedules) | [Self-hosted server](https://pppsdavid.github.io/rust-based-prefect/SELF_HOSTED_SERVER/) |
+| Map Prefect concepts to this repo | [Prefect → IronFlow](https://pppsdavid.github.io/rust-based-prefect/PREFECT_IRONFLOW_MAPPING/) |
+| Supported behavior & gaps vs Prefect | [Compatibility matrix](https://pppsdavid.github.io/rust-based-prefect/compatibility/) |
+| PyPI / conda packaging notes (contributors) | [DISTRIBUTION.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/DISTRIBUTION.md) |
+| Releases & version bumps | [RELEASING.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/RELEASING.md) |
+| Change history | [CHANGELOG.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/CHANGELOG.md) |
 | Agent / contributor workflow | [AGENTS.md](AGENTS.md) |
 
 ## Goals
@@ -59,7 +59,7 @@ Expect **`True`** when a matching wheel loaded. **Developing the repo**, integra
 ## Prefect baseline
 
 - Target baseline: **Prefect OSS 3.x** (see `environment.yml` / `requirements-ci.txt` pins). For how Prefect itself describes flows and tasks, see the official [Prefect 3 get started](https://docs.prefect.io/v3/get-started) guide; upstream code is at [prefecthq/prefect](https://github.com/prefecthq/prefect).
-- Compatibility is **subset-based** and validated against expectations in `COMPATIBILITY.md` — this is **not** a full Prefect runtime or Cloud substitute.
+- Compatibility is **subset-based** and validated against expectations in the [compatibility matrix](https://pppsdavid.github.io/rust-based-prefect/compatibility/) — this is **not** a full Prefect runtime or Cloud substitute.
 
 ## Repository lifecycle
 
@@ -81,7 +81,7 @@ Expect **`True`** when a matching wheel loaded. **Developing the repo**, integra
 | `docs/` | Methodology notes, UI checklists, **MkDocs sources** for the site above. |
 | `scripts/` | Server launcher (`ironflow_server.py`), seeds, demos. |
 
-See [docs/architecture.md](docs/architecture.md) for the runtime data path (Python → shim → Rust engine).
+See [Architecture](https://pppsdavid.github.io/rust-based-prefect/architecture/) for the runtime data path (Python → shim → Rust engine).
 
 ## Quickstart
 
@@ -113,7 +113,7 @@ python -m venv .venv
 python -m pip install -r requirements-ci.txt
 ```
 
-Python **3.11+** is supported; `.python-version` / `environment.yml` default to **3.12**. Published wheels on PyPI target **CPython 3.11 and 3.12** (see [COMPATIBILITY.md](COMPATIBILITY.md)); other versions may install from **sdist** or require a source checkout + `cargo build`.
+Python **3.11+** is supported; `.python-version` / `environment.yml` default to **3.12**. Published wheels on PyPI target **CPython 3.11 and 3.12** (see the [compatibility matrix](https://pppsdavid.github.io/rust-based-prefect/compatibility/)); other versions may install from **sdist** or require a source checkout + `cargo build`.
 
 ### Install from PyPI (Python 3.11 / 3.12)
 
@@ -153,7 +153,7 @@ python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v
 
 Replace `v0.1.2` with the [latest release tag](https://github.com/PPPSDavid/rust-based-prefect/releases).
 
-**Install guide (users):** see [docs/INSTALL.md](docs/INSTALL.md) on the hosted docs site. Use `pip install ironflow-prefect-compat` when wheels are published for your platform/version; otherwise use the documented TestPyPI or source-install fallback paths. Packaging details for maintainers are in [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md).
+**Install guide (users):** see [Installation](https://pppsdavid.github.io/rust-based-prefect/INSTALL/). Use `pip install ironflow-prefect-compat` when wheels are published for your platform/version; otherwise use the documented TestPyPI or source-install fallback paths. Packaging details for maintainers are in [DISTRIBUTION.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/DISTRIBUTION.md) (not published to the site).
 
 **Docs vs releases:** The [hosted MkDocs site](https://pppsdavid.github.io/rust-based-prefect/) tracks the **`main`** branch. For documentation that exactly matches a tag, use GitHub’s file browser at that tag, or checkout the tag locally and run `mkdocs serve` (see **Building docs locally**).
 
@@ -169,7 +169,7 @@ cargo test --manifest-path rust-engine/Cargo.toml
 
 ### 3. Run flows (no server required)
 
-Orchestration runs **in-process** through `prefect_compat`; the API and UI are optional. See [docs/PREFECT_IRONFLOW_MAPPING.md](docs/PREFECT_IRONFLOW_MAPPING.md) for import and wiring patterns, and `python-shim/tests/` for examples.
+Orchestration runs **in-process** through `prefect_compat`; the API and UI are optional. See [Prefect → IronFlow](https://pppsdavid.github.io/rust-based-prefect/PREFECT_IRONFLOW_MAPPING/) for import and wiring patterns, and `python-shim/tests/` for examples.
 
 ### 4. Optional API + UI
 
@@ -222,13 +222,13 @@ Override the search path with **`IRONFLOW_RUST_LIB`** if you build elsewhere. Sk
 
 IronFlow targets **control-plane** performance (state transitions, scheduling), not faster arbitrary Python in tasks. On the **synthetic A/B harness** checked into `docs/perf_comparison.json`, **in-process IronFlow** reaches on the order of **10⁴–10⁵ transitions/s** vs **10²–10¹** for local Prefect OSS on comparable toy flows — **roughly two to three orders of magnitude** higher throughput in that narrow scenario, and **~10²×** when IronFlow is used behind the local HTTP API. **End-to-end** pipelines dominated by I/O or heavy task bodies may see **much smaller** wall-clock gains.
 
-Read the full caveats and tables in **[docs/PERFORMANCE_OVERVIEW.md](docs/PERFORMANCE_OVERVIEW.md)** (also on the hosted docs site).
+Read the full caveats and tables in the [Performance overview](https://pppsdavid.github.io/rust-based-prefect/PERFORMANCE_OVERVIEW/).
 
 - **Prefect vs IronFlow A/B** (optional; needs Prefect installed):  
   `python benchmarks/compare_prefect_vs_ironflow.py` → writes `docs/perf_comparison.json` (JSON **array** — not for `perf_matrix.py compare`).
 - **Deterministic control-plane matrix** (IronFlow vs IronFlow regressions):  
   `python benchmarks/perf_matrix.py run --preset lite --repetitions 1 --warmups 0 --jobs 2`  
-  See [docs/perf_methodology.md](docs/perf_methodology.md) and **Performance** in [AGENTS.md](AGENTS.md).
+  See [perf_methodology.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/perf_methodology.md) (not on the docs site) and **Performance** in [AGENTS.md](AGENTS.md).
 
 ## Persistence defaults
 
@@ -238,16 +238,16 @@ Read the full caveats and tables in **[docs/PERFORMANCE_OVERVIEW.md](docs/PERFOR
 ## End-to-end UI check
 
 1. Start API + UI, then `python scripts/ui_e2e_seed.py`
-2. Open `http://localhost:4173/runs` and verify tabs — see [docs/ui_e2e_visual_check.md](docs/ui_e2e_visual_check.md)
+2. Open `http://localhost:4173/runs` and verify tabs — see [Optional: verify the web UI](https://pppsdavid.github.io/rust-based-prefect/ui_e2e_visual_check/)
 
 ## Versioning & releases
 
 - Current release: see GitHub [**Releases**](https://github.com/PPPSDavid/rust-based-prefect/releases) (e.g. **v0.1.2**). Single version in **`VERSION`**, kept in sync with Rust, Python packages, and `frontend/package.json` (`python scripts/check_version_sync.py`).
-- Tag **`vX.Y.Z`** must match `VERSION`; pushing a tag creates a GitHub Release (see [RELEASING.md](RELEASING.md)). Changes are listed in [CHANGELOG.md](CHANGELOG.md).
+- Tag **`vX.Y.Z`** must match `VERSION`; pushing a tag creates a GitHub Release (see [RELEASING.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/RELEASING.md)). Changes are listed in [CHANGELOG.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/CHANGELOG.md).
 
 ## Building docs locally
 
-The **GitHub Pages** site is **end-user** documentation: [docs/INSTALL.md](docs/INSTALL.md), quick start, architecture, compatibility, performance, etc. Maintainer topics such as [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) (PyPI roadmap) and [docs/perf_methodology.md](docs/perf_methodology.md) (benchmark harness internals) stay in the repository but are **not** published to the site.
+The **GitHub Pages** site ([https://pppsdavid.github.io/rust-based-prefect/](https://pppsdavid.github.io/rust-based-prefect/)) is **end-user** documentation: [Installation](https://pppsdavid.github.io/rust-based-prefect/INSTALL/), quick start, architecture, compatibility, performance, etc. Maintainer topics such as [DISTRIBUTION.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/DISTRIBUTION.md) (PyPI roadmap) and [perf_methodology.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/perf_methodology.md) (benchmark harness internals) stay in the repository but are **not** published to the site.
 
 ```bash
 python -m pip install -r requirements-docs.txt
