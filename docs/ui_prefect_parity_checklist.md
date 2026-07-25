@@ -2,38 +2,42 @@
 
 Side-by-side comparison notes for IronFlow UI vs Prefect OSS 3.x.
 
+**Last audited:** 2026-07-25 against `frontend/src/App.tsx` routes and page implementations.
+
 ## Navigation
 
-| Area | Prefect | IronFlow (target) |
+| Area | Prefect | IronFlow today |
 | --- | --- | --- |
-| Primary nav | Flow Runs, Flows, Deployments, Work Pools | Same top-level sections |
-| Run detail | Actions (cancel, retry), tabs for tasks/logs | Cancel/retry action bar + tabs |
+| Primary nav | Flow Runs, Flows, Deployments, Work Pools | Same top-level sections (`AppShell`: `/runs`, `/flows`, `/deployments`, `/work-pools`) |
+| Run detail | Actions (cancel, retry), tabs for tasks/logs | Cancel/retry action bar + tabs (tasks, logs, events, artifacts, DAG) |
 
 ## Flow Runs
 
-- [ ] List with state filters and pagination
-- [ ] Run detail with live SSE updates
-- [ ] Cancel active runs
-- [ ] Retry failed deployment-backed runs
+- [x] List with state filters and pagination (`RunsPage`: state chips + cursor “Load more”)
+- [x] Run detail with live SSE updates (`useSsePulse` + `/api/stream/flow-runs/{id}`)
+- [x] Cancel active runs (`POST /api/flow-runs/{id}/cancel` when `SCHEDULED` / `PENDING` / `RUNNING`)
+- [x] Retry failed deployment-backed runs (`POST …/retry`; non-deployment runs surface an error)
+- [x] Run detail tabs: Task Runs, Logs, Events, Artifacts, DAG (logical / expanded modes)
+- [ ] Concurrency-limits admin surface (API exists; no UI page — backlog)
 
 ## Flows
 
-- [ ] Flow catalog with run counts
-- [ ] Flow detail with tasks and linked deployments
+- [x] Flow catalog with run counts (`FlowsPage`)
+- [x] Flow detail with tasks and linked deployments (`FlowDetailPage`)
 
 ## Deployments
 
-- [ ] Dedicated deployments list (not buried under flows)
-- [ ] Quick run with parameter JSON editor
-- [ ] Pause/resume deployment
-- [ ] Deployment run history on detail page
+- [x] Dedicated deployments list (not buried under flows) (`/deployments`)
+- [x] Quick run with parameter JSON editor (`QuickRunModal`)
+- [x] Pause/resume deployment (detail page patch `{ paused }`)
+- [x] Deployment run history on detail page
 
 ## Work Pools (MVP)
 
-- [ ] Process-type work pools list
-- [ ] Worker ONLINE/OFFLINE status
-- [ ] Pool pause/resume
-- [ ] Deployment assigned to work pool
+- [x] Process-type work pools list (`WorkPoolsPage`; create process pools)
+- [x] Worker status from heartbeats (`WorkPoolDetailPage` polls workers; runtime marks `ONLINE` / `OFFLINE`)
+- [x] Pool pause/resume
+- [x] Deployment shows assigned work pool id (detail field; defaults to `default-process-pool` label when unset — not a full assign/reassign UI)
 
 ## Explicit non-goals (MVP)
 
@@ -41,6 +45,7 @@ Side-by-side comparison notes for IronFlow UI vs Prefect OSS 3.x.
 - Work queue priority/concurrency
 - Prefect Cloud auth/tenancy
 - Pixel-perfect visual clone of Prefect UI
+- UI concurrency admin (tracked separately; see `COMPATIBILITY.md`)
 
 ## Visual audit procedure
 
