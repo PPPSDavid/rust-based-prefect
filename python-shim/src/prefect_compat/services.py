@@ -34,12 +34,12 @@ def run_services_loop(
     interval = (
         interval_ms
         if interval_ms is not None
-        else _env_int("IRONFLOW_SCHEDULER_INTERVAL_MS", 1000)
+        else _env_int("FLOWOXIDE_SCHEDULER_INTERVAL_MS", 1000)
     )
     stale = (
         stale_after_seconds
         if stale_after_seconds is not None
-        else _env_int("IRONFLOW_SCHEDULER_STALE_SECONDS", 120)
+        else _env_int("FLOWOXIDE_SCHEDULER_STALE_SECONDS", 120)
     )
     interval = max(1, interval)
     stale = max(1, stale)

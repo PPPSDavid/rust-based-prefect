@@ -16,10 +16,10 @@ from prefect_compat.runtime import InMemoryControlPlane
 
 
 def test_resolve_sqlite_path_from_history() -> None:
-    assert resolve_sqlite_path(Path("data/ironflow_history.jsonl")) == Path(
-        "data/ironflow_history.db"
+    assert resolve_sqlite_path(Path("data/flowoxide_history.jsonl")) == Path(
+        "data/flowoxide_history.db"
     )
-    assert resolve_sqlite_path(None) == Path("data") / "ironflow_ui.db"
+    assert resolve_sqlite_path(None) == Path("data") / "flowoxide_ui.db"
 
 
 def test_sqlite_store_open_creates_tables(tmp_path: Path) -> None:
@@ -53,7 +53,7 @@ def test_sqlite_store_upgrade_idempotent(tmp_path: Path) -> None:
 
 
 def test_create_store_sqlite_default(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("IRONFLOW_DATABASE_URL", raising=False)
+    monkeypatch.delenv("FLOWOXIDE_DATABASE_URL", raising=False)
     history = tmp_path / "hist.jsonl"
     store = create_store(history_path=history)
     assert isinstance(store, SqliteStore)
@@ -67,8 +67,8 @@ def test_create_store_postgres_when_url_set(
     import os
 
     url = os.getenv(
-        "IRONFLOW_TEST_DATABASE_URL",
-        "postgresql://ironflow:ironflow@127.0.0.1:5432/ironflow_b1",
+        "FLOWOXIDE_TEST_DATABASE_URL",
+        "postgresql://flowoxide:flowoxide@127.0.0.1:5432/flowoxide_b1",
     )
     try:
         import psycopg
@@ -78,7 +78,7 @@ def test_create_store_postgres_when_url_set(
     except Exception:
         pytest.skip("Postgres not available")  # ty: ignore[too-many-positional-arguments]
 
-    monkeypatch.setenv("IRONFLOW_DATABASE_URL", url)
+    monkeypatch.setenv("FLOWOXIDE_DATABASE_URL", url)
     from prefect_compat.persistence import PostgresStore
 
     store = create_store(history_path=None)
@@ -89,7 +89,7 @@ def test_create_store_postgres_when_url_set(
 def test_control_plane_uses_store(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.delenv("IRONFLOW_DATABASE_URL", raising=False)
+    monkeypatch.delenv("FLOWOXIDE_DATABASE_URL", raising=False)
     history = tmp_path / "hist.jsonl"
     plane = InMemoryControlPlane(history_path=str(history))
     assert plane._store.backend_kind == "sqlite"

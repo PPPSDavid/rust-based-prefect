@@ -1,4 +1,4 @@
-name: ironflow-dev
+name: flowoxide-dev
 channels:
   - conda-forge
 dependencies:

@@ -16,7 +16,7 @@ def test_run_pull_steps_changes_cwd(tmp_path: Path, monkeypatch) -> None:
     result = run_pull_steps(
         [
             PullStepSpec(
-                step="ironflow.deployments.steps.set_working_directory",
+                step="flowoxide.deployments.steps.set_working_directory",
                 inputs={"directory": str(target)},
             )
         ]

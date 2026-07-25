@@ -1,11 +1,11 @@
 ---
-description: Project IronFlow context and execution defaults
+description: Project FlowOxide context and execution defaults
 alwaysApply: true
 ---
 
 # Project Context
 
-- This repo is `rust-based-prefect` (Project IronFlow).
+- This repo is `rust-based-prefect` (Project FlowOxide).
 - Objective: Prefect-compatible orchestration with better deterministic state handling, scale, and static planning.
 - Prefect baseline target is `3.x`, with subset-first compatibility expansion.
 

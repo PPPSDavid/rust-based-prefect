@@ -147,7 +147,7 @@ class InMemoryControlPlane:
                 self._rust_bridge = RustQueryBridge()
             except Exception:
                 self._rust_bridge = None
-        use_rust_fsm = os.getenv("IRONFLOW_USE_RUST_FSM", "1").strip().lower() not in (
+        use_rust_fsm = os.getenv("FLOWOXIDE_USE_RUST_FSM", "1").strip().lower() not in (
             "0",
             "false",
             "no",
@@ -242,7 +242,7 @@ class InMemoryControlPlane:
                 and not self._warned_deployment_fallback
             ):
                 logging.getLogger(__name__).warning(
-                    "IronFlow deployment op %s using Python fallback (Rust FSM active but bind_db failed).",
+                    "FlowOxide deployment op %s using Python fallback (Rust FSM active but bind_db failed).",
                     op,
                 )
                 self._warned_deployment_fallback = True
@@ -606,7 +606,7 @@ class InMemoryControlPlane:
     def worker_heartbeat(
         self, worker_name: str, work_pool_id: str | None = None
     ) -> None:
-        pool_id = work_pool_id or os.getenv("IRONFLOW_WORK_POOL", DEFAULT_WORK_POOL_ID)
+        pool_id = work_pool_id or os.getenv("FLOWOXIDE_WORK_POOL", DEFAULT_WORK_POOL_ID)
         rust = self._rust_deployment_dispatch(
             "deployment_worker_heartbeat",
             {"worker_name": worker_name, "work_pool_id": pool_id},
@@ -3007,7 +3007,7 @@ class InMemoryControlPlane:
     def claim_next_deployment_run(
         self, worker_name: str, lease_seconds: int = 30, work_pool_id: str | None = None
     ) -> dict[str, Any] | None:
-        pool_id = work_pool_id or os.getenv("IRONFLOW_WORK_POOL", DEFAULT_WORK_POOL_ID)
+        pool_id = work_pool_id or os.getenv("FLOWOXIDE_WORK_POOL", DEFAULT_WORK_POOL_ID)
         rust = self._rust_deployment_dispatch(
             "deployment_claim_next",
             {
@@ -3095,7 +3095,7 @@ class InMemoryControlPlane:
         wait_ms: int = 500,
         work_pool_id: str | None = None,
     ) -> dict[str, Any] | None:
-        pool_id = work_pool_id or os.getenv("IRONFLOW_WORK_POOL", DEFAULT_WORK_POOL_ID)
+        pool_id = work_pool_id or os.getenv("FLOWOXIDE_WORK_POOL", DEFAULT_WORK_POOL_ID)
         rust = self._rust_deployment_dispatch(
             "deployment_claim_next_wait",
             {

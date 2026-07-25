@@ -3,15 +3,15 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ironflow-prefect-compat"
+name = "flowoxide-prefect-compat"
 version = "0.2.0"
-description = "Prefect-style compatibility shim for Project IronFlow (Rust orchestration kernel + Python authoring)."
+description = "Prefect-style compatibility shim for Project FlowOxide (Rust orchestration kernel + Python authoring)."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.11"
 license = "Apache-2.0"
-authors = [{ name = "IronFlow contributors" }]
+authors = [{ name = "FlowOxide contributors" }]
 keywords = [
-  "ironflow",
+  "flowoxide",
   "prefect",
   "orchestration",
   "workflow",
@@ -41,7 +41,7 @@ postgres = [
 ]
 
 [project.scripts]
-ironflow = "prefect_compat.cli.main:main"
+flowoxide = "prefect_compat.cli.main:main"
 
 [project.urls]
 Homepage = "https://github.com/PPPSDavid/rust-based-prefect"

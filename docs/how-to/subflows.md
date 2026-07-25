@@ -1,6 +1,6 @@
 # How to compose flows with subflows
 
-IronFlow supports **two** ways to nest flows (also called **nested flows**). If you are coming from Prefect’s `run_deployment` / subflow APIs, start here—IronFlow’s surface is smaller and intentional.
+FlowOxide supports **two** ways to nest flows (also called **nested flows**). If you are coming from Prefect’s `run_deployment` / subflow APIs, start here—FlowOxide’s surface is smaller and intentional.
 
 Pick the mechanism that matches where the child must run.
 
@@ -9,17 +9,17 @@ Pick the mechanism that matches where the child must run.
 | Run a child **in the same process** and wait for its return value | **Inline (M1)** | Call the child `@flow` like a normal function: `child(...)` |
 | Run a child on a **deployment / work pool** (possibly another worker) | **Deployment-backed (M2)** | `deployment_ref("name").submit(...).result()` |
 
-Normative limits live in the **[Compatibility matrix](../compatibility.md)**. Conceptual background: **[Flows](../concepts/flows.md)** · Prefect mapping: **[Prefect → IronFlow](../PREFECT_IRONFLOW_MAPPING.md)**.
+Normative limits live in the **[Compatibility matrix](../compatibility.md)**. Conceptual background: **[Flows](../concepts/flows.md)** · Prefect mapping: **[Prefect → FlowOxide](../PREFECT_FLOWOXIDE_MAPPING.md)**.
 
 ## Prerequisites
 
 - `from prefect_compat import flow, task, set_control_plane, InMemoryControlPlane, deployment_ref, wait`
 - A control plane registered with **`set_control_plane`** (in-process or via the self-hosted server).
-- For **M2 only:** a **deployment** whose `flow_name` matches the child flow, and a **worker** claiming that deployment’s work pool (local worker thread or `ironflow worker start`). See **[How to create and update deployments](deployments.md)** and **[How to deploy with the CLI](deploy-with-cli.md)**.
+- For **M2 only:** a **deployment** whose `flow_name` matches the child flow, and a **worker** claiming that deployment’s work pool (local worker thread or `flowoxide worker start`). See **[How to create and update deployments](deployments.md)** and **[How to deploy with the CLI](deploy-with-cli.md)**.
 
 ## Mechanism 1 — Blocking inline
 
-Call another `@flow` from inside a parent flow. The parent **blocks** until the child returns. IronFlow records a **linked child flow run** (`execution_mode=inline`) with parent/root/depth metadata.
+Call another `@flow` from inside a parent flow. The parent **blocks** until the child returns. FlowOxide records a **linked child flow run** (`execution_mode=inline`) with parent/root/depth metadata.
 
 ```python
 from prefect_compat import flow, set_control_plane, InMemoryControlPlane, task
@@ -46,7 +46,7 @@ def parent_inline() -> int:
 
 ## Mechanism 2 — Deployment-backed subflow as task
 
-Resolve a deployment by **unique name** (or UUID) and **`submit`**. IronFlow creates a surrogate parent task (`kind=subflow`), enqueues a **deployment run**, and returns a **`SubflowFuture`**.
+Resolve a deployment by **unique name** (or UUID) and **`submit`**. FlowOxide creates a surrogate parent task (`kind=subflow`), enqueues a **deployment run**, and returns a **`SubflowFuture`**.
 
 ```python
 from prefect_compat import (
@@ -128,7 +128,7 @@ Cancelling a parent flow run cancels **active** deployment-backed children linke
 | `deployment_ref(...).submit()` outside a `@flow` | Submit requires an **active parent flow run**. |
 | Submit hangs forever | No worker claiming the child’s work pool, or deployment missing/paused. |
 | `deployment not found` | Create the deployment (API/CLI) with the exact name you pass to `deployment_ref`. |
-| Sibling unlinked runs when calling `child(...)` | Ensure you use `@flow` on the child and a shared control plane; IronFlow links inline children automatically when called from an active parent flow. |
+| Sibling unlinked runs when calling `child(...)` | Ensure you use `@flow` on the child and a shared control plane; FlowOxide links inline children automatically when called from an active parent flow. |
 
 ## Related pages
 

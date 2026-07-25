@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from prefect_compat.deploy import DeploymentSpec, IronflowManifest
+from prefect_compat.deploy import DeploymentSpec, FlowOxideManifest
 from prefect_compat.deploy.spec import parse_entrypoint
 from prefect_compat.deploy.yaml_loader import load_manifest
 
@@ -43,10 +43,10 @@ def test_deployment_spec_to_api_body():
 
 
 def test_manifest_load_minimal(tmp_path):
-    manifest_path = tmp_path / "ironflow.yaml"
+    manifest_path = tmp_path / "flowoxide.yaml"
     manifest_path.write_text(
         """\
-ironflow-version: "1"
+flowoxide-version: "1"
 deployments:
   - name: prod
     entrypoint: flows/etl.py:my_etl
@@ -62,8 +62,8 @@ deployments:
 
     manifest = load_manifest(manifest_path)
 
-    assert isinstance(manifest, IronflowManifest)
-    assert manifest.ironflow_version == "1"
+    assert isinstance(manifest, FlowOxideManifest)
+    assert manifest.flowoxide_version == "1"
     assert len(manifest.deployments) == 1
 
     spec = manifest.deployments[0]

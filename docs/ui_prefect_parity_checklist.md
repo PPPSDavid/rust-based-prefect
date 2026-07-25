@@ -1,12 +1,12 @@
 # UI Prefect Parity Checklist
 
-Side-by-side comparison notes for IronFlow UI vs Prefect OSS 3.x.
+Side-by-side comparison notes for FlowOxide UI vs Prefect OSS 3.x.
 
 **Last audited:** 2026-07-25 against `frontend/src/App.tsx` routes and page implementations.
 
 ## Navigation
 
-| Area | Prefect | IronFlow today |
+| Area | Prefect | FlowOxide today |
 | --- | --- | --- |
 | Primary nav | Flow Runs, Flows, Deployments, Work Pools | Same top-level sections (`AppShell`: `/runs`, `/flows`, `/deployments`, `/work-pools`) |
 | Run detail | Actions (cancel, retry), tabs for tasks/logs | Cancel/retry action bar + tabs (tasks, logs, events, artifacts, DAG) |
@@ -49,7 +49,7 @@ Side-by-side comparison notes for IronFlow UI vs Prefect OSS 3.x.
 
 ## Visual audit procedure
 
-1. Start IronFlow API + UI (`scripts/ironflow_server.py`, `npm run dev` in `frontend/`)
+1. Start FlowOxide API + UI (`scripts/flowoxide_server.py`, `npm run dev` in `frontend/`)
 2. Seed data: `python scripts/ui_e2e_seed.py`
 3. Optionally start Prefect OSS for reference: `prefect server start`
 4. Capture screenshots per section and note functional deltas above

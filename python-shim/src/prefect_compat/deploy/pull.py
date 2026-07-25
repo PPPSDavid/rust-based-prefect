@@ -14,7 +14,7 @@ def set_working_directory(directory: str) -> dict[str, str]:
 
 
 STEP_REGISTRY: dict[str, Callable[..., dict[str, Any]]] = {
-    "ironflow.deployments.steps.set_working_directory": set_working_directory,
+    "flowoxide.deployments.steps.set_working_directory": set_working_directory,
 }
 
 

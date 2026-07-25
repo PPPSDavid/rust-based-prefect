@@ -1,7 +1,7 @@
 [project]
-name = "ironflow"
+name = "flowoxide"
 version = "0.0.0"
-description = "IronFlow monorepo workspace root (not published to PyPI). Holds shared tooling and dependency groups."
+description = "FlowOxide monorepo workspace root (not published to PyPI). Holds shared tooling and dependency groups."
 requires-python = ">=3.11"
 dependencies = []
 

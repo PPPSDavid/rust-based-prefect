@@ -1,4 +1,4 @@
-# Manual publish of ironflow-prefect-compat wheels to TestPyPI.
+# Manual publish of flowoxide-prefect-compat wheels to TestPyPI.
 #
 # One-time maintainer setup:
 # 1. Create https://test.pypi.org/account/register/ and a project (or let first upload create it).
@@ -111,7 +111,7 @@ jobs:
           CIBW_ARCHS_LINUX: "aarch64"
           CIBW_SKIP: "*musllinux*"
           CIBW_BEFORE_ALL_LINUX: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal && ln -sf /root/.cargo/bin/cargo /usr/local/bin/cargo && ln -sf /root/.cargo/bin/rustc /usr/local/bin/rustc"
-          CIBW_ENVIRONMENT: "IRONFLOW_FORCE_PLATFORM_WHEEL=1 PATH=/root/.cargo/bin:$PATH"
+          CIBW_ENVIRONMENT: "FLOWOXIDE_FORCE_PLATFORM_WHEEL=1 PATH=/root/.cargo/bin:$PATH"
         run: cibuildwheel --platform linux --output-dir python-shim/wheelhouse python-shim
 
       - name: Auditwheel repair (Linux)

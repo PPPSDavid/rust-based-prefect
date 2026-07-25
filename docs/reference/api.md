@@ -1,8 +1,8 @@
 # REST API overview
 
-IronFlow exposes a FastAPI application at `http://127.0.0.1:8000` by default.
+FlowOxide exposes a FastAPI application at `http://127.0.0.1:8000` by default.
 
-**Authentication (optional):** set `IRONFLOW_SERVER_API_AUTH_STRING` on the server and `IRONFLOW_API_AUTH_STRING` on clients. When enabled, `/api/*` requires HTTP Basic auth; `/health` does not. See [Secure a self-hosted server](../how-to/secure-self-hosted.md).
+**Authentication (optional):** set `FLOWOXIDE_SERVER_API_AUTH_STRING` on the server and `FLOWOXIDE_API_AUTH_STRING` on clients. When enabled, `/api/*` requires HTTP Basic auth; `/health` does not. See [Secure a self-hosted server](../how-to/secure-self-hosted.md).
 
 **Interactive docs:** `GET /docs` (Swagger UI) and `GET /redoc` when the server is running.
 
@@ -94,6 +94,6 @@ Only **process** work pools are supported today.
 
 - [How to create and update deployments](../how-to/deployments.md) — curl examples.
 - [Self-hosted server](../SELF_HOSTED_SERVER.md) — workers and schedules.
-- [Environment variables](env-vars.md) — `IRONFLOW_HISTORY_PATH`, worker toggles.
+- [Environment variables](env-vars.md) — `FLOWOXIDE_HISTORY_PATH`, worker toggles.
 
 Maintainer contract notes (internal): `docs/ui_phase1_api_contract.md` in the repository.

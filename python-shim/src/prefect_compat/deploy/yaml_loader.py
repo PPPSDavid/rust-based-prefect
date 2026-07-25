@@ -4,11 +4,11 @@ from pathlib import Path
 
 import yaml
 
-from .spec import IronflowManifest
+from .spec import FlowOxideManifest
 
 
-def load_manifest(path: str | Path) -> IronflowManifest:
+def load_manifest(path: str | Path) -> FlowOxideManifest:
     manifest_path = Path(path)
     with manifest_path.open(encoding="utf-8") as handle:
         data = yaml.safe_load(handle)
-    return IronflowManifest.model_validate(data or {})
+    return FlowOxideManifest.model_validate(data or {})

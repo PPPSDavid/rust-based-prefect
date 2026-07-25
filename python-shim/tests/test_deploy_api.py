@@ -106,7 +106,7 @@ def test_serve_deploys_runs_pull_steps_and_worker_loop(
 
     pull_steps = [
         PullStepSpec(
-            step="ironflow.deployments.steps.set_working_directory",
+            step="flowoxide.deployments.steps.set_working_directory",
             inputs={"directory": str(tmp_path)},
         )
     ]

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from scripts import ironflow_server
+from scripts import flowoxide_server
 from prefect_compat.decorators import set_control_plane
 from prefect_compat.runtime import InMemoryControlPlane
 from prefect_compat.server import app, control_plane, failing_flow, mapped_flow
@@ -139,7 +139,7 @@ def test_cors_allows_local_frontend_origin(tmp_path: Path) -> None:
 
 
 def test_doctor_reports_backend_frontend_keys(capsys) -> None:
-    rc = ironflow_server.main(["doctor"])
+    rc = flowoxide_server.main(["doctor"])
     out = capsys.readouterr().out
     assert rc in (0, 1)
     payload = json.loads(out)

@@ -2,14 +2,14 @@
 
 A **task runner** controls how **`task.submit()`** and **`task.map()`** run work inside a `@flow`. It is **not** the same as a deployment **worker** or **work pool** — those claim queued deployment runs from the control plane. This guide helps you pick a runner for common workload shapes (remote API calls vs local Python).
 
-Conceptual reference: **[Runners](../concepts/runners.md)** · **[Tasks](../concepts/tasks.md)** · Environment variables: **[`IRONFLOW_TASK_RUNNER`](../reference/env-vars.md)**.
+Conceptual reference: **[Runners](../concepts/runners.md)** · **[Tasks](../concepts/tasks.md)** · Environment variables: **[`FLOWOXIDE_TASK_RUNNER`](../reference/env-vars.md)**.
 
 ## Task runners vs deployment workers
 
 | Term | What it does |
 | --- | --- |
 | **Task runner** (`ThreadPoolTaskRunner`, …) | Parallelizes **`submit()`** / **`map()`** inside a flow that is already executing |
-| **Deployment worker** (`ironflow worker start`, embedded server worker) | Claims **deployment runs** and runs the whole `@flow` in a Python process |
+| **Deployment worker** (`flowoxide worker start`, embedded server worker) | Claims **deployment runs** and runs the whole `@flow` in a Python process |
 
 You can run API-wrapper flows on a normal **process** work-pool worker and still use **`ThreadPoolTaskRunner`** inside the flow for concurrent `submit` / `map` calls.
 
@@ -32,7 +32,7 @@ Independent branches can use either multiple **`submit()`** calls or **`map()`**
 | Need deterministic order or easier debugging | **`SequentialTaskRunner`** | `step.map([1, 2, 3])` or sequential `submit` |
 | Fan out once with a single `map` value | Default is fine | Runner falls back to single-threaded path |
 
-**Default:** If you do nothing, IronFlow uses **`ThreadPoolTaskRunner`** via `IRONFLOW_TASK_RUNNER=thread`. That is the right default for most flows, including thin API-wrapper tasks.
+**Default:** If you do nothing, FlowOxide uses **`ThreadPoolTaskRunner`** via `FLOWOXIDE_TASK_RUNNER=thread`. That is the right default for most flows, including thin API-wrapper tasks.
 
 ## Mechanism 1 — Thread pool (I/O-bound, default)
 
@@ -59,7 +59,7 @@ def poll_jobs(job_ids: list[str]) -> list[dict]:
     return [f.result() for f in futures]
 ```
 
-**Tuning:** pass `max_workers` on the runner, or set **`IRONFLOW_TASK_RUNNER_THREAD_POOL_MAX_WORKERS`** globally. When unset, the pool size defaults to `min(32, cpu_count + 4)`.
+**Tuning:** pass `max_workers` on the runner, or set **`FLOWOXIDE_TASK_RUNNER_THREAD_POOL_MAX_WORKERS`** globally. When unset, the pool size defaults to `min(32, cpu_count + 4)`.
 
 **When thread pool does *not* help:** CPU-bound pure Python in every mapped task (GIL-bound). Prefer a process runner or move hot paths to Rust/native code.
 
@@ -87,7 +87,7 @@ def crunch(nums: list[int]) -> int:
 - **Windows** multiprocessing from pytest is unreliable; process-pool `map` is primarily validated on Linux/macOS.
 - Process startup has overhead — not worth it for thin API wrappers.
 
-**Tuning:** `max_workers` on the runner or **`IRONFLOW_TASK_RUNNER_PROCESS_POOL_MAX_WORKERS`**.
+**Tuning:** `max_workers` on the runner or **`FLOWOXIDE_TASK_RUNNER_PROCESS_POOL_MAX_WORKERS`**.
 
 ## Mechanism 3 — Sequential (deterministic)
 
@@ -111,9 +111,9 @@ def ordered() -> list[int]:
 Set the default runner for all flows that do not pass `task_runner=`:
 
 ```bash
-export IRONFLOW_TASK_RUNNER=thread    # default
-export IRONFLOW_TASK_RUNNER=sequential  # or seq, serial
-export IRONFLOW_TASK_RUNNER=process     # or multiprocessing, mp
+export FLOWOXIDE_TASK_RUNNER=thread    # default
+export FLOWOXIDE_TASK_RUNNER=sequential  # or seq, serial
+export FLOWOXIDE_TASK_RUNNER=process     # or multiprocessing, mp
 ```
 
 Per-flow overrides always win: `@flow(task_runner=ThreadPoolTaskRunner(max_workers=4))`.
@@ -122,7 +122,7 @@ Per-flow overrides always win: `@flow(task_runner=ThreadPoolTaskRunner(max_worke
 
 1. **Expecting process-pool `submit()` to overlap** — `ProcessPoolTaskRunner` parallelizes **`map()`** only; independent `submit()` still runs synchronously. Prefer threads for concurrent submit, or `map()` for process fan-out.
 2. **Using `ProcessPoolTaskRunner` for API calls** — adds pickling overhead with no I/O benefit; use threads.
-3. **Confusing task runner with work pool** — API flows still need a deployment worker (embedded or `ironflow worker start`); the thread runner only affects in-flow `submit` / `map`.
+3. **Confusing task runner with work pool** — API flows still need a deployment worker (embedded or `flowoxide worker start`); the thread runner only affects in-flow `submit` / `map`.
 4. **Huge `max_workers` against rate-limited APIs** — cap `max_workers` to respect remote quotas.
 5. **Omitting `wait_for` on dependents** — without `wait_for` (or resolving upstream futures as args), concurrent submits may race; gate with `wait_for=[upstream]`.
 

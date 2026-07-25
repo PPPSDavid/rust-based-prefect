@@ -55,16 +55,16 @@ _CONTROL_PLANE = InMemoryControlPlane()
 
 _ACTIVE_TASK_RUNNER: contextvars.ContextVar[
     MapTaskRunner | ProcessPoolTaskRunner | None
-] = contextvars.ContextVar("ironflow_active_task_runner", default=None)
+] = contextvars.ContextVar("flowoxide_active_task_runner", default=None)
 _ACTIVE_FLOW_RUN: contextvars.ContextVar[UUID | None] = contextvars.ContextVar(
-    "ironflow_active_flow_run", default=None
+    "flowoxide_active_flow_run", default=None
 )
 _ACTIVE_DEPLOYMENT_RUN: contextvars.ContextVar[UUID | None] = contextvars.ContextVar(
-    "ironflow_active_deployment_run", default=None
+    "flowoxide_active_deployment_run", default=None
 )
 # Shared pool for concurrent ``submit`` under ``ThreadPoolTaskRunner`` (per flow invoke).
 _ACTIVE_SUBMIT_EXECUTOR: contextvars.ContextVar[ThreadPoolExecutor | None] = (
-    contextvars.ContextVar("ironflow_active_submit_executor", default=None)
+    contextvars.ContextVar("flowoxide_active_submit_executor", default=None)
 )
 
 _UNSET: Any = object()

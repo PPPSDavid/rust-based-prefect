@@ -16,7 +16,7 @@ export function AppShell({ children }: AppShellProps) {
   return (
     <div className="app">
       <header className="topbar">
-        <h1>IronFlow</h1>
+        <h1>FlowOxide</h1>
         <nav>
           {NAV_ITEMS.map((item) => (
             <NavLink

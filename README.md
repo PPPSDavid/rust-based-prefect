@@ -1,26 +1,26 @@
-# Project IronFlow
+# Project FlowOxide
 
 [![CI](https://github.com/PPPSDavid/rust-based-prefect/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/PPPSDavid/rust-based-prefect/actions/workflows/ci.yml)
 [![Docs](https://github.com/PPPSDavid/rust-based-prefect/actions/workflows/docs.yml/badge.svg?branch=main)](https://github.com/PPPSDavid/rust-based-prefect/actions/workflows/docs.yml)
-[![PyPI ironflow-prefect-compat](https://img.shields.io/pypi/v/ironflow-prefect-compat)](https://pypi.org/project/ironflow-prefect-compat/)
+[![PyPI flowoxide-prefect-compat](https://img.shields.io/pypi/v/flowoxide-prefect-compat)](https://pypi.org/project/flowoxide-prefect-compat/)
 [![Release](https://img.shields.io/github/v/release/PPPSDavid/rust-based-prefect?sort=semver)](https://github.com/PPPSDavid/rust-based-prefect/releases)
 [![License](https://img.shields.io/github/license/PPPSDavid/rust-based-prefect)](LICENSE)
 
-Project IronFlow is a **hybrid MVP** built around a **Rust orchestration kernel** (`rust-engine/`) and **Prefect-style** Python authoring (`@flow` / `@task` via `prefect_compat/`). It is aimed at developers who already know **Prefect 3.x** and want a deterministic, locally persisted control plane where **orchestration semantics live in Rust** and Python carries authoring and integration.
+Project FlowOxide is a **hybrid MVP** built around a **Rust orchestration kernel** (`rust-engine/`) and **Prefect-style** Python authoring (`@flow` / `@task` via `prefect_compat/`). It is aimed at developers who already know **Prefect 3.x** and want a deterministic, locally persisted control plane where **orchestration semantics live in Rust** and Python carries authoring and integration.
 
 ## Install from PyPI
 
-The published package is **`ironflow-prefect-compat`** on [PyPI](https://pypi.org/project/ironflow-prefect-compat/). On supported platforms, **prebuilt wheels include the Rust engine** — install like any other wheel-backed package (**no Rust toolchain required** for those wheels). Use **CPython 3.11 or 3.12** for the published wheel matrix; other versions may fall back to **sdist** (needs `cargo`) — see the [compatibility matrix](https://pppsdavid.github.io/rust-based-prefect/compatibility/) and [Installation](https://pppsdavid.github.io/rust-based-prefect/INSTALL/) guides.
+The published package is **`flowoxide-prefect-compat`** on [PyPI](https://pypi.org/project/flowoxide-prefect-compat/). On supported platforms, **prebuilt wheels include the Rust engine** — install like any other wheel-backed package (**no Rust toolchain required** for those wheels). Use **CPython 3.11 or 3.12** for the published wheel matrix; other versions may fall back to **sdist** (needs `cargo`) — see the [compatibility matrix](https://pppsdavid.github.io/rust-based-prefect/compatibility/) and [Installation](https://pppsdavid.github.io/rust-based-prefect/INSTALL/) guides.
 
 ```bash
 python -m pip install --upgrade pip
-python -m pip install ironflow-prefect-compat
+python -m pip install flowoxide-prefect-compat
 ```
 
 With **[uv](https://docs.astral.sh/uv/)**:
 
 ```bash
-uv pip install ironflow-prefect-compat
+uv pip install flowoxide-prefect-compat
 ```
 
 Quick check:
@@ -31,20 +31,20 @@ python -c "from prefect_compat.rust_bridge import native_library_available; prin
 
 Expect **`True`** when a matching wheel loaded. **Developing the repo**, integrating from **git**, or running on an **unsupported ABI** may still require a **source checkout** and `cargo build` — see **Quickstart** below and the hosted [Installation](https://pppsdavid.github.io/rust-based-prefect/INSTALL/) guide.
 
-**Hosted docs (MkDocs / GitHub Pages):** [https://pppsdavid.github.io/rust-based-prefect/](https://pppsdavid.github.io/rust-based-prefect/) — organized into **Get started**, **Concepts**, **How-to guides**, and **Reference**. The [Prefect → IronFlow mapping](https://pppsdavid.github.io/rust-based-prefect/PREFECT_IRONFLOW_MAPPING/) is the main Prefect-oriented entry. Markdown sources live under `docs/`; Pages deploy is described in [RELEASING.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/RELEASING.md).
+**Hosted docs (MkDocs / GitHub Pages):** [https://pppsdavid.github.io/rust-based-prefect/](https://pppsdavid.github.io/rust-based-prefect/) — organized into **Get started**, **Concepts**, **How-to guides**, and **Reference**. The [Prefect → FlowOxide mapping](https://pppsdavid.github.io/rust-based-prefect/PREFECT_FLOWOXIDE_MAPPING/) is the main Prefect-oriented entry. Markdown sources live under `docs/`; Pages deploy is described in [RELEASING.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/RELEASING.md).
 
 | If you want… | Go to… |
 | --- | --- |
 | Doc home | [Hosted docs](https://pppsdavid.github.io/rust-based-prefect/) |
 | How Rust and Python fit together | [Architecture](https://pppsdavid.github.io/rust-based-prefect/architecture/) |
 | **Install (PyPI first)** | [Installation](https://pppsdavid.github.io/rust-based-prefect/INSTALL/) |
-| **PyPI (`ironflow-prefect-compat`)** | [https://pypi.org/project/ironflow-prefect-compat/](https://pypi.org/project/ironflow-prefect-compat/) — `pip install ironflow-prefect-compat` (see INSTALL for CPython versions shipped as wheels). |
+| **PyPI (`flowoxide-prefect-compat`)** | [https://pypi.org/project/flowoxide-prefect-compat/](https://pypi.org/project/flowoxide-prefect-compat/) — `pip install flowoxide-prefect-compat` (see INSTALL for CPython versions shipped as wheels). |
 | Performance vs Prefect (expectations, caveats) | [Performance overview](https://pppsdavid.github.io/rust-based-prefect/PERFORMANCE_OVERVIEW/) |
 | Quick start (demo flow) | [Quick start](https://pppsdavid.github.io/rust-based-prefect/QUICKSTART_DEMO/) |
 | Self-hosted server (API, workers, deployments, schedules) | [Self-hosted server](https://pppsdavid.github.io/rust-based-prefect/SELF_HOSTED_SERVER/) |
 | Docker (single container) | [Docker quickstart](https://pppsdavid.github.io/rust-based-prefect/how-to/docker-quickstart/) |
 | Docker Compose (Postgres + services + HTTP workers) | [Docker Compose](https://pppsdavid.github.io/rust-based-prefect/how-to/docker-compose/) |
-| Map Prefect concepts to this repo | [Prefect → IronFlow](https://pppsdavid.github.io/rust-based-prefect/PREFECT_IRONFLOW_MAPPING/) |
+| Map Prefect concepts to this repo | [Prefect → FlowOxide](https://pppsdavid.github.io/rust-based-prefect/PREFECT_FLOWOXIDE_MAPPING/) |
 | Supported behavior & gaps vs Prefect | [Compatibility matrix](https://pppsdavid.github.io/rust-based-prefect/compatibility/) |
 | PyPI / conda packaging notes (contributors) | [DISTRIBUTION.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/DISTRIBUTION.md) |
 | Releases & version bumps | [RELEASING.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/RELEASING.md) |
@@ -79,9 +79,9 @@ Expect **`True`** when a matching wheel loaded. **Developing the repo**, integra
 | `python-shim/` | Authoring and runtime: `prefect_compat` decorators, control-plane calls into Rust, optional FastAPI server. |
 | `static-planner/` | Static graph IR and forecasting for analyzable flows. |
 | `frontend/` | Optional Vite/React UI for runs and detail views. |
-| `benchmarks/` | `perf_matrix.py`, Prefect vs IronFlow comparison harnesses. |
+| `benchmarks/` | `perf_matrix.py`, Prefect vs FlowOxide comparison harnesses. |
 | `docs/` | Methodology notes, UI checklists, **MkDocs sources** for the site above. |
-| `scripts/` | Server launcher (`ironflow_server.py`), seeds, demos. |
+| `scripts/` | Server launcher (`flowoxide_server.py`), seeds, demos. |
 
 See [Architecture](https://pppsdavid.github.io/rust-based-prefect/architecture/) for the runtime data path (Python → shim → Rust engine).
 
@@ -104,7 +104,7 @@ This uses the root workspace (`python-shim` + `static-planner`) and the committe
 
 ```bash
 mamba env create -f environment.yml   # or: conda env create -f environment.yml
-conda activate ironflow-dev
+conda activate flowoxide-dev
 ```
 
 **pip only (transitional, no uv):**
@@ -121,7 +121,7 @@ Python **3.11+** is supported; `.python-version` / `environment.yml` default to 
 
 ```bash
 python -m pip install --upgrade pip
-python -m pip install ironflow-prefect-compat
+python -m pip install flowoxide-prefect-compat
 python -c "from prefect_compat.rust_bridge import native_library_available; print(native_library_available())"
 ```
 
@@ -141,7 +141,7 @@ Then follow the **Environment** subsection above (`environment.yml` or `requirem
 
 **B — Install only the Python shim (`prefect_compat`) from git**
 
-Use this when you want the **Python package alone** in another project. That install path does **not** ship the `rust-engine` crate or its native library; behavior falls back to Python-side implementations unless you **build `rust-engine` yourself** and point **`IRONFLOW_RUST_LIB`** at the resulting `cdylib`. For the intended architecture (kernel in Rust), prefer **full checkout** and `cargo build` below.
+Use this when you want the **Python package alone** in another project. That install path does **not** ship the `rust-engine` crate or its native library; behavior falls back to Python-side implementations unless you **build `rust-engine` yourself** and point **`FLOWOXIDE_RUST_LIB`** at the resulting `cdylib`. For the intended architecture (kernel in Rust), prefer **full checkout** and `cargo build` below.
 
 ```bash
 python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v0.1.2#subdirectory=python-shim"
@@ -155,7 +155,7 @@ python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v
 
 Replace `v0.1.2` with the [latest release tag](https://github.com/PPPSDavid/rust-based-prefect/releases).
 
-**Install guide (users):** see [Installation](https://pppsdavid.github.io/rust-based-prefect/INSTALL/). Use `pip install ironflow-prefect-compat` when wheels are published for your platform/version; otherwise use the documented TestPyPI or source-install fallback paths. Packaging details for maintainers are in [DISTRIBUTION.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/DISTRIBUTION.md) (not published to the site).
+**Install guide (users):** see [Installation](https://pppsdavid.github.io/rust-based-prefect/INSTALL/). Use `pip install flowoxide-prefect-compat` when wheels are published for your platform/version; otherwise use the documented TestPyPI or source-install fallback paths. Packaging details for maintainers are in [DISTRIBUTION.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/DISTRIBUTION.md) (not published to the site).
 
 **Docs vs releases:** The [hosted MkDocs site](https://pppsdavid.github.io/rust-based-prefect/) tracks the **`main`** branch. For documentation that exactly matches a tag, use GitHub’s file browser at that tag, or checkout the tag locally and run `mkdocs serve` (see **Building docs locally**).
 
@@ -171,7 +171,7 @@ cargo test --manifest-path rust-engine/Cargo.toml
 
 ### 3. Run flows (no server required)
 
-Orchestration runs **in-process** through `prefect_compat`; the API and UI are optional. See [Prefect → IronFlow](https://pppsdavid.github.io/rust-based-prefect/PREFECT_IRONFLOW_MAPPING/) for import and wiring patterns, and `python-shim/tests/` for examples.
+Orchestration runs **in-process** through `prefect_compat`; the API and UI are optional. See [Prefect → FlowOxide](https://pppsdavid.github.io/rust-based-prefect/PREFECT_FLOWOXIDE_MAPPING/) for import and wiring patterns, and `python-shim/tests/` for examples.
 
 ### 4. Optional API + UI
 
@@ -186,13 +186,13 @@ python scripts/bootstrap.py
 2. Start the local stack (backend + Vite dev server when `npm` is available):
 
 ```bash
-python scripts/ironflow_server.py start
+python scripts/flowoxide_server.py start
 ```
 
 3. Run readiness diagnostics anytime:
 
 ```bash
-python scripts/ironflow_server.py doctor
+python scripts/flowoxide_server.py doctor
 ```
 
 - API: `http://127.0.0.1:8000` — e.g. `GET /health`, `GET /api/flow-runs`
@@ -201,7 +201,7 @@ python scripts/ironflow_server.py doctor
 Backend only:
 
 ```bash
-python scripts/ironflow_server.py start --backend-only
+python scripts/flowoxide_server.py start --backend-only
 ```
 
 Manual uvicorn (equivalent API):
@@ -218,24 +218,24 @@ The control plane is implemented in **`rust-engine/`**. Build the shared library
 cargo build --manifest-path rust-engine/Cargo.toml
 ```
 
-Override the search path with **`IRONFLOW_RUST_LIB`** if you build elsewhere. Skipping this step leaves you on Python fallbacks where implemented; for production-like behavior and parity with how the repo is developed, treat **`cargo build` as part of the normal full stack**, not a niche optimization.
+Override the search path with **`FLOWOXIDE_RUST_LIB`** if you build elsewhere. Skipping this step leaves you on Python fallbacks where implemented; for production-like behavior and parity with how the repo is developed, treat **`cargo build` as part of the normal full stack**, not a niche optimization.
 
 ## Benchmarks and expected speedup
 
-IronFlow targets **control-plane** performance (state transitions, scheduling), not faster arbitrary Python in tasks. On the **synthetic A/B harness** checked into `docs/perf_comparison.json`, **in-process IronFlow** reaches on the order of **10⁴–10⁵ transitions/s** vs **10²–10¹** for local Prefect OSS on comparable toy flows — **roughly two to three orders of magnitude** higher throughput in that narrow scenario, and **~10²×** when IronFlow is used behind the local HTTP API. **End-to-end** pipelines dominated by I/O or heavy task bodies may see **much smaller** wall-clock gains.
+FlowOxide targets **control-plane** performance (state transitions, scheduling), not faster arbitrary Python in tasks. On the **synthetic A/B harness** checked into `docs/perf_comparison.json`, **in-process FlowOxide** reaches on the order of **10⁴–10⁵ transitions/s** vs **10²–10¹** for local Prefect OSS on comparable toy flows — **roughly two to three orders of magnitude** higher throughput in that narrow scenario, and **~10²×** when FlowOxide is used behind the local HTTP API. **End-to-end** pipelines dominated by I/O or heavy task bodies may see **much smaller** wall-clock gains.
 
 Read the full caveats and tables in the [Performance overview](https://pppsdavid.github.io/rust-based-prefect/PERFORMANCE_OVERVIEW/).
 
-- **Prefect vs IronFlow A/B** (optional; needs Prefect installed):  
-  `python benchmarks/compare_prefect_vs_ironflow.py` → writes `docs/perf_comparison.json` (JSON **array** — not for `perf_matrix.py compare`).
-- **Deterministic control-plane matrix** (IronFlow vs IronFlow regressions):  
+- **Prefect vs FlowOxide A/B** (optional; needs Prefect installed):  
+  `python benchmarks/compare_prefect_vs_flowoxide.py` → writes `docs/perf_comparison.json` (JSON **array** — not for `perf_matrix.py compare`).
+- **Deterministic control-plane matrix** (FlowOxide vs FlowOxide regressions):  
   `python benchmarks/perf_matrix.py run --preset lite --repetitions 1 --warmups 0 --jobs 2`  
   See [perf_methodology.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/perf_methodology.md) (not on the docs site) and **Performance** in [AGENTS.md](AGENTS.md).
 
 ## Persistence defaults
 
-- JSONL history: `data/ironflow_history.jsonl` or `IRONFLOW_HISTORY_PATH`
-- SQLite read model: sidecar `.db` next to the JSONL path, or `data/ironflow_ui.db` when defaults apply — details in earlier sections of this file and in runtime code paths.
+- JSONL history: `data/flowoxide_history.jsonl` or `FLOWOXIDE_HISTORY_PATH`
+- SQLite read model: sidecar `.db` next to the JSONL path, or `data/flowoxide_ui.db` when defaults apply — details in earlier sections of this file and in runtime code paths.
 
 ## End-to-end UI check
 

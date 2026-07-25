@@ -1,9 +1,9 @@
 ---
-name: ironflow-perf-gate
-description: Run and interpret IronFlow perf_matrix.py gates. Use before claiming no regression, after engine/shim control-plane changes, or when comparing baseline vs candidate JSON.
+name: flowoxide-perf-gate
+description: Run and interpret FlowOxide perf_matrix.py gates. Use before claiming no regression, after engine/shim control-plane changes, or when comparing baseline vs candidate JSON.
 ---
 
-# IronFlow — perf_matrix gate
+# FlowOxide — perf_matrix gate
 
 Read root `AGENTS.md` section **Performance: perf_matrix.py** and `docs/perf_methodology.md`.
 

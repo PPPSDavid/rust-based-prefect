@@ -92,9 +92,9 @@ class DeploymentRunTriggerRequest(BaseModel):
     idempotency_key: str | None = None
 
 
-history_path = os.getenv("IRONFLOW_HISTORY_PATH")
+history_path = os.getenv("FLOWOXIDE_HISTORY_PATH")
 if history_path is None:
-    history_path = str(Path("data") / "ironflow_history.jsonl")
+    history_path = str(Path("data") / "flowoxide_history.jsonl")
 
 control_plane = InMemoryControlPlane(history_path=history_path)
 set_control_plane(control_plane)
@@ -103,10 +103,10 @@ _worker_thread: threading.Thread | None = None
 _scheduler_stop_event = threading.Event()
 _scheduler_thread: threading.Thread | None = None
 _rust_scheduler_started = False
-LOCAL_WORKER_NAME = os.getenv("IRONFLOW_LOCAL_WORKER_NAME", "local-worker-1")
-LOCAL_WORK_POOL = os.getenv("IRONFLOW_WORK_POOL", "default-process-pool")
+LOCAL_WORKER_NAME = os.getenv("FLOWOXIDE_LOCAL_WORKER_NAME", "local-worker-1")
+LOCAL_WORK_POOL = os.getenv("FLOWOXIDE_WORK_POOL", "default-process-pool")
 
-app = FastAPI(title="IronFlow Compat Server")
+app = FastAPI(title="FlowOxide Compat Server")
 app.include_router(workers_router)
 app.add_middleware(BasicAuthMiddleware)
 app.add_middleware(
@@ -379,13 +379,13 @@ def _startup_local_worker() -> None:
             paused=False,
         )
     global _worker_thread, _scheduler_thread, _rust_scheduler_started
-    if os.getenv("IRONFLOW_ENABLE_SCHEDULER", "1").strip().lower() not in {
+    if os.getenv("FLOWOXIDE_ENABLE_SCHEDULER", "1").strip().lower() not in {
         "0",
         "false",
         "no",
     }:
-        interval_ms = int(os.getenv("IRONFLOW_SCHEDULER_INTERVAL_MS", "1000"))
-        stale = int(os.getenv("IRONFLOW_SCHEDULER_STALE_SECONDS", "120"))
+        interval_ms = int(os.getenv("FLOWOXIDE_SCHEDULER_INTERVAL_MS", "1000"))
+        stale = int(os.getenv("FLOWOXIDE_SCHEDULER_STALE_SECONDS", "120"))
         if control_plane.start_rust_deployment_scheduler(
             interval_ms=interval_ms, stale_after_seconds=stale
         ):
@@ -394,11 +394,11 @@ def _startup_local_worker() -> None:
             _scheduler_stop_event.clear()
             _scheduler_thread = threading.Thread(
                 target=_scheduler_maintenance_loop,
-                name="ironflow-scheduler",
+                name="flowoxide-scheduler",
                 daemon=True,
             )
             _scheduler_thread.start()
-    if os.getenv("IRONFLOW_ENABLE_LOCAL_WORKER", "1").strip().lower() in {
+    if os.getenv("FLOWOXIDE_ENABLE_LOCAL_WORKER", "1").strip().lower() in {
         "0",
         "false",
         "no",
@@ -412,7 +412,7 @@ def _startup_local_worker() -> None:
         )
         target = _local_worker_loop_rust_wait if use_rust_wait else _local_worker_loop
         _worker_thread = threading.Thread(
-            target=target, name="ironflow-local-worker", daemon=True
+            target=target, name="flowoxide-local-worker", daemon=True
         )
         _worker_thread.start()
 

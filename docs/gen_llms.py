@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate llms.txt at site root for AI/agent discovery (Prefect-style sitemap)."""
+"""Generate discovery files at site root: llms.txt and robots.txt."""
 
 from __future__ import annotations
 
@@ -7,6 +7,12 @@ from mkdocs_gen_files import open as gen_open
 
 SITE_BASE = "https://pppsdavid.github.io/rust-based-prefect"
 REPO_BASE = "https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs"
+
+# robots.txt (Google Search Console + crawlers)
+with gen_open("robots.txt", "w") as robots:
+    robots.write("User-agent: *\n")
+    robots.write("Allow: /\n")
+    robots.write(f"\nSitemap: {SITE_BASE}/sitemap.xml\n")
 
 PAGES: list[tuple[str, str, str]] = [
     ("Home", "", "Layered doc home and onboarding paths."),
@@ -28,7 +34,7 @@ PAGES: list[tuple[str, str, str]] = [
     (
         "Quickstart: first deployment",
         "quickstart-first-deployment/",
-        "Install → API → ironflow deploy → trigger run.",
+        "Install → API → flowoxide deploy → trigger run.",
     ),
     (
         "Self-hosted server",
@@ -51,17 +57,17 @@ PAGES: list[tuple[str, str, str]] = [
         "RunState and Rust FSM edges.",
     ),
     (
-        "Prefect → IronFlow",
-        "PREFECT_IRONFLOW_MAPPING/",
+        "Prefect → FlowOxide",
+        "PREFECT_FLOWOXIDE_MAPPING/",
         "Concept mapping from Prefect 3.",
     ),
     ("Architecture", "architecture/", "Python shim, Rust engine, persistence."),
     ("How-to overview", "how-to/", "Task-focused guides index."),
-    ("How to set up IronFlow", "how-to/setup/", "Clone, env, cargo build, env vars."),
+    ("How to set up FlowOxide", "how-to/setup/", "Clone, env, cargo build, env vars."),
     (
         "How to run the server and UI",
         "how-to/server-and-ui/",
-        "ironflow_server.py and manual uvicorn.",
+        "flowoxide_server.py and manual uvicorn.",
     ),
     (
         "How to run the server in Docker",
@@ -69,19 +75,19 @@ PAGES: list[tuple[str, str, str]] = [
         "Single-container API image and volumes.",
     ),
     (
-        "How to run IronFlow with Docker Compose",
+        "How to run FlowOxide with Docker Compose",
         "how-to/docker-compose/",
         "Postgres + API + services + HTTP workers.",
     ),
     (
         "How to run background services",
         "how-to/run-background-services/",
-        "ironflow server services start without HTTP.",
+        "flowoxide server services start without HTTP.",
     ),
     (
         "How to use Postgres for the control plane",
         "how-to/database-postgres/",
-        "IRONFLOW_DATABASE_URL and Rust claim bind.",
+        "FLOWOXIDE_DATABASE_URL and Rust claim bind.",
     ),
     (
         "How to run workers in HTTP mode",
@@ -91,12 +97,12 @@ PAGES: list[tuple[str, str, str]] = [
     (
         "How to secure a self-hosted server",
         "how-to/secure-self-hosted/",
-        "HTTP Basic auth via IRONFLOW_*_AUTH_STRING.",
+        "HTTP Basic auth via FLOWOXIDE_*_AUTH_STRING.",
     ),
     (
         "How to deploy with CLI",
         "how-to/deploy-with-cli/",
-        "ironflow.yaml and ironflow CLI.",
+        "flowoxide.yaml and flowoxide CLI.",
     ),
     (
         "How to create deployments",
@@ -128,7 +134,7 @@ PAGES: list[tuple[str, str, str]] = [
         "compatibility/",
         "Supported vs unsupported Prefect semantics.",
     ),
-    ("Environment variables", "reference/env-vars/", "All IRONFLOW_* variables."),
+    ("Environment variables", "reference/env-vars/", "All FLOWOXIDE_* variables."),
     ("REST API overview", "reference/api/", "HTTP route index."),
     (
         "Troubleshooting",
@@ -143,7 +149,7 @@ PAGES: list[tuple[str, str, str]] = [
 ]
 
 with gen_open("llms.txt", "w") as f:
-    f.write("# Project IronFlow documentation index\n")
+    f.write("# Project FlowOxide documentation index\n")
     f.write("# Fetch this file for a sitemap of published pages.\n")
     f.write(f"# Site: {SITE_BASE}\n")
     f.write("# Markdown source: append paths to the GitHub docs/ tree below.\n\n")
@@ -164,7 +170,7 @@ with gen_open("llms.txt", "w") as f:
             "concepts/runners/": "concepts/runners.md",
             "concepts/dag-and-forecast/": "concepts/dag-and-forecast.md",
             "concepts/states-and-transitions/": "concepts/states-and-transitions.md",
-            "PREFECT_IRONFLOW_MAPPING/": "PREFECT_IRONFLOW_MAPPING.md",
+            "PREFECT_FLOWOXIDE_MAPPING/": "PREFECT_FLOWOXIDE_MAPPING.md",
             "architecture/": "architecture.md",
             "how-to/": "how-to/index.md",
             "how-to/setup/": "how-to/setup.md",

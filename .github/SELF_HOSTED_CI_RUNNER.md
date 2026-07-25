@@ -63,7 +63,7 @@ For **public** repos, GitHub **does not** run workflows from **fork** PRs on sel
 
 ## Changing labels
 
-If you use **custom labels** only (for example `ironflow-pi`), update workflow **`runs-on`** in:
+If you use **custom labels** only (for example `flowoxide-pi`), update workflow **`runs-on`** in:
 
 - `.github/workflows/ci.yml` → job **`wheel-linux-aarch64`**
 - `.github/workflows/publish-testpypi.yml` and **`publish-pypi.yml`** → matrix row **`linux-aarch64`**

@@ -24,7 +24,7 @@ fi
 echo "[cloud-install] Python deps (uv sync --frozen) ..."
 # App/test deps come from the committed uv.lock + [dependency-groups].dev.
 # Workspace packages stay on pytest.ini pythonpath; skip native build during sync.
-IRONFLOW_SKIP_NATIVE_BUILD=1 uv sync --frozen --group dev
+FLOWOXIDE_SKIP_NATIVE_BUILD=1 uv sync --frozen --group dev
 export PATH="${ROOT}/.venv/bin:${PATH}"
 
 echo "[cloud-install] Frontend deps ..."

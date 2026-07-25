@@ -5,8 +5,8 @@
 services:
   server:
     environment:
-      IRONFLOW_SERVER_API_AUTH_STRING: ${IRONFLOW_SERVER_API_AUTH_STRING:-admin:pass}
+      FLOWOXIDE_SERVER_API_AUTH_STRING: ${FLOWOXIDE_SERVER_API_AUTH_STRING:-admin:pass}
 
   worker:
     environment:
-      IRONFLOW_API_AUTH_STRING: ${IRONFLOW_API_AUTH_STRING:-admin:pass}
+      FLOWOXIDE_API_AUTH_STRING: ${FLOWOXIDE_API_AUTH_STRING:-admin:pass}

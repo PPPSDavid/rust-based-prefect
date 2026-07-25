@@ -1,6 +1,6 @@
 # AGENTS — benchmarks
 
-Ownership: `perf_matrix.py`, Prefect vs IronFlow A/B harnesses, recipe definitions.
+Ownership: `perf_matrix.py`, Prefect vs FlowOxide A/B harnesses, recipe definitions.
 
 Read first: root `AGENTS.md` (**Performance: perf_matrix.py**), `docs/perf_methodology.md`.
 

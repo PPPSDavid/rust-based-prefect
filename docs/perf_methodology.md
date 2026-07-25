@@ -1,6 +1,6 @@
-# IronFlow Performance Methodology
+# FlowOxide Performance Methodology
 
-For **Prefect vs IronFlow headline throughput** (synthetic A/B, caveats, and multipliers), see [Performance overview](PERFORMANCE_OVERVIEW.md).
+For **Prefect vs FlowOxide headline throughput** (synthetic A/B, caveats, and multipliers), see [Performance overview](PERFORMANCE_OVERVIEW.md).
 
 This document describes the deterministic benchmark harness in `benchmarks/perf_matrix.py`.
 The harness is designed for stable cross-commit comparison, regression detection, and CI use.
@@ -14,7 +14,7 @@ Always use a **subcommand**: `run` or `compare` (there is no bare `perf_matrix.p
 - Compare baseline vs candidate (both files must be **`run` outputs** — JSON **objects** with `aggregates`):
   - `python benchmarks/perf_matrix.py compare --baseline docs/perf_baseline_example.json --candidate docs/perf_candidate_example.json`
 
-Do **not** use `docs/perf_comparison.json` (from `compare_prefect_vs_ironflow.py`) as an input to `compare`; that file is a JSON **array** and will be rejected with an explicit error.
+Do **not** use `docs/perf_comparison.json` (from `compare_prefect_vs_flowoxide.py`) as an input to `compare`; that file is a JSON **array** and will be rejected with an explicit error.
 
 Fast local loop:
 
@@ -54,7 +54,7 @@ The recipe catalog spans:
 - optional **decorator transition-hook microbench** (`decorator_hook_profile` on select recipes): `flow_count` is timed shim iterations; `tasks_per_flow` is warmup iterations before the timer; profiles `none` / `flow` / `task` / `both` compare baseline vs no-op hooks.
 - optional **decorator map microbench** (`decorator_map_width` on `micro_map_*`): `@flow` + `ThreadPoolTaskRunner` + `task.map()`.
 - optional **decorator concurrent-submit microbench** (`decorator_submit_width` on `micro_submit_*`): N independent `task.submit()` calls on the shared per-flow thread pool; create / PENDING→RUNNING stay on the coordinating thread (Rust batch); COMPLETED is lock-serialized Rust `record_task_event` from workers. Counts include `rust_fsm_active`.
-- optional **subflow microbench** (`subflow_profile` on `subflow_*` recipes): `flow_count` maps to depth/burst/child-count per profile; `tasks_per_flow` maps to fan-out or query iterations; `task_events_per_task` is timed sample iterations. Profiles: `inline_depth`, `deploy_wait_chain`, `deploy_cross_pool`, `fire_forget_burst`, `cancel_propagation`, `query_dag_nested`. Deployment profiles use multiple in-process workers per sample (same as production); Rust `bind_db` path is exercised when `IRONFLOW_USE_RUST_FSM=1` (default).
+- optional **subflow microbench** (`subflow_profile` on `subflow_*` recipes): `flow_count` maps to depth/burst/child-count per profile; `tasks_per_flow` maps to fan-out or query iterations; `task_events_per_task` is timed sample iterations. Profiles: `inline_depth`, `deploy_wait_chain`, `deploy_cross_pool`, `fire_forget_burst`, `cancel_propagation`, `query_dag_nested`. Deployment profiles use multiple in-process workers per sample (same as production); Rust `bind_db` path is exercised when `FLOWOXIDE_USE_RUST_FSM=1` (default).
 
 Use defaults for consistency (`--preset lite`, `--preset pr`, `--preset hook_micro`, `--preset flow_map`, `--preset flow_submit`, `--preset concurrency`, `--preset gcl`, `--preset subflow_lite`, `--preset subflow`, or `--preset full`) or override with:
 
@@ -166,20 +166,20 @@ When reviewing changes:
 
 ## Concurrency and Locking (Read/Write Contract)
 
-IronFlow optimizes **read throughput** without sacrificing **single-writer determinism** on the FSM.
+FlowOxide optimizes **read throughput** without sacrificing **single-writer determinism** on the FSM.
 Agents and contributors must preserve this contract when touching `runtime.py` or the Rust FFI.
 
 ### Write path (must stay serialized per control plane)
 
 - `InMemoryControlPlane` holds an `RLock` (`_lock`) around all mutations: flow/task creation, state transitions, event append, and Python SQLite writes.
 - When `bind_db` is active (`_rust_db_bound`), Rust deployment FFI calls also acquire `_lock` so the Python and Rust SQLite connections do not write concurrently to the same file.
-- Rust FSM calls (`ironflow_control`) take a **per-handle** mutex. Different engine handles can dispatch in parallel; a single handle is still single-writer.
+- Rust FSM calls (`flowoxide_control`) take a **per-handle** mutex. Different engine handles can dispatch in parallel; a single handle is still single-writer.
 - **Do not** remove the Python write lock or shard it by flow without an explicit determinism design — optimistic concurrency and transition tokens assume ordered application per plane.
 
 ### Read path (intentionally concurrent)
 
 - List/detail query methods (`list_flow_runs`, `list_task_runs`, `list_events`, etc.) call `_query_rust()` **without** acquiring `_lock`.
-- `ironflow_query` uses a **thread-local SQLite connection pool** (one reused connection per thread per database path) under WAL mode.
+- `flowoxide_query` uses a **thread-local SQLite connection pool** (one reused connection per thread per database path) under WAL mode.
 - Mixed `perf_matrix` recipes spawn one writer thread plus `mixed_reader_count` reader threads to regression-test this path.
 
 ### Task runners vs control plane

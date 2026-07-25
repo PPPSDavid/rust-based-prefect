@@ -3,7 +3,7 @@
 This page walks through **one minimal flow** using the **bundled repository example** — no API server and no UI required.
 
 !!! note "PyPI users"
-    If you installed with **`pip install ironflow-prefect-compat`** and do **not** have a clone, use **[Quick start: PyPI](QUICKSTART_PYPI.md)** instead (copy-paste script, no `PYTHONPATH`).
+    If you installed with **`pip install flowoxide-prefect-compat`** and do **not** have a clone, use **[Quick start: PyPI](QUICKSTART_PYPI.md)** instead (copy-paste script, no `PYTHONPATH`).
 
 **Repository checkout path:** complete **[Installation](INSTALL.md)** §2–5 (clone, Python env, `cargo build`), then continue here.
 
@@ -13,10 +13,10 @@ Imports use **`prefect_compat`**, not `prefect`. Tasks are plain functions decor
 
 **Flow of data:** `example_flow(5)` calls **`start`** once (`5 → 6`), then **`process.map`** runs **`process`** on **two** values derived from that result (`6` and `7` → `12` and `14`). **`aggregate`** sums those to **`26`**.
 
-The listing below is the same source as `python-shim/examples/flow_ironflow.py` (embedded here so you can read it without opening the repo):
+The listing below is the same source as `python-shim/examples/flow_flowoxide.py` (embedded here so you can read it without opening the repo):
 
 ```python
---8<-- "python-shim/examples/flow_ironflow.py"
+--8<-- "python-shim/examples/flow_flowoxide.py"
 ```
 
 - **`start.submit(total)`** — schedule one task; **`first.result()`** waits for it inside the flow.
@@ -26,7 +26,7 @@ The listing below is the same source as `python-shim/examples/flow_ironflow.py` 
 
 ## 1. Prepare the environment
 
-From the **root** of a cloned IronFlow repository (with dependencies installed as in the README):
+From the **root** of a cloned FlowOxide repository (with dependencies installed as in the README):
 
 **Windows (PowerShell):**
 
@@ -47,7 +47,7 @@ That lets Python import the `prefect_compat` package without a separate editable
 Still at the repo root:
 
 ```bash
-python python-shim/examples/flow_ironflow.py
+python python-shim/examples/flow_flowoxide.py
 ```
 
 ## 3. What you should see
@@ -55,16 +55,16 @@ python python-shim/examples/flow_ironflow.py
 Typical **stdout** looks like:
 
 ```text
-ironflow_result=26
-ironflow_events=15
+flowoxide_result=26
+flowoxide_events=15
 ```
 
 | Line | Meaning |
 | --- | --- |
-| `ironflow_result=26` | The flow returned **26**. The example uses `submit`, `map`, and `aggregate`: starting from `5`, it computes a small DAG and sums the mapped results (here \(12 + 14 = 26\)). |
-| `ironflow_events=15` | The in-memory control plane recorded **15** append-only events for this run (flow/task lifecycle transitions and related records). The exact count can vary slightly with version, but it should be **stable** for the same code and parameters. |
+| `flowoxide_result=26` | The flow returned **26**. The example uses `submit`, `map`, and `aggregate`: starting from `5`, it computes a small DAG and sums the mapped results (here \(12 + 14 = 26\)). |
+| `flowoxide_events=15` | The in-memory control plane recorded **15** append-only events for this run (flow/task lifecycle transitions and related records). The exact count can vary slightly with version, but it should be **stable** for the same code and parameters. |
 
-Nothing listens on a port: orchestration runs **in-process**. If you set `IRONFLOW_HISTORY_PATH` to a file path before running, the same flow also **persists** history to that JSONL file (see the repository README for persistence defaults).
+Nothing listens on a port: orchestration runs **in-process**. If you set `FLOWOXIDE_HISTORY_PATH` to a file path before running, the same flow also **persists** history to that JSONL file (see the repository README for persistence defaults).
 
 ## 4. What this proves
 
@@ -75,8 +75,8 @@ Nothing listens on a port: orchestration runs **in-process**. If you set `IRONFL
 ## 5. Next steps
 
 - **[Quick start: PyPI](QUICKSTART_PYPI.md)** — same flow pattern without a clone.
-- **[Quickstart: first deployment](quickstart-first-deployment.md)** — API + `ironflow deploy`.
-- **[Prefect → IronFlow](PREFECT_IRONFLOW_MAPPING.md)** — map Prefect concepts to this project.
+- **[Quickstart: first deployment](quickstart-first-deployment.md)** — API + `flowoxide deploy`.
+- **[Prefect → FlowOxide](PREFECT_FLOWOXIDE_MAPPING.md)** — map Prefect concepts to this project.
 - **[Compatibility](compatibility.md)** — what is supported vs not.
-- **[How to set up IronFlow](how-to/setup.md)** · **[How to run the server and UI](how-to/server-and-ui.md)** — optional stack beyond in-process runs.
+- **[How to set up FlowOxide](how-to/setup.md)** · **[How to run the server and UI](how-to/server-and-ui.md)** — optional stack beyond in-process runs.
 - **README** in the repo — optional HTTP API, UI, and `cargo build` for the Rust engine.

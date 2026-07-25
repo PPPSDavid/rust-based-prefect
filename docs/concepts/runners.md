@@ -11,13 +11,13 @@ Task runners are **not** deployment **workers** or **work pools**. Workers claim
 | Runner | Role |
 | --- | --- |
 | **`SequentialTaskRunner`** | Single-threaded `submit` / `map`; bodies run on the coordinating thread (no overlap). |
-| **`ThreadPoolTaskRunner`** | Concurrent `submit` and `map` via `ThreadPoolExecutor` (Prefect 3–style default). Optional `max_workers`; pool size can also follow **`IRONFLOW_TASK_RUNNER_THREAD_POOL_MAX_WORKERS`**. |
-| **`ProcessPoolTaskRunner`** | Process-pool `map` for picklable tasks; optional **`IRONFLOW_TASK_RUNNER_PROCESS_POOL_MAX_WORKERS`**. Independent `submit()` calls remain **synchronous** on the caller (process-pool submit concurrency is not wired yet). |
+| **`ThreadPoolTaskRunner`** | Concurrent `submit` and `map` via `ThreadPoolExecutor` (Prefect 3–style default). Optional `max_workers`; pool size can also follow **`FLOWOXIDE_TASK_RUNNER_THREAD_POOL_MAX_WORKERS`**. |
+| **`ProcessPoolTaskRunner`** | Process-pool `map` for picklable tasks; optional **`FLOWOXIDE_TASK_RUNNER_PROCESS_POOL_MAX_WORKERS`**. Independent `submit()` calls remain **synchronous** on the caller (process-pool submit concurrency is not wired yet). |
 
 ## Choosing a runner
 
 - Pass a runner to **`@flow(task_runner=...)`** (see examples in `python-shim/src/prefect_compat/server.py` and tests under `python-shim/tests/`).
-- **`default_task_runner_from_env()`** picks a runner from **`IRONFLOW_TASK_RUNNER`**: `thread` (default), `sequential` / `seq` / `serial`, or `process` / `multiprocessing` / `mp`.
+- **`default_task_runner_from_env()`** picks a runner from **`FLOWOXIDE_TASK_RUNNER`**: `thread` (default), `sequential` / `seq` / `serial`, or `process` / `multiprocessing` / `mp`.
 
 **Workload guide:** **[How to choose a task runner](../how-to/choose-task-runners.md)** — API/remote vs local CPU, `submit` vs `map`, and common mistakes.
 

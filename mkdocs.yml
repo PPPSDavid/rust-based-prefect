@@ -1,5 +1,7 @@
-site_name: Project IronFlow
-site_description: Rust orchestration kernel with Prefect-style Python authoring (prefect_compat)
+site_name: FlowOxide
+site_description: >-
+  FlowOxide is a Rust-based, Prefect-style orchestration engine:
+  write @flow / @task in Python (prefect_compat); the control plane runs in Rust.
 site_url: https://pppsdavid.github.io/rust-based-prefect/
 repo_url: https://github.com/PPPSDavid/rust-based-prefect
 edit_uri: edit/main/docs/
@@ -23,6 +25,7 @@ exclude_docs: |
 
 theme:
   name: material
+  custom_dir: overrides
   palette:
     - scheme: default
       primary: indigo
@@ -61,19 +64,19 @@ nav:
       - Runners: concepts/runners.md
       - "DAG and forecast": concepts/dag-and-forecast.md
       - "States and transitions": concepts/states-and-transitions.md
-      - "Prefect → IronFlow": PREFECT_IRONFLOW_MAPPING.md
+      - "Prefect → FlowOxide": PREFECT_FLOWOXIDE_MAPPING.md
       - Architecture: architecture.md
   - "How-to guides":
       - Overview: how-to/index.md
-      - "How to set up IronFlow": how-to/setup.md
+      - "How to set up FlowOxide": how-to/setup.md
       - "How to run the server and UI": how-to/server-and-ui.md
       - "How to run the server in Docker": how-to/docker-quickstart.md
-      - "How to run IronFlow with Docker Compose": how-to/docker-compose.md
+      - "How to run FlowOxide with Docker Compose": how-to/docker-compose.md
       - "How to run background services": how-to/run-background-services.md
       - "How to use Postgres for the control plane": how-to/database-postgres.md
       - "How to run workers in HTTP mode": how-to/worker-http-mode.md
       - "How to secure a self-hosted server": how-to/secure-self-hosted.md
-      - "How to deploy with the CLI and ironflow.yaml": how-to/deploy-with-cli.md
+      - "How to deploy with the CLI and flowoxide.yaml": how-to/deploy-with-cli.md
       - "How to create and update deployments": how-to/deployments.md
       - "How to compose flows with subflows": how-to/subflows.md
       - "How to choose a task runner": how-to/choose-task-runners.md
@@ -101,5 +104,14 @@ markdown_extensions:
   - tables
   - toc:
       permalink: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/PPPSDavid/rust-based-prefect
+      name: FlowOxide on GitHub
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/flowoxide-prefect-compat/
+      name: flowoxide-prefect-compat on PyPI
 
 strict: true

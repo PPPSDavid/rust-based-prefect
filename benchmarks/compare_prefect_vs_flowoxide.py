@@ -27,7 +27,7 @@ class PerfResult:
     notes: str = ""
 
 
-def _run_ironflow(flavor: str, complexity: int) -> PerfResult:
+def _run_flowoxide(flavor: str, complexity: int) -> PerfResult:
     sys.path.insert(0, str(ROOT / "python-shim" / "src"))
     from prefect_compat import InMemoryControlPlane, flow, set_control_plane, task, wait
 
@@ -75,7 +75,7 @@ def _run_ironflow(flavor: str, complexity: int) -> PerfResult:
     events = len(plane.events())
 
     return PerfResult(
-        engine="ironflow",
+        engine="flowoxide",
         flavor=flavor,
         complexity=complexity,
         startup_seconds=startup,
@@ -198,14 +198,14 @@ def _run_prefect(flavor: str, complexity: int, port: int = 4201) -> PerfResult:
             server.kill()
 
 
-def _run_ironflow_http(flavor: str, complexity: int, port: int = 4210) -> PerfResult:
+def _run_flowoxide_http(flavor: str, complexity: int, port: int = 4210) -> PerfResult:
     env = os.environ.copy()
     python_path_parts = [str(ROOT / "python-shim" / "src")]
     if env.get("PYTHONPATH"):
         python_path_parts.append(env["PYTHONPATH"])
     env["PYTHONPATH"] = os.pathsep.join(python_path_parts)
     with tempfile.TemporaryDirectory() as tmpdir:
-        env["IRONFLOW_HISTORY_PATH"] = str(Path(tmpdir) / "history.jsonl")
+        env["FLOWOXIDE_HISTORY_PATH"] = str(Path(tmpdir) / "history.jsonl")
         cmd = [
             sys.executable,
             "-m",
@@ -227,14 +227,14 @@ def _run_ironflow_http(flavor: str, complexity: int, port: int = 4210) -> PerfRe
             )
         except Exception as exc:
             return PerfResult(
-                engine="ironflow_http",
+                engine="flowoxide_http",
                 flavor=flavor,
                 complexity=complexity,
                 startup_seconds=0.0,
                 runtime_seconds=0.0,
                 transition_events=0,
                 transitions_per_second=0.0,
-                notes=f"ironflow http server unavailable: {exc}",
+                notes=f"flowoxide http server unavailable: {exc}",
             )
         startup = 0.0
         try:
@@ -260,7 +260,7 @@ def _run_ironflow_http(flavor: str, complexity: int, port: int = 4210) -> PerfRe
             delta_events = max(after - before, 0)
             runtime = float(body["runtime_seconds"])
             return PerfResult(
-                engine="ironflow_http",
+                engine="flowoxide_http",
                 flavor=flavor,
                 complexity=complexity,
                 startup_seconds=startup,
@@ -270,14 +270,14 @@ def _run_ironflow_http(flavor: str, complexity: int, port: int = 4210) -> PerfRe
             )
         except Exception as exc:
             return PerfResult(
-                engine="ironflow_http",
+                engine="flowoxide_http",
                 flavor=flavor,
                 complexity=complexity,
                 startup_seconds=startup,
                 runtime_seconds=0.0,
                 transition_events=0,
                 transitions_per_second=0.0,
-                notes=f"ironflow http benchmark failed: {exc}",
+                notes=f"flowoxide http benchmark failed: {exc}",
             )
         finally:
             server.terminate()
@@ -325,8 +325,8 @@ def main() -> None:
         ("chained", 100),
         ("chained", 500),
     ]:
-        results.append(_run_ironflow(flavor, complexity))
-        results.append(_run_ironflow_http(flavor, complexity))
+        results.append(_run_flowoxide(flavor, complexity))
+        results.append(_run_flowoxide_http(flavor, complexity))
         results.append(_run_prefect(flavor, complexity))
 
     payload = [asdict(r) for r in results]

@@ -1,24 +1,24 @@
-# IronFlow API server image (Tier A / B5 compose).
+# FlowOxide API server image (Tier A / B5 compose).
 #
 # Build from repo root:
-#   docker build -f deploy/docker/Dockerfile.server -t ironflow-server:local .
+#   docker build -f deploy/docker/Dockerfile.server -t flowoxide-server:local .
 #
 # Local wheel:
 #   python -m build --wheel --outdir dist/wheels --directory python-shim
 #   docker build -f deploy/docker/Dockerfile.server \
-#     --build-arg INSTALL_MODE=local -t ironflow-server:local .
+#     --build-arg INSTALL_MODE=local -t flowoxide-server:local .
 
 ARG PYTHON_VERSION=3.12
 FROM python:${PYTHON_VERSION}-slim AS runtime
 
-ARG IRONFLOW_VERSION=0.2.0
+ARG FLOWOXIDE_VERSION=0.2.0
 ARG INSTALL_MODE=pypi
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /opt/ironflow
+WORKDIR /opt/flowoxide
 
 RUN pip install --no-cache-dir \
     "fastapi>=0.115,<1" \
@@ -27,16 +27,16 @@ RUN pip install --no-cache-dir \
 
 COPY dist/wheels/ /tmp/wheels/
 RUN if [ "$INSTALL_MODE" = "local" ]; then \
-      WHEEL="$(ls /tmp/wheels/ironflow_prefect_compat-*.whl | head -n 1)"; \
+      WHEEL="$(ls /tmp/wheels/flowoxide_prefect_compat-*.whl | head -n 1)"; \
       pip install --no-cache-dir "$WHEEL"; \
     else \
-      pip install --no-cache-dir "ironflow-prefect-compat[postgres]==${IRONFLOW_VERSION}"; \
+      pip install --no-cache-dir "flowoxide-prefect-compat[postgres]==${FLOWOXIDE_VERSION}"; \
     fi \
     && rm -rf /tmp/wheels
 
-ENV IRONFLOW_HISTORY_PATH=/data/ironflow_history.jsonl \
-    IRONFLOW_ENABLE_LOCAL_WORKER=1 \
-    IRONFLOW_ENABLE_SCHEDULER=1 \
+ENV FLOWOXIDE_HISTORY_PATH=/data/flowoxide_history.jsonl \
+    FLOWOXIDE_ENABLE_LOCAL_WORKER=1 \
+    FLOWOXIDE_ENABLE_SCHEDULER=1 \
     PYTHONUNBUFFERED=1
 
 VOLUME ["/data"]

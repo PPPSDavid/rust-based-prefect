@@ -5,7 +5,7 @@ import os
 
 
 def server_api_auth_string() -> str | None:
-    raw = os.getenv("IRONFLOW_SERVER_API_AUTH_STRING")
+    raw = os.getenv("FLOWOXIDE_SERVER_API_AUTH_STRING")
     if raw is None:
         return None
     value = raw.strip()
@@ -13,7 +13,7 @@ def server_api_auth_string() -> str | None:
 
 
 def api_client_auth_string() -> str | None:
-    raw = os.getenv("IRONFLOW_API_AUTH_STRING")
+    raw = os.getenv("FLOWOXIDE_API_AUTH_STRING")
     if raw is None:
         return None
     value = raw.strip()

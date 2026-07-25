@@ -3,7 +3,7 @@
 **Audience:** operators running multi-process or Compose stacks  
 **Default remains SQLite** for local zero-config.
 
-**Prefect example to borrow from:** [Local Prefect server — database](https://docs.prefect.io/v3/how-to-guides/self-hosted/server-cli) (SQLite default; Postgres for multi-process). IronFlow uses `IRONFLOW_DATABASE_URL` instead of Prefect’s asyncpg URL setting; there is no `ironflow server database upgrade` CLI yet.
+**Prefect example to borrow from:** [Local Prefect server — database](https://docs.prefect.io/v3/how-to-guides/self-hosted/server-cli) (SQLite default; Postgres for multi-process). FlowOxide uses `FLOWOXIDE_DATABASE_URL` instead of Prefect’s asyncpg URL setting; there is no `flowoxide server database upgrade` CLI yet.
 
 ## When to use it
 
@@ -16,13 +16,13 @@
 2. Point the API at the DSN:
 
 ```bash
-export IRONFLOW_DATABASE_URL=postgresql://ironflow:ironflow@127.0.0.1:5432/ironflow
+export FLOWOXIDE_DATABASE_URL=postgresql://flowoxide:flowoxide@127.0.0.1:5432/flowoxide
 uv run python -m uvicorn python-shim.src.prefect_compat.server:app --host 127.0.0.1 --port 8000
 ```
 
-On first connect IronFlow creates the control-plane tables (flow/task runs, deployments, workers, …).
+On first connect FlowOxide creates the control-plane tables (flow/task runs, deployments, workers, …).
 
-3. Leave `IRONFLOW_DATABASE_URL` unset to keep the SQLite sidecar next to `IRONFLOW_HISTORY_PATH`.
+3. Leave `FLOWOXIDE_DATABASE_URL` unset to keep the SQLite sidecar next to `FLOWOXIDE_HISTORY_PATH`.
 
 ## Behavior notes
 

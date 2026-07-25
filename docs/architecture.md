@@ -1,6 +1,6 @@
 # Architecture Note (MVP)
 
-IronFlow is intentionally **Rust-first**: the **`rust-engine`** crate is the **authoritative orchestration kernel** — deterministic state transitions, validation, and append-only history. **Python** (`prefect_compat`) is the **authoring and integration layer**: Prefect-like decorators, process orchestration glue, HTTP when enabled, and calls into the engine over FFI when the native library is loaded. The frontend (if used) observes state through the same persistence and APIs; it is not a second control plane.
+FlowOxide is intentionally **Rust-first**: the **`rust-engine`** crate is the **authoritative orchestration kernel** — deterministic state transitions, validation, and append-only history. **Python** (`prefect_compat`) is the **authoring and integration layer**: Prefect-like decorators, process orchestration glue, HTTP when enabled, and calls into the engine over FFI when the native library is loaded. The frontend (if used) observes state through the same persistence and APIs; it is not a second control plane.
 
 ## Runtime path
 
@@ -11,7 +11,7 @@ IronFlow is intentionally **Rust-first**: the **`rust-engine`** crate is the **a
 
 ## Static planning path
 
-1. On flow start, IronFlow compiles the **`@flow` function body** (AST) into graph IR via `static-planner/`.
+1. On flow start, FlowOxide compiles the **`@flow` function body** (AST) into graph IR via `static-planner/`.
 2. Supported patterns: `submit` / `map` chains, `wait_for`, constant bounded loops, repeated same-task calls, and `@task(name=...)` when task objects are visible to the flow module/closure.
 3. The manifest is stored per flow run; each `submit` receives the next matching **`planned_node_id`** (or a dynamic `dyn_<task>_<n>` id when the forecast is exhausted). **`map()`** shares one planned node across all fan-out task runs in a batch.
 4. Unsupported constructs (`if`, dynamic `range(n)`, opaque control flow) set **`fallback_required`**; the UI/API can still build a runtime-inferred DAG from task-run history.

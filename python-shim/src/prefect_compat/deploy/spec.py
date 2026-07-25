@@ -155,10 +155,10 @@ def _normalize_deployment(raw: Any) -> DeploymentSpec:
     return DeploymentSpec.model_validate(data)
 
 
-class IronflowManifest(BaseModel):
+class FlowOxideManifest(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
-    ironflow_version: str = Field(alias="ironflow-version")
+    flowoxide_version: str = Field(alias="flowoxide-version")
     deployments: list[DeploymentSpec] = Field(default_factory=list)
 
     @field_validator("deployments", mode="before")

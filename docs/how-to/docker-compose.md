@@ -1,10 +1,10 @@
-# How to run IronFlow with Docker Compose
+# How to run FlowOxide with Docker Compose
 
 Production-shaped stack: **Postgres**, **API server** (no embedded worker/scheduler),
 **background services**, and **HTTP worker(s)**. Workers never share a filesystem
 with the server.
 
-**Prefect example to borrow from:** [Prefect Server via Docker Compose](https://docs.prefect.io/v3/how-to-guides/self-hosted/docker-compose) — same **process layout** (Postgres + API without embeds + background services + worker). IronFlow does **not** include Prefect’s Redis messaging or a compose UI service yet (see [Compatibility](../compatibility.md)).
+**Prefect example to borrow from:** [Prefect Server via Docker Compose](https://docs.prefect.io/v3/how-to-guides/self-hosted/docker-compose) — same **process layout** (Postgres + API without embeds + background services + worker). FlowOxide does **not** include Prefect’s Redis messaging or a compose UI service yet (see [Compatibility](../compatibility.md)).
 
 For a single-container quickstart, see [Docker quickstart](docker-quickstart.md).
 
@@ -27,10 +27,10 @@ Health: `http://127.0.0.1:8000/health`.
 
 | Service | Role |
 | --- | --- |
-| `postgres` | Control-plane DB (`IRONFLOW_DATABASE_URL`) |
-| `server` | FastAPI; `IRONFLOW_ENABLE_SCHEDULER=0`, `IRONFLOW_ENABLE_LOCAL_WORKER=0` |
-| `services` | `ironflow server services start` (schedule / lease reclaim) |
-| `worker` | `IRONFLOW_WORKER_MODE=http` → claim API |
+| `postgres` | Control-plane DB (`FLOWOXIDE_DATABASE_URL`) |
+| `server` | FastAPI; `FLOWOXIDE_ENABLE_SCHEDULER=0`, `FLOWOXIDE_ENABLE_LOCAL_WORKER=0` |
+| `services` | `flowoxide server services start` (schedule / lease reclaim) |
+| `worker` | `FLOWOXIDE_WORKER_MODE=http` → claim API |
 
 Optional auth overlay:
 
@@ -47,7 +47,7 @@ bash scripts/docker_compose_smoke.sh
 ## Operations notes
 
 - Run **one** `services` replica until HA leader election lands (see [background services](run-background-services.md)).
-- Scale workers horizontally; keep them on `http` mode and the same `IRONFLOW_API_URL`.
+- Scale workers horizontally; keep them on `http` mode and the same `FLOWOXIDE_API_URL`.
 - Redis is **not** required for this stack (deferred).
 - UI image is optional / separate from this compose file.
 

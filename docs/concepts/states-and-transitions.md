@@ -1,6 +1,6 @@
 # States and transitions
 
-IronFlow’s control plane uses a single **`RunState`** enum for **flow runs** and **task runs**. States and **allowed transitions** are enforced in the Rust engine (`rust-engine`); invalid transitions are rejected.
+FlowOxide’s control plane uses a single **`RunState`** enum for **flow runs** and **task runs**. States and **allowed transitions** are enforced in the Rust engine (`rust-engine`); invalid transitions are rejected.
 
 ## States
 

@@ -1,10 +1,10 @@
-# IronFlow deployment manifest (Tier 1)
+# FlowOxide deployment manifest (Tier 1)
 # See: https://github.com/PPPSDavid/rust-based-prefect
-ironflow-version: "1"
+flowoxide-version: "1"
 
 # Optional pull steps run before the worker imports flow code (serve / worker --file).
 # pull:
-#   - step: ironflow.deployments.steps.set_working_directory
+#   - step: flowoxide.deployments.steps.set_working_directory
 #     inputs:
 #       directory: .
 

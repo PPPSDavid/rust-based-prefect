@@ -5,8 +5,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-IMAGE="${IRONFLOW_SERVER_IMAGE:-ironflow-server:local}"
-HOST_PORT="${IRONFLOW_SMOKE_PORT:-18000}"
+IMAGE="${FLOWOXIDE_SERVER_IMAGE:-flowoxide-server:local}"
+HOST_PORT="${FLOWOXIDE_SMOKE_PORT:-18000}"
 BASE_URL="http://127.0.0.1:${HOST_PORT}"
 INSTALL_MODE="${INSTALL_MODE:-local}"
 CONTAINER=""
@@ -52,15 +52,15 @@ wait_for_health() {
 run_container() {
   local auth_env=()
   if [ -n "${1:-}" ]; then
-    auth_env=(-e "IRONFLOW_SERVER_API_AUTH_STRING=${1}")
+    auth_env=(-e "FLOWOXIDE_SERVER_API_AUTH_STRING=${1}")
   fi
-  VOLUME="ironflow-smoke-${RANDOM}"
-  CONTAINER="ironflow-server-smoke-${RANDOM}"
+  VOLUME="flowoxide-smoke-${RANDOM}"
+  CONTAINER="flowoxide-server-smoke-${RANDOM}"
   docker volume create "${VOLUME}" >/dev/null
   docker run -d --name "${CONTAINER}" \
     -p "${HOST_PORT}:8000" \
     -v "${VOLUME}:/data" \
-    -e IRONFLOW_HISTORY_PATH=/data/ironflow_history.jsonl \
+    -e FLOWOXIDE_HISTORY_PATH=/data/flowoxide_history.jsonl \
     "${auth_env[@]}" \
     "${IMAGE}" >/dev/null
   wait_for_health
@@ -96,11 +96,11 @@ curl -sf -u "admin:pass" -X POST "${BASE_URL}/api/deployments/${DEPLOYMENT_ID}/r
   -H 'Content-Type: application/json' \
   -d '{"parameters":{"n":2}}' | "$PYTHON" -m json.tool >/dev/null
 
-echo "==> Smoke: CLI deploy client with IRONFLOW_API_AUTH_STRING"
+echo "==> Smoke: CLI deploy client with FLOWOXIDE_API_AUTH_STRING"
 # Install the same local wheel the image used so host client deps (pydantic) resolve.
-WHEEL="$(ls "${ROOT}"/dist/wheels/ironflow_prefect_compat-*.whl | head -n 1)"
+WHEEL="$(ls "${ROOT}"/dist/wheels/flowoxide_prefect_compat-*.whl | head -n 1)"
 "$PYTHON" -m pip install -q "${WHEEL}"
-IRONFLOW_API_URL="${BASE_URL}" IRONFLOW_API_AUTH_STRING="admin:pass" \
+FLOWOXIDE_API_URL="${BASE_URL}" FLOWOXIDE_API_AUTH_STRING="admin:pass" \
   "$PYTHON" -c "
 from prefect_compat.deploy.client import DeployClient
 client = DeployClient('${BASE_URL}')

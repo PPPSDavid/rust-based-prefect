@@ -44,7 +44,7 @@ def qmark_to_pyformat(sql: str) -> str:
 
 
 def rewrite_sqlite_sql_for_postgres(sql: str) -> str:
-    """Best-effort dialect rewrite for IronFlow control-plane SQL."""
+    """Best-effort dialect rewrite for FlowOxide control-plane SQL."""
     text = sql.strip()
     # Pagination / listing used SQLite rowid; Postgres schema exposes seq.
     text = re.sub(r"\browid\b", "seq", text, flags=re.IGNORECASE)

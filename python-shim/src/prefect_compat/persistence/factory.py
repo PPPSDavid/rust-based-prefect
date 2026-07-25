@@ -13,7 +13,7 @@ def resolve_sqlite_path(history_path: str | Path | None = None) -> Path:
     """Derive SQLite path from history JSONL path (same rules as runtime)."""
     if history_path:
         return Path(history_path).with_suffix(".db")
-    return Path("data") / "ironflow_ui.db"
+    return Path("data") / "flowoxide_ui.db"
 
 
 def create_store(
@@ -24,13 +24,13 @@ def create_store(
 ) -> ControlPlaneStore:
     """Create a control-plane store.
 
-    ``IRONFLOW_DATABASE_URL`` / ``database_url`` with a Postgres DSN selects
+    ``FLOWOXIDE_DATABASE_URL`` / ``database_url`` with a Postgres DSN selects
     ``PostgresStore``; otherwise opens SQLite (local/dev default).
     """
     url = (
         database_url
         if database_url is not None
-        else os.getenv("IRONFLOW_DATABASE_URL", "")
+        else os.getenv("FLOWOXIDE_DATABASE_URL", "")
     ).strip()
     if url and url.lower().startswith(("postgres://", "postgresql://")):
         # Import only when selected so envs without psycopg can use SQLite.
@@ -39,7 +39,7 @@ def create_store(
         return PostgresStore.open(url)
     if url and not url.lower().startswith("sqlite"):
         raise ValueError(
-            f"Unsupported IRONFLOW_DATABASE_URL scheme (expected sqlite or postgres): {url!r}"
+            f"Unsupported FLOWOXIDE_DATABASE_URL scheme (expected sqlite or postgres): {url!r}"
         )
 
     path = Path(sqlite_path) if sqlite_path else resolve_sqlite_path(history_path)

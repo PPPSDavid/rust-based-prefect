@@ -344,7 +344,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ironflow-engine"
+name = "flowoxide-engine"
 version = "0.2.0"
 dependencies = [
  "chrono",

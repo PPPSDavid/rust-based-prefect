@@ -1,6 +1,6 @@
 # Releasing
 
-IronFlow uses a **single version** shared by:
+FlowOxide uses a **single version** shared by:
 
 - `VERSION` (authoritative string)
 - `rust-engine/Cargo.toml` → `[package].version`
@@ -29,36 +29,36 @@ If you fork, replace repository URLs in `CHANGELOG.md` with your GitHub coordina
 
 ## PyPI (production)
 
-The **`ironflow-prefect-compat`** package is published to **https://pypi.org** via GitHub Actions (**workflow_dispatch**).
+The **`flowoxide-prefect-compat`** package is published to **https://pypi.org** via GitHub Actions (**workflow_dispatch**).
 
-1. **One-time:** On **PyPI**, open the project → **Manage** → **Publishing** → add a **trusted publisher** for this repository and workflow **`.github/workflows/publish-pypi.yml`** (same pattern as [TestPyPI trusted publishers](https://docs.pypi.org/trusted-publishers/), but against **pypi.org**). TestPyPI and PyPI trusted publishers are configured **separately**.
+1. **One-time (after the IronFlow → FlowOxide rename):** On **PyPI**, create **`flowoxide-prefect-compat`** (new project — PyPI does not rename `ironflow-prefect-compat` in place) → **Manage** → **Publishing** → add a **trusted publisher** for this repository and workflow **`.github/workflows/publish-pypi.yml`** (same pattern as [TestPyPI trusted publishers](https://docs.pypi.org/trusted-publishers/), but against **pypi.org**). Repeat on **TestPyPI**. Old `ironflow-*` uploads remain historical.
 2. **Before uploading:** Bump **`VERSION`** and sync versions across `VERSION`, `rust-engine/Cargo.toml`, **`python-shim/pyproject.toml`**, `static-planner/pyproject.toml`, and `frontend/package.json` (`python scripts/check_version_sync.py`). Run validation from **`AGENTS.md`**. Optionally publish to **TestPyPI** first using **`Publish to TestPyPI`**.
 3. **Upload:** **Actions** → **Publish to PyPI** → **Run workflow**. Use **`dry_run`** to build wheels and download artifacts without uploading.
-4. **Install:** `python -m pip install ironflow-prefect-compat` (see **`docs/INSTALL.md`**).
+4. **Install:** `python -m pip install flowoxide-prefect-compat` (see **`docs/INSTALL.md`**).
 
 The **TestPyPI** workflow (`.github/workflows/publish-testpypi.yml`) is unchanged and remains the recommended validation index before production uploads.
 
 ## Container images (server)
 
-The **`ironflow-server`** image is a **runtime wrapper** around the same PyPI wheel — not a separate artifact line.
+The **`flowoxide-server`** image is a **runtime wrapper** around the same PyPI wheel — not a separate artifact line.
 
 | Channel | Artifact | When to use |
 | --- | --- | --- |
-| PyPI | `ironflow-prefect-compat` | Libraries, CLI, custom processes |
-| GHCR (proposed) | `ghcr.io/pppsdavid/ironflow-server:<VERSION>` | Ready-to-run API (`uvicorn` + defaults) |
+| PyPI | `flowoxide-prefect-compat` | Libraries, CLI, custom processes |
+| GHCR (proposed) | `ghcr.io/pppsdavid/flowoxide-server:<VERSION>` | Ready-to-run API (`uvicorn` + defaults) |
 
-**Release order:** publish the PyPI wheel first, then build/push the server image with the matching `IRONFLOW_VERSION` build arg (see **`deploy/docker/README.md`**). CI smoke: `.github/workflows/docker-server-smoke.yml`. Automated GHCR push workflow to follow.
+**Release order:** publish the PyPI wheel first, then build/push the server image with the matching `FLOWOXIDE_VERSION` build arg (see **`deploy/docker/README.md`**). CI smoke: `.github/workflows/docker-server-smoke.yml`. Automated GHCR push workflow to follow.
 
-Attach `docker pull ghcr.io/pppsdavid/ironflow-server:vX.Y.Z` to GitHub Release notes when images are published.
+Attach `docker pull ghcr.io/pppsdavid/flowoxide-server:vX.Y.Z` to GitHub Release notes when images are published.
 
 ## Using a release (downstream)
 
 Consumers should take artifacts from [**GitHub Releases**](https://github.com/PPPSDavid/rust-based-prefect/releases), not from unlabeled `main` snapshots, when they need a reproducible version.
 
 1. **Full stack:** clone the repository and `git checkout vX.Y.Z`, then use **`uv sync --group dev`** (preferred) or `environment.yml` / `requirements-ci.txt`, and run from the repo root — including **`rust-engine`** (see README `cargo build`), benchmarks, `scripts/`, and optional UI as in the root `README.md`.
-2. **Python packages only:** install from **PyPI** when published (`pip install ironflow-prefect-compat`), or from git, for example:
+2. **Python packages only:** install from **PyPI** when published (`pip install flowoxide-prefect-compat`), or from git, for example:
    - `pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@vX.Y.Z#subdirectory=python-shim"`
-   - optional: `#subdirectory=static-planner` for `ironflow-static-planner`.
+   - optional: `#subdirectory=static-planner` for `flowoxide-static-planner`.
 3. **Documentation:** the public MkDocs site tracks **`main`**. To read docs that match a specific tag exactly, browse the repo on GitHub at that tag, or checkout the tag and run `mkdocs serve` per the README.
 
 ## Documentation site (GitHub Pages)
@@ -69,3 +69,15 @@ After enabling **GitHub Pages** from **GitHub Actions** in the repository settin
 2. Optionally set `repo_url` to the same repository for the “view source” link in the theme.
 
 The **Documentation** workflow builds on every push to `main` that touches docs or `COMPATIBILITY.md`.
+
+### Google discoverability (Search Console)
+
+MkDocs already emits `sitemap.xml`; the build also writes `robots.txt` and Open Graph meta (see `overrides/main.html`). To get the home page into Google:
+
+1. Open [Google Search Console](https://search.google.com/search-console) and add the property for `https://pppsdavid.github.io/` (URL-prefix) or a Domain property if you later use a custom domain.
+2. Verify ownership (HTML tag, DNS, or GitHub association as offered).
+3. Submit **`https://pppsdavid.github.io/rust-based-prefect/sitemap.xml`**.
+4. Use **URL Inspection** → **Request indexing** on `https://pppsdavid.github.io/rust-based-prefect/`.
+5. Keep strong backlinks from the GitHub README and PyPI project **Documentation** URL (already set).
+
+Indexing usually takes days; ranking for queries like “rust based prefect” also depends on title/description relevance and inbound links. Renaming the **GitHub repository** is optional and **not required** for SEO — the current `rust-based-prefect` path already matches that query.

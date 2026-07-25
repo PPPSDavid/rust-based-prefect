@@ -46,20 +46,20 @@ Summarize work in the **branch description, commit messages, or PR body**: impac
 | `rust-engine/` | Deterministic orchestration kernel, FFI surface, hot paths | **Engine agent**: state machine, transitions, persistence hooks, performance-sensitive Rust |
 | `python-shim/` | Prefect-compatible runtime, API, decorators, runners | **Shim/API agent**: compatibility surface, HTTP/runtime behavior, Python↔Rust glue |
 | `static-planner/` | Static flow analysis and forecasting | **Planner agent**: graph extraction, forecasts, analyzer-only changes |
-| `benchmarks/` | Performance harnesses, `perf_matrix.py`, Prefect vs IronFlow comparisons | **Benchmarks agent**: recipes, metrics, comparison tooling (coordinate with engine/shim if semantics change) |
+| `benchmarks/` | Performance harnesses, `perf_matrix.py`, Prefect vs FlowOxide comparisons | **Benchmarks agent**: recipes, metrics, comparison tooling (coordinate with engine/shim if semantics change) |
 | `frontend/` | Web UI (e.g. Vite/React) for runs/flows | **Frontend agent**: UI, client types, API usage—coordinate API contract changes with `python-shim` |
 | `scripts/` | Server launchers, demos, stress/seed scripts | **Integration/scripts agent**: wiring and E2E-oriented scripts |
 | `docs/` | Methodology, baselines, memory bank, perf artifacts | **Docs agent** or whoever changes behavior: keep `COMPATIBILITY.md` and benchmarks docs in sync |
 | `tools/` | Dev tooling (e.g. MCP helpers, local scripts) | **Tooling agent**: isolated from runtime semantics unless agreed |
 | `.github/` | CI workflows | **Infra/CI agent** (see Quality & Safety—often “ask first”) |
 
-**Multi-repo / larger workspace:** IronFlow is self-contained in this repository. If your workspace includes other repos (e.g. shared libraries or deployment configs), treat them as separate ownership boundaries: **land dependency or contract changes first** (shared lib → engine/shim → API → frontend), and avoid spanning repos in a single agent branch unless the task explicitly includes integration.
+**Multi-repo / larger workspace:** FlowOxide is self-contained in this repository. If your workspace includes other repos (e.g. shared libraries or deployment configs), treat them as separate ownership boundaries: **land dependency or contract changes first** (shared lib → engine/shim → API → frontend), and avoid spanning repos in a single agent branch unless the task explicitly includes integration.
 
 ## Hotspot Files (Single-Writer Rule)
 
 These files tend to merge-conflict or silently affect the whole system. **At most one agent should actively edit a given hotspot at a time**; others treat them as **read-only** and open a follow-up task or branch instead of interleaving edits.
 
-**Examples in this repo:** root `pytest.ini` (Python path layout); `rust-engine/Cargo.toml` / `rust-engine/Cargo.lock`; `python-shim/pyproject.toml` and `static-planner/pyproject.toml`; `frontend/package.json` and frontend lockfiles; `python-shim/src/prefect_compat/__init__.py` (public exports); `rust-engine/src/lib.rs` (crate exports); central route or API entry modules (e.g. `python-shim/src/prefect_compat/server.py`); `scripts/ironflow_server.py` (process wiring); `.github/workflows/*` (CI definitions).
+**Examples in this repo:** root `pytest.ini` (Python path layout); `rust-engine/Cargo.toml` / `rust-engine/Cargo.lock`; `python-shim/pyproject.toml` and `static-planner/pyproject.toml`; `frontend/package.json` and frontend lockfiles; `python-shim/src/prefect_compat/__init__.py` (public exports); `rust-engine/src/lib.rs` (crate exports); central route or API entry modules (e.g. `python-shim/src/prefect_compat/server.py`); `scripts/flowoxide_server.py` (process wiring); `.github/workflows/*` (CI definitions).
 
 Prefer **adding new modules or extension points** (new submodule, new route file included from a thin registry) over repeatedly editing the same central registry when parallel work is likely.
 
@@ -100,7 +100,7 @@ When ownership areas shift, new hotspots appear, or validation commands change, 
 - `COMPATIBILITY.md` for supported Prefect semantics
 - `docs/MEMORY_BANK.md` for session handoff context
 - `docs/perf_methodology.md` for workload dimensions and **`perf_matrix.py` metrics/thresholds**
-- `docs/perf_comparison.json` for **Prefect vs IronFlow** A/B numbers (`benchmarks/compare_prefect_vs_ironflow.py`) — **not** a `perf_matrix compare` input
+- `docs/perf_comparison.json` for **Prefect vs FlowOxide** A/B numbers (`benchmarks/compare_prefect_vs_flowoxide.py`) — **not** a `perf_matrix compare` input
 - `docs/perf_matrix_results.json` / `docs/perf_matrix_summary.md` for **`perf_matrix.py run` outputs** (when present)
 - Section **Performance: perf_matrix.py** (below) for the canonical agent runbook (`run` / `compare`, modes, exit codes)
 
@@ -126,7 +126,7 @@ Run before declaring completion:
 
 ## Performance: `perf_matrix.py` (read this before using or changing benchmarks)
 
-This is the **deterministic control-plane matrix** harness. It is **not** the same tool as `benchmarks/compare_prefect_vs_ironflow.py` (which writes `docs/perf_comparison.json`).
+This is the **deterministic control-plane matrix** harness. It is **not** the same tool as `benchmarks/compare_prefect_vs_flowoxide.py` (which writes `docs/perf_comparison.json`).
 
 ### Commands
 
@@ -254,7 +254,7 @@ This repo commits `.cursor/environment.json` with:
 
 That **update/install** script (idempotent) runs on each new agent boot:
 
-1. Ensure **uv**, then `IRONFLOW_SKIP_NATIVE_BUILD=1 uv sync --frozen --group dev` (committed `uv.lock`; puts `.venv/bin` ahead on `PATH`)
+1. Ensure **uv**, then `FLOWOXIDE_SKIP_NATIVE_BUILD=1 uv sync --frozen --group dev` (committed `uv.lock`; puts `.venv/bin` ahead on `PATH`)
 2. `npm --prefix frontend ci`
 3. `cargo build --manifest-path rust-engine/Cargo.toml`
 4. `bash scripts/setup_code_review_graph.sh` (installs CRG via pip/`requirements-agent.txt`, builds `.code-review-graph/`, verifies MCP tool calls)
@@ -288,10 +288,10 @@ Non-obvious caveats for this environment:
 - **Running the stack:** start the backend with
   `uv run python -m uvicorn python-shim.src.prefect_compat.server:app --host 127.0.0.1 --port 8000`
   (or `python3 -m uvicorn …` when `.venv` is on `PATH`)
-  and the UI with `npm --prefix frontend run dev` (or both via `python3 scripts/ironflow_server.py start`).
+  and the UI with `npm --prefix frontend run dev` (or both via `python3 scripts/flowoxide_server.py start`).
   Seed demo runs for the UI with `python3 scripts/ui_e2e_seed.py` (needs the backend up). The local
-  worker + scheduler run as daemon threads inside the API process (toggle via `IRONFLOW_ENABLE_LOCAL_WORKER`
-  / `IRONFLOW_ENABLE_SCHEDULER`).
+  worker + scheduler run as daemon threads inside the API process (toggle via `FLOWOXIDE_ENABLE_LOCAL_WORKER`
+  / `FLOWOXIDE_ENABLE_SCHEDULER`).
 - **Python lint:** CI runs `uv run ruff check .` and `uv run ty check` (see root `pyproject.toml`). Prefer `uv sync --frozen --group dev` before running locally.
 - **Persistence is local files** under `data/` (JSONL history + a stdlib-SQLite read model); there is no
   external database/broker to start. `data/` is git-ignored, but `benchmarks/perf_matrix.py run` overwrites

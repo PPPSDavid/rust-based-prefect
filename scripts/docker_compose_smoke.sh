@@ -5,10 +5,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-COMPOSE_FILE="${IRONFLOW_COMPOSE_FILE:-deploy/docker/compose.yml}"
+COMPOSE_FILE="${FLOWOXIDE_COMPOSE_FILE:-deploy/docker/compose.yml}"
 export INSTALL_MODE="${INSTALL_MODE:-local}"
-export IRONFLOW_VERSION="${IRONFLOW_VERSION:-0.2.0}"
-BASE_URL="${IRONFLOW_SMOKE_BASE_URL:-http://127.0.0.1:8000}"
+export FLOWOXIDE_VERSION="${FLOWOXIDE_VERSION:-0.2.0}"
+BASE_URL="${FLOWOXIDE_SMOKE_BASE_URL:-http://127.0.0.1:8000}"
 PYTHON="${PYTHON:-python3}"
 
 cleanup() {

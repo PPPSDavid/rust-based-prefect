@@ -1,13 +1,13 @@
 # Docker images
 
-Official container images complement the **`ironflow-prefect-compat`** PyPI package.
+Official container images complement the **`flowoxide-prefect-compat`** PyPI package.
 
 ## PyPI vs container
 
 | Channel | What you get | Typical use |
 | --- | --- | --- |
-| **PyPI** (`pip install ironflow-prefect-compat`) | Python library, `ironflow` CLI, bundled Rust engine wheel | Author flows, embed in apps, CI scripts, custom server commands |
-| **Container** (`ghcr.io/<org>/ironflow-server`) | Ready-to-run API / services / HTTP worker images | Self-hosted control plane + compose |
+| **PyPI** (`pip install flowoxide-prefect-compat`) | Python library, `flowoxide` CLI, bundled Rust engine wheel | Author flows, embed in apps, CI scripts, custom server commands |
+| **Container** (`ghcr.io/<org>/flowoxide-server`) | Ready-to-run API / services / HTTP worker images | Self-hosted control plane + compose |
 
 Images install the **same PyPI wheel** (same `VERSION` tag). Server/services images also install `psycopg[binary]` for Postgres.
 
@@ -16,18 +16,18 @@ Images install the **same PyPI wheel** (same `VERSION` tag). Server/services ima
 | Dockerfile | Role | Default `CMD` |
 | --- | --- | --- |
 | `Dockerfile.server` | API (uvicorn) | `uvicorn … --host 0.0.0.0 --port 8000` |
-| `Dockerfile.services` | Background scheduler | `ironflow server services start` |
-| `Dockerfile.worker` | HTTP worker | `ironflow worker start --worker-mode http` |
+| `Dockerfile.services` | Background scheduler | `flowoxide server services start` |
+| `Dockerfile.worker` | HTTP worker | `flowoxide worker start --worker-mode http` |
 
 ## Tags (proposed)
 
 | Tag | Meaning |
 | --- | --- |
-| `ghcr.io/<org>/ironflow-server:0.2.0` | Immutable release (matches `VERSION` / PyPI) |
-| `ghcr.io/<org>/ironflow-server:0.2` | Patch-line float |
-| `ghcr.io/<org>/ironflow-server:latest` | Latest release (avoid in production) |
+| `ghcr.io/<org>/flowoxide-server:0.2.0` | Immutable release (matches `VERSION` / PyPI) |
+| `ghcr.io/<org>/flowoxide-server:0.2` | Patch-line float |
+| `ghcr.io/<org>/flowoxide-server:latest` | Latest release (avoid in production) |
 
-Same versioning for `ironflow-services` / `ironflow-worker` when published.
+Same versioning for `flowoxide-services` / `flowoxide-worker` when published.
 
 ## Compose
 
@@ -47,13 +47,13 @@ mkdir -p dist/wheels
 python -m build --wheel --outdir dist/wheels --directory python-shim
 docker build -f deploy/docker/Dockerfile.server \
   --build-arg INSTALL_MODE=local \
-  -t ironflow-server:local .
+  -t flowoxide-server:local .
 ```
 
 ## Publish (maintainers)
 
-1. Release **`ironflow-prefect-compat`** to PyPI first.
-2. Build and push images with the **same version** to GHCR (`ghcr.io/PPPSDavid/ironflow-{server,services,worker}`).
+1. Release **`flowoxide-prefect-compat`** to PyPI first.
+2. Build and push images with the **same version** to GHCR (`ghcr.io/PPPSDavid/flowoxide-{server,services,worker}`).
 3. Attach `docker pull …` to the GitHub Release notes.
 
 Automated GHCR publish may be added as a follow-up workflow; until then, maintainers push manually.

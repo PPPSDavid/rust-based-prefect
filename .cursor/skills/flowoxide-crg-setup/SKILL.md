@@ -1,9 +1,9 @@
 ---
-name: ironflow-crg-setup
-description: Install and verify code-review-graph (CRG) for IronFlow agents on Linux/Cloud or desktop. Use when MCP graph tools are missing, after cloning, or when setting up Cursor Cloud Update scripts.
+name: flowoxide-crg-setup
+description: Install and verify code-review-graph (CRG) for FlowOxide agents on Linux/Cloud or desktop. Use when MCP graph tools are missing, after cloning, or when setting up Cursor Cloud Update scripts.
 ---
 
-# IronFlow — code-review-graph setup
+# FlowOxide — code-review-graph setup
 
 Upstream: https://github.com/tirth8205/code-review-graph
 

@@ -1,4 +1,4 @@
-"""IronFlow command-line interface."""
+"""FlowOxide command-line interface."""
 
 __all__ = ["main"]
 
