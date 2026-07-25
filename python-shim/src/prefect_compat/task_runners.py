@@ -77,9 +77,11 @@ class ThreadPoolTaskRunner:
 
 @dataclass
 class ProcessPoolTaskRunner:
-    """Process-pool ``map`` (handled in ``TaskWrapper`` — task callable must be picklable).
+    """Process-backed ``map`` / ``submit`` (task callable must be picklable).
 
-    Independent ``submit()`` calls stay synchronous on the coordinating thread.
+    Each task body runs in a registered child process so cancel / terminate-pause
+    can SIGTERM→SIGKILL. ``submit()`` returns a ``TaskFuture`` immediately; the
+    coordinating thread waits on ``.result()`` while a helper thread joins the child.
     """
 
     max_workers: int | None = None

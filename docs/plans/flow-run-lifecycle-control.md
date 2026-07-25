@@ -1,6 +1,6 @@
 # Flow-run lifecycle control: cancel, pause, resume
 
-**Status:** Design accepted — **P3.2a/b partially implemented** (mode-required pause API, drain pause/resume, cancel lifecycle metadata). **P3.2c** process-kill terminate still open.  
+**Status:** Design accepted — **P3.2a–d implemented** (mode-required pause, drain/resume, process-kill terminate under `ProcessPoolTaskRunner`, hard-pause resume via P1 `prepare_resume` / deployment retry). **P3.2e** UI pause chooser still open.  
 **Canvas ID:** **P3.2** (expanded) — see `docs/plans/prefect-gap-canvas.md`  
 **Last updated:** 2026-07-25  
 **Depends on:** P1.1 resume lineage (interrupted-task retry on hard pause / cancel→retry); P3.0 context helpful  

@@ -3308,6 +3308,13 @@ class InMemoryControlPlane:
         life = self._lifecycle_by_flow.get(str(flow_run_id))
         return bool(life and life.get("lifecycle_action") == "pause")
 
+    def has_operator_interrupt(self, flow_run_id: UUID) -> bool:
+        """True while cancel or pause lifecycle is in progress (any flow state)."""
+        life = self._lifecycle_by_flow.get(str(flow_run_id))
+        return bool(
+            life and life.get("lifecycle_action") in {"pause", "cancel"}
+        )
+
     def pause_flow_run(
         self, flow_run_id: UUID, mode: str | Any
     ) -> dict[str, Any]:
@@ -3353,9 +3360,11 @@ class InMemoryControlPlane:
                         pass
             return self.get_flow_run_detail(flow_run_id) or detail
 
-        # terminate: control-plane interrupt of RUNNING tasks; PENDING held.
-        # Process kill lands in P3.2c — bodies on threads may continue until they exit,
-        # but late COMPLETED is fenced in task finalize (task stays CANCELLED).
+        # terminate: cancel RUNNING task rows first (fence late COMPLETED), then
+        # kill registered process workers. Thread-pool bodies may continue until
+        # exit; late COMPLETED is still fenced by CANCELLED state.
+        from .process_workers import task_process_registry
+
         self._set_lifecycle(
             flow_run_id,
             lifecycle_action="pause",
@@ -3377,12 +3386,12 @@ class InMemoryControlPlane:
                     {"interrupt_reason": "terminated_by_pause"},
                 )
             except Exception:
-                # Fallback: force CANCELLED if FSM rejects mid-race.
                 with self._lock:
                     task = self._tasks.get(tid)
                     if task and task.state == RunState.RUNNING:
                         task.state = RunState.CANCELLED
                         self._update_task_row(task)
+        killed = task_process_registry().terminate_flow_workers(flow_run_id)
         try:
             self.set_flow_state(
                 flow_run_id, RunState.PAUSED, uuid4(), "operator_pause_terminate"
@@ -3392,15 +3401,22 @@ class InMemoryControlPlane:
         refreshed = self.get_flow_run_detail(flow_run_id)
         if refreshed is None:
             raise ValueError("flow run not found")
+        if killed:
+            refreshed = dict(refreshed)
+            refreshed["terminated_task_run_ids"] = killed
         return refreshed
 
     def resume_flow_run(self, flow_run_id: UUID) -> dict[str, Any]:
         """Resume an operator-paused flow run (not gate-only PAUSED).
 
-        For in-process ``@flow()`` calls that already exited while paused, if a
-        result was stored and no non-terminal tasks remain, completes the run
-        instead of leaving a zombie ``RUNNING`` state. Worker/deployment-driven
-        continuation of pending work is the primary resume path.
+        After **terminate** pause:
+        - deployment-backed runs → ``retry_flow_run`` (new attempt with P1
+          ``resume_from`` so COMPLETED skips and interrupted tasks re-run)
+        - in-process → ``prepare_resume`` so the next ``@flow()`` invoke skips
+          completed nodes
+
+        After **drain** pause: flip back to RUNNING (or COMPLETED if the body
+        already stored a result and nothing remains).
         """
         detail = self.get_flow_run_detail(flow_run_id)
         if detail is None:
@@ -3413,9 +3429,41 @@ class InMemoryControlPlane:
         state = str(detail["state"])
         if state not in {"PAUSED", "RUNNING"}:
             raise ValueError(f"cannot resume from state {state}")
-        life = self._lifecycle_by_flow.get(str(flow_run_id), {})
+        life = dict(self._lifecycle_by_flow.get(str(flow_run_id), {}))
         if life.get("pause_drain_pending"):
             raise ValueError("cannot resume while drain pause is still pending")
+
+        prior_mode = life.get("interrupt_mode")
+        if prior_mode == "terminate":
+            # P3.2d: re-drive interrupted work via P1 resume lineage.
+            self._set_lifecycle(
+                flow_run_id,
+                lifecycle_action="resume",
+                interrupt_mode=None,
+                pause_drain_pending=False,
+                lifecycle_summary="Resume after terminate — re-execute interrupted",
+            )
+            if detail.get("deployment_id"):
+                retried = self.retry_flow_run(flow_run_id)
+                retried = dict(retried)
+                retried["resumed_via"] = "retry_after_terminate"
+                retried["resume_from_flow_run_id"] = str(flow_run_id)
+                return retried
+            self.prepare_resume(flow_run_id)
+            if state == "PAUSED":
+                try:
+                    self.set_flow_state(
+                        flow_run_id, RunState.RUNNING, uuid4(), "operator_resume"
+                    )
+                except ValueError:
+                    pass
+            refreshed = self.get_flow_run_detail(flow_run_id)
+            if refreshed is None:
+                raise ValueError("flow run not found")
+            refreshed = dict(refreshed)
+            refreshed["resumed_via"] = "prepare_resume"
+            refreshed["resume_from_flow_run_id"] = str(flow_run_id)
+            return refreshed
 
         has_result = flow_run_id in self._flow_results
         pending_left = self._count_nonterminal_tasks(flow_run_id) > 0
@@ -3557,18 +3605,12 @@ class InMemoryControlPlane:
             lifecycle_summary="Cancelled (terminate)",
         )
 
-        token = uuid4()
-        try:
-            self.set_flow_state(flow_run_id, RunState.CANCELLED, token, "user_cancel")
-        except ValueError:
-            refreshed = self.get_flow_run_detail(flow_run_id)
-            if refreshed and refreshed["state"] == "CANCELLED":
-                return refreshed
-            raise
+        from .process_workers import task_process_registry
 
+        # Fence late COMPLETED before SIGTERM/SIGKILL so the parent wait loop
+        # cannot race a successful result into COMPLETED.
         now = self._now()
         with self._lock:
-            self._propagate_cancel_to_subflows(flow_run_id)
             self._sqlite_conn.execute(
                 """
                 UPDATE task_runs
@@ -3584,9 +3626,29 @@ class InMemoryControlPlane:
                     "RUNNING",
                 }:
                     task.state = RunState.CANCELLED
+
+        killed = task_process_registry().terminate_flow_workers(flow_run_id)
+
+        token = uuid4()
+        try:
+            self.set_flow_state(flow_run_id, RunState.CANCELLED, token, "user_cancel")
+        except ValueError:
+            refreshed = self.get_flow_run_detail(flow_run_id)
+            if refreshed and refreshed["state"] == "CANCELLED":
+                if killed:
+                    refreshed = dict(refreshed)
+                    refreshed["terminated_task_run_ids"] = killed
+                return refreshed
+            raise
+
+        with self._lock:
+            self._propagate_cancel_to_subflows(flow_run_id)
         refreshed = self.get_flow_run_detail(flow_run_id)
         if refreshed is None:
             raise ValueError("flow run not found")
+        if killed:
+            refreshed = dict(refreshed)
+            refreshed["terminated_task_run_ids"] = killed
         return refreshed
 
     def retry_flow_run(self, flow_run_id: UUID) -> dict[str, Any]:
