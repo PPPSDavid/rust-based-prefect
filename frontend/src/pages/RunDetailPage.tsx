@@ -2,13 +2,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api";
+import { formatTaskResult, parseTaskResultSummary } from "../artifactResult";
 import { ActionButton } from "../components/ActionButton";
 import { PageHeader } from "../components/PageHeader";
 import { RunDagPanel } from "../components/RunDagPanel";
 import { StateBadge } from "../components/StateBadge";
 import { TabBar } from "../components/TabBar";
 import { useSsePulse } from "../hooks/useSsePulse";
-import type { FlowRunDag } from "../types";
+import type { ArtifactRecord, FlowRunDag } from "../types";
 
 type Tab = "tasks" | "logs" | "events" | "artifacts" | "dag";
 
@@ -39,7 +40,9 @@ export function RunDetailPage() {
       void queryClient.invalidateQueries({ queryKey: ["task-runs", id] });
       if (tab === "logs") void queryClient.invalidateQueries({ queryKey: ["logs", id] });
       if (tab === "events") void queryClient.invalidateQueries({ queryKey: ["events", id] });
-      if (tab === "artifacts") void queryClient.invalidateQueries({ queryKey: ["artifacts", id] });
+      if (tab === "artifacts" || tab === "tasks") {
+        void queryClient.invalidateQueries({ queryKey: ["artifacts", id] });
+      }
       if (tab === "dag") void queryClient.invalidateQueries({ queryKey: ["dag", id, dagMode] });
     }
   }, [pulse, id, dagMode, queryClient, tab]);
@@ -67,8 +70,17 @@ export function RunDetailPage() {
     queryKey: ["artifacts", id],
     queryFn: () => api.listFlowArtifacts(id),
     staleTime: 5_000,
-    enabled: tab === "artifacts"
+    enabled: tab === "artifacts" || tab === "tasks"
   });
+  const resultByTaskId = useMemo(() => {
+    const map = new Map<string, ArtifactRecord>();
+    for (const artifact of artifacts.data ?? []) {
+      if (artifact.artifact_type === "result" && artifact.task_run_id && !map.has(artifact.task_run_id)) {
+        map.set(artifact.task_run_id, artifact);
+      }
+    }
+    return map;
+  }, [artifacts.data]);
   const dag = useQuery({
     queryKey: ["dag", id, dagMode],
     queryFn: () => api.getFlowRunDag(id, dagMode),
@@ -204,18 +216,26 @@ export function RunDetailPage() {
       <TabBar tabs={TABS} activeTab={tab} onChange={setTab} />
       {tab === "tasks" && (
         <ul>
-          {tasks.data?.items.map((task) => (
-            <li key={task.id}>
-              {task.task_name} - {task.state}
-              {task.kind === "subflow" && task.child_flow_run_id ? (
-                <>
-                  {" "}
-                  ·{" "}
-                  <Link to={`/runs/${task.child_flow_run_id}`}>child run {task.child_flow_run_id.slice(0, 8)}…</Link>
-                </>
-              ) : null}
-            </li>
-          ))}
+          {tasks.data?.items.map((task) => {
+            const artifact = resultByTaskId.get(task.id);
+            const parsed = parseTaskResultSummary(artifact?.summary);
+            return (
+              <li key={task.id}>
+                {task.task_name} - {task.state}
+                {parsed.cacheHit ? " · resumed" : null}
+                {task.kind === "subflow" && task.child_flow_run_id ? (
+                  <>
+                    {" "}
+                    ·{" "}
+                    <Link to={`/runs/${task.child_flow_run_id}`}>child run {task.child_flow_run_id.slice(0, 8)}…</Link>
+                  </>
+                ) : null}
+                {parsed.hasResult ? (
+                  <pre className="task-result mono-list">{formatTaskResult(parsed.result)}</pre>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       )}
       {tab === "logs" && (
@@ -238,11 +258,19 @@ export function RunDetailPage() {
       )}
       {tab === "artifacts" && (
         <ul className="mono-list">
-          {artifacts.data?.map((artifact) => (
-            <li key={artifact.id}>
-              {artifact.key} ({artifact.artifact_type}) {artifact.summary ?? ""}
-            </li>
-          ))}
+          {artifacts.data?.map((artifact) => {
+            const parsed = parseTaskResultSummary(artifact.summary);
+            return (
+              <li key={artifact.id}>
+                {artifact.key} ({artifact.artifact_type})
+                {parsed.hasResult ? (
+                  <pre className="task-result">{formatTaskResult(parsed.result)}</pre>
+                ) : (
+                  <> {artifact.summary ?? ""}</>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
       {tab === "dag" && dag.data && <RunDagPanel dag={dag.data} mode={dagMode} onModeChange={setDagMode} />}

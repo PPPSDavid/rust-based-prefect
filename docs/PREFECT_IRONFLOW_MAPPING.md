@@ -20,6 +20,7 @@ This project is **not** a drop-in replacement for Prefect Cloud or the full Pref
 | Deployment concurrency / collision strategy | **Subset:** `concurrency_limit` + `ENQUEUE` / `CANCEL_NEW` on deployments (claim/trigger path). Caps concurrent runs **of that deployment**, not named global slots. |
 | Global concurrency limits (`concurrency` / `rate_limit`) | **Subset:** named slots, sync CM, leases, rate-limit decay — **[how-to](how-to/concurrency-limits.md)**. |
 | Tag-based concurrency (`@task(tags=...)`) | **Subset:** tags backed by `tag:{name}` limits; gated on enter `Running`. Same how-to. |
+| Task caching (`cache_policy`, …) | **Different model:** IronFlow **resume** skips DAG nodes on retry lineage (`None` auto; `@task(persist_result=True)` for JSON-safe values). Not Prefect cache-policy parity. Guide: **[How to resume tasks and persist results](how-to/task-resume-and-persist.md)**. |
 | Blocks, integrations, secrets | **Not** a focus of the MVP; many patterns are unsupported or stubbed. |
 | State hooks (`on_running`, …) | IronFlow uses **`transition_hooks`** on `@flow` / `@task` with `TransitionHookSpec` / `on_transition`—see `COMPATIBILITY.md`. This is an **extension**, not Prefect’s hook API. |
 | Event stream / observability | Local persistence (JSONL + SQLite) and optional API/SSE; see README **History persistence**. |

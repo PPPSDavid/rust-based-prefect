@@ -151,6 +151,17 @@ a {
   font-size: 13px;
 }
 
+.task-result {
+  margin: 6px 0 10px 12px;
+  padding: 8px 10px;
+  background: #1a1f35;
+  border: 1px solid #2c3147;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;
