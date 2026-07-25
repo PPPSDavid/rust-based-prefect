@@ -140,6 +140,45 @@ def test_drain_pause_holds_scheduling_until_inflight_finishes(tmp_path: Path) ->
     assert resumed["state"] == "COMPLETED"
 
 
+def test_terminate_holds_scheduling_before_paused_settles(tmp_path: Path) -> None:
+    """Terminate must block new tasks as soon as lifecycle is written (not only at PAUSED)."""
+    plane = _plane(tmp_path)
+    set_control_plane(plane)
+    started = threading.Event()
+    release = threading.Event()
+
+    @task
+    def slow() -> str:
+        started.set()
+        release.wait(timeout=5)
+        return "x"
+
+    @flow
+    def f() -> str:
+        return slow.submit().result()
+
+    thread = threading.Thread(target=f, daemon=True)
+    thread.start()
+    assert started.wait(timeout=5)
+    run = plane.latest_flow()
+    assert run is not None
+
+    # Simulate the mid-terminate window: lifecycle terminate written, state still RUNNING.
+    plane._set_lifecycle(
+        run.run_id,
+        lifecycle_action="pause",
+        interrupt_mode="terminate",
+        pause_drain_pending=False,
+        lifecycle_summary="Paused (terminate) — in-flight tasks interrupted",
+    )
+    assert plane.get_flow(run.run_id).state == RunState.RUNNING
+    with pytest.raises(FlowRunSchedulingHeld):
+        plane.create_task_run(run.run_id, "should-block")
+
+    release.set()
+    thread.join(timeout=5)
+
+
 def test_cancel_sets_terminate_lifecycle(tmp_path: Path) -> None:
     plane = _plane(tmp_path)
     set_control_plane(plane)

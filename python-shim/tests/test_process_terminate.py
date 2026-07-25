@@ -112,6 +112,9 @@ def test_terminate_pause_then_prepare_resume_reruns_interrupted(tmp_path: Path) 
     # P3.2d: resume prepares P1 lineage; next invoke skips completed None, re-runs sleep.
     resumed = plane.resume_flow_run(run.run_id)
     assert resumed.get("resumed_via") == "prepare_resume"
+    # Prior attempt is terminalized (not zombie RUNNING — no body reattached).
+    assert plane.get_flow(run.run_id).state == RunState.CANCELLED
+    assert resumed["state"] == "CANCELLED"
 
     @flow(name="term-resume", task_runner=ProcessPoolTaskRunner(max_workers=1))
     def pipeline2() -> str:
@@ -124,9 +127,9 @@ def test_terminate_pause_then_prepare_resume_reruns_interrupted(tmp_path: Path) 
     assert new_run is not None
     assert new_run.run_id != run.run_id
     assert new_run.state == RunState.COMPLETED
+    assert plane.get_flow(run.run_id).state == RunState.CANCELLED
     # Cache hit on the None-returning first task.
     page = plane.list_task_runs(new_run.run_id, limit=50)
     first_rows = [t for t in page.items if t.get("task_name") == "return_none"]
     assert first_rows
-    # Artifacts / event data may carry cache_hit; at minimum first task completed once.
     assert any(t.get("state") == "COMPLETED" for t in first_rows)

@@ -3301,6 +3301,10 @@ class InMemoryControlPlane:
             return False
         if life.get("pause_drain_pending"):
             return True
+        # Terminate holds immediately — do not allow new submits between
+        # lifecycle write and PAUSED settle (race window for concurrent runners).
+        if life.get("interrupt_mode") == "terminate":
+            return True
         flow = self._flows.get(flow_run_id)
         return bool(flow and flow.state == RunState.PAUSED)
 
@@ -3436,6 +3440,9 @@ class InMemoryControlPlane:
         prior_mode = life.get("interrupt_mode")
         if prior_mode == "terminate":
             # P3.2d: re-drive interrupted work via P1 resume lineage.
+            # In-process: queue prepare_resume for the *next* @flow() invoke
+            # (new run). Keep this run PAUSED — flipping to RUNNING would leave
+            # a zombie with no attached Python body.
             self._set_lifecycle(
                 flow_run_id,
                 lifecycle_action="resume",
@@ -3450,10 +3457,15 @@ class InMemoryControlPlane:
                 retried["resume_from_flow_run_id"] = str(flow_run_id)
                 return retried
             self.prepare_resume(flow_run_id)
+            # Terminalize this attempt — successor is a new flow run via
+            # prepare_resume. Leaving PAUSED/RUNNING would strand a zombie.
             if state == "PAUSED":
                 try:
                     self.set_flow_state(
-                        flow_run_id, RunState.RUNNING, uuid4(), "operator_resume"
+                        flow_run_id,
+                        RunState.CANCELLED,
+                        uuid4(),
+                        "superseded_by_terminate_resume",
                     )
                 except ValueError:
                     pass
