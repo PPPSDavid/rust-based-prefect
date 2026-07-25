@@ -308,9 +308,7 @@ Parallel (optional, labeled interim):
 
 **Recommended first PR:** Tier **A + C1/C2** (secured single-container server).
 
-**Recommended first Tier B PR:** **B0 RFC + B0.2 storage interface refactor** (no user-visible behavior change).
-
-**Tier B core is complete** when B5 compose smoke passes (#57) — not when B-fast alone works. B-fast was skipped.
+**Tier B core is complete** — B5 compose smoke passes (#57). B-fast was skipped.
 
 ---
 
