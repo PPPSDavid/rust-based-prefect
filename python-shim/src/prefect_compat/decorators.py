@@ -27,6 +27,7 @@ from .hooks import (
 )
 from .runtime import (
     FlowRunRecord,
+    FlowRunSchedulingHeld,
     InMemoryControlPlane,
     RunState,
     SetStateResult,
@@ -311,20 +312,30 @@ class TaskWrapper:
             else:
                 result = self(*args, **kwargs)
             if task_run is not None:
-                _CONTROL_PLANE.record_task_event(
-                    task_run.task_run_id, "task_completed", {"task_name": self.name}
-                )
-                th = self._transition_hooks
-                if th:
-                    _emit_task_single_hook_edge(
-                        th,
-                        task_run,
-                        self.name,
-                        RunState.RUNNING,
-                        RunState.COMPLETED,
+                try:
+                    st = _CONTROL_PLANE.get_task_run(task_run.task_run_id).state
+                except Exception:
+                    st = None
+                # Fence late COMPLETED after cancel/terminate pause.
+                if st == RunState.CANCELLED:
+                    return result
+                if st in (RunState.RUNNING, RunState.PENDING, None):
+                    _CONTROL_PLANE.record_task_event(
+                        task_run.task_run_id,
                         "task_completed",
                         {"task_name": self.name},
                     )
+                    th = self._transition_hooks
+                    if th and st == RunState.RUNNING:
+                        _emit_task_single_hook_edge(
+                            th,
+                            task_run,
+                            self.name,
+                            RunState.RUNNING,
+                            RunState.COMPLETED,
+                            "task_completed",
+                            {"task_name": self.name},
+                        )
             return result
         except Exception as exc:
             if isinstance(exc, FlowRunCancelled):
@@ -335,6 +346,8 @@ class TaskWrapper:
                     st = _CONTROL_PLANE.get_task_run(task_run.task_run_id).state
                 except Exception:
                     st = None
+                if st == RunState.CANCELLED:
+                    raise
                 if st in (RunState.RUNNING, RunState.PENDING):
                     _CONTROL_PLANE.record_task_event(
                         task_run.task_run_id,
@@ -826,17 +839,15 @@ def flow(
                             _finalize_explicit(record.run_id, result, fh, current)
                         return result
                     except FlowRunCancelled:
-                        if (
-                            _CONTROL_PLANE.get_flow(record.run_id).state
-                            != RunState.CANCELLED
-                        ):
-                            prev = _CONTROL_PLANE.get_flow(record.run_id).state
+                        current = _CONTROL_PLANE.get_flow(record.run_id)
+                        if current.state != RunState.CANCELLED:
+                            prev = current.state
                             cancelled = _CONTROL_PLANE.set_flow_state(
                                 record.run_id,
                                 RunState.CANCELLED,
                                 uuid4(),
                                 "cancel",
-                                expected_version=2,
+                                expected_version=current.version,
                             )
                             if fh and cancelled.status == "applied":
                                 _emit_flow_transition(
@@ -847,21 +858,41 @@ def flow(
                                     "cancel",
                                 )
                         raise
+                    except FlowRunSchedulingHeld:
+                        # Operator drain blocked a later submit — keep pause, do not FAILED.
+                        current = _CONTROL_PLANE.get_flow(record.run_id)
+                        if _CONTROL_PLANE.has_operator_pause(record.run_id):
+                            if current.state == RunState.RUNNING:
+                                try:
+                                    _CONTROL_PLANE.set_flow_state(
+                                        record.run_id,
+                                        RunState.PAUSED,
+                                        uuid4(),
+                                        "operator_pause_drain_held",
+                                        expected_version=current.version,
+                                    )
+                                except ValueError:
+                                    pass
+                            raise
+                        raise
                     except FlowChildrenFailed:
                         raise
                     except Exception:
+                        current = _CONTROL_PLANE.get_flow(record.run_id)
+                        if current.state == RunState.CANCELLED:
+                            raise
                         if (
-                            _CONTROL_PLANE.get_flow(record.run_id).state
-                            == RunState.CANCELLED
+                            current.state == RunState.PAUSED
+                            and _CONTROL_PLANE.has_operator_pause(record.run_id)
                         ):
                             raise
-                        prev = _CONTROL_PLANE.get_flow(record.run_id).state
+                        prev = current.state
                         failed = _CONTROL_PLANE.set_flow_state(
                             record.run_id,
                             RunState.FAILED,
                             uuid4(),
                             "fail",
-                            expected_version=2,
+                            expected_version=current.version,
                         )
                         if fh and failed.status == "applied":
                             _emit_flow_transition(
@@ -897,10 +928,8 @@ def _finalize_explicit(
     fh: tuple[TransitionHookSpec, ...] | None,
     current: FlowRunRecord,
 ) -> None:
-    if (
-        current.state == RunState.PAUSED
-        and _CONTROL_PLANE.has_operator_pause(flow_run_id)
-    ):
+    if _CONTROL_PLANE.has_operator_pause(flow_run_id):
+        # Drain-pending or settled PAUSED — do not auto-complete.
         _CONTROL_PLANE.set_flow_result(flow_run_id, result)
         return
     prev = current.state
@@ -932,8 +961,8 @@ def _finalize_wait_all(
     prev = current.state
     if prev == RunState.CANCELLED:
         raise FlowRunCancelled(f"flow run {flow_run_id} was cancelled")
-    if prev == RunState.PAUSED and _CONTROL_PLANE.has_operator_pause(flow_run_id):
-        # Operator drain/terminate pause wins over auto-complete.
+    if _CONTROL_PLANE.has_operator_pause(flow_run_id):
+        # Operator drain/terminate pause wins over auto-complete (incl. drain-pending).
         _CONTROL_PLANE.set_flow_result(flow_run_id, result)
         return
 

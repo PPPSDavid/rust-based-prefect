@@ -7,7 +7,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Body, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from starlette.responses import StreamingResponse
@@ -612,10 +612,11 @@ def get_deployment(deployment_id: UUID) -> dict:
 
 @app.post("/api/flow-runs/{flow_run_id}/cancel")
 def cancel_flow_run(
-    flow_run_id: UUID, req: FlowRunCancelRequest = FlowRunCancelRequest()
+    flow_run_id: UUID,
+    req: FlowRunCancelRequest | None = Body(default=None),
 ) -> dict:
     try:
-        parse_cancel_mode(req.mode)
+        parse_cancel_mode(None if req is None else req.mode)
         return control_plane.cancel_flow_run(flow_run_id)
     except ValueError as exc:
         detail = str(exc)

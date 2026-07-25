@@ -768,10 +768,6 @@ class InMemoryControlPlane:
         tags: Sequence[str] | None = None,
         contribute_to_flow_state: bool = True,
     ) -> TaskRunRecord:
-        if self.is_scheduling_held(flow_run_id):
-            raise FlowRunSchedulingHeld(
-                f"flow run {flow_run_id} is paused; new tasks cannot start until resume"
-            )
         tag_tuple = tuple(str(t) for t in (tags or ()))
         task = TaskRunRecord(
             task_run_id=uuid4(),
@@ -788,6 +784,10 @@ class InMemoryControlPlane:
             contribute_to_flow_state=contribute_to_flow_state,
         )
         with self._lock:
+            if self._is_scheduling_held_unlocked(flow_run_id):
+                raise FlowRunSchedulingHeld(
+                    f"flow run {flow_run_id} is paused; new tasks cannot start until resume"
+                )
             self._tasks[task.task_run_id] = task
             persisted_by_rust = False
             if self._rust_fsm_active() and self._rust_native_persistence:
@@ -1253,7 +1253,20 @@ class InMemoryControlPlane:
             transition_token: UUID | None = None
             from_state: str | None = None
 
-            if self._rust_fsm_active() and event_type in event_to_state:
+            fenced_late_event = (
+                task.state == RunState.CANCELLED
+                and event_type
+                in {
+                    "task_completed",
+                    "task_failed",
+                    "task_running",
+                    "task_pending",
+                }
+            )
+            if fenced_late_event:
+                flow_run_id_for_settle = task.flow_run_id
+                from_state = None
+            elif self._rust_fsm_active() and event_type in event_to_state:
                 from_state = task.state.value
                 to_state = event_to_state[event_type]
                 transition_token = uuid4()
@@ -1292,19 +1305,37 @@ class InMemoryControlPlane:
                     task.state = RunState(str(out["current_state"]))
                     task.version = int(out["version"])
             else:
-                if event_type == "task_pending":
+                # Fence: terminal CANCELLED must not be overwritten by late COMPLETED/FAILED.
+                if task.state == RunState.CANCELLED and event_type in {
+                    "task_completed",
+                    "task_failed",
+                    "task_running",
+                    "task_pending",
+                }:
+                    flow_run_id_for_settle = task.flow_run_id
+                    from_state = None
+                elif event_type == "task_pending":
                     task.state = RunState.PENDING
                     task.version += 1
+                    from_state = None
                 elif event_type == "task_running":
                     task.state = RunState.RUNNING
                     task.version += 1
+                    from_state = None
                 elif event_type == "task_completed":
                     task.state = RunState.COMPLETED
                     task.version += 1
+                    from_state = None
                 elif event_type == "task_failed":
                     task.state = RunState.FAILED
                     task.version += 1
-                from_state = None
+                    from_state = None
+                elif event_type == "task_cancelled":
+                    task.state = RunState.CANCELLED
+                    task.version += 1
+                    from_state = None
+                else:
+                    from_state = None
 
             if flow_run_id_for_settle is None:
                 # Normal (non-duplicate) path: persist event rows.
@@ -2875,6 +2906,10 @@ class InMemoryControlPlane:
 
     def is_scheduling_held(self, flow_run_id: UUID) -> bool:
         """True when operator pause blocks starting new task runs."""
+        with self._lock:
+            return self._is_scheduling_held_unlocked(flow_run_id)
+
+    def _is_scheduling_held_unlocked(self, flow_run_id: UUID) -> bool:
         life = self._lifecycle_by_flow.get(str(flow_run_id))
         if not life:
             return False
@@ -2882,10 +2917,8 @@ class InMemoryControlPlane:
             return False
         if life.get("pause_drain_pending"):
             return True
-        try:
-            return self.get_flow(flow_run_id).state == RunState.PAUSED
-        except Exception:
-            return True
+        flow = self._flows.get(flow_run_id)
+        return bool(flow and flow.state == RunState.PAUSED)
 
     def has_operator_pause(self, flow_run_id: UUID) -> bool:
         life = self._lifecycle_by_flow.get(str(flow_run_id))
@@ -2904,8 +2937,13 @@ class InMemoryControlPlane:
         state = str(detail["state"])
         if state in {"COMPLETED", "FAILED", "CANCELLED"}:
             raise ValueError(f"cannot pause from state {state}")
-        if state not in {"SCHEDULED", "PENDING", "RUNNING", "PAUSED"}:
-            raise ValueError(f"cannot pause from state {state}")
+        # Operator pause only from active scheduling states — not gate-only PAUSED.
+        if state not in {"SCHEDULED", "PENDING", "RUNNING"}:
+            raise ValueError(
+                f"cannot pause from state {state} "
+                "(operator pause requires SCHEDULED/PENDING/RUNNING; "
+                "gate waits are not operator pauses)"
+            )
 
         if interrupt is InterruptMode.DRAIN:
             running = self._count_running_tasks(flow_run_id)
@@ -2932,7 +2970,8 @@ class InMemoryControlPlane:
             return self.get_flow_run_detail(flow_run_id) or detail
 
         # terminate: control-plane interrupt of RUNNING tasks; PENDING held.
-        # Process kill lands in P3.2c — bodies on threads may continue until they exit.
+        # Process kill lands in P3.2c — bodies on threads may continue until they exit,
+        # but late COMPLETED is fenced in task finalize (task stays CANCELLED).
         self._set_lifecycle(
             flow_run_id,
             lifecycle_action="pause",
@@ -2940,36 +2979,45 @@ class InMemoryControlPlane:
             pause_drain_pending=False,
             lifecycle_summary="Paused (terminate) — in-flight tasks interrupted",
         )
-        now = self._now()
-        with self._lock:
-            self._sqlite_conn.execute(
-                """
-                UPDATE task_runs
-                SET state = 'CANCELLED', updated_at = ?
-                WHERE flow_run_id = ? AND state IN ('RUNNING')
-                """,
-                [now, str(flow_run_id)],
-            )
-            for task in self._tasks.values():
-                if (
-                    str(task.flow_run_id) == str(flow_run_id)
-                    and task.state == RunState.RUNNING
-                ):
-                    task.state = RunState.CANCELLED
-        if state != "PAUSED":
+        running_ids = [
+            tid
+            for tid, task in list(self._tasks.items())
+            if str(task.flow_run_id) == str(flow_run_id)
+            and task.state == RunState.RUNNING
+        ]
+        for tid in running_ids:
             try:
-                self.set_flow_state(
-                    flow_run_id, RunState.PAUSED, uuid4(), "operator_pause_terminate"
+                self.record_task_event(
+                    tid,
+                    "task_cancelled",
+                    {"interrupt_reason": "terminated_by_pause"},
                 )
-            except ValueError:
-                pass
+            except Exception:
+                # Fallback: force CANCELLED if FSM rejects mid-race.
+                with self._lock:
+                    task = self._tasks.get(tid)
+                    if task and task.state == RunState.RUNNING:
+                        task.state = RunState.CANCELLED
+                        self._update_task_row(task)
+        try:
+            self.set_flow_state(
+                flow_run_id, RunState.PAUSED, uuid4(), "operator_pause_terminate"
+            )
+        except ValueError:
+            pass
         refreshed = self.get_flow_run_detail(flow_run_id)
         if refreshed is None:
             raise ValueError("flow run not found")
         return refreshed
 
     def resume_flow_run(self, flow_run_id: UUID) -> dict[str, Any]:
-        """Resume an operator-paused flow run (not gate-only PAUSED)."""
+        """Resume an operator-paused flow run (not gate-only PAUSED).
+
+        For in-process ``@flow()`` calls that already exited while paused, if a
+        result was stored and no non-terminal tasks remain, completes the run
+        instead of leaving a zombie ``RUNNING`` state. Worker/deployment-driven
+        continuation of pending work is the primary resume path.
+        """
         detail = self.get_flow_run_detail(flow_run_id)
         if detail is None:
             raise ValueError("flow run not found")
@@ -2984,6 +3032,10 @@ class InMemoryControlPlane:
         life = self._lifecycle_by_flow.get(str(flow_run_id), {})
         if life.get("pause_drain_pending"):
             raise ValueError("cannot resume while drain pause is still pending")
+
+        has_result = flow_run_id in self._flow_results
+        pending_left = self._count_nonterminal_tasks(flow_run_id) > 0
+
         if state == "PAUSED":
             try:
                 self.set_flow_state(
@@ -2991,10 +3043,23 @@ class InMemoryControlPlane:
                 )
             except ValueError as exc:
                 refreshed = self.get_flow_run_detail(flow_run_id)
-                if refreshed and refreshed["state"] == "RUNNING":
-                    pass
-                else:
+                if not (refreshed and refreshed["state"] == "RUNNING"):
                     raise ValueError(str(exc)) from exc
+
+        if has_result and not pending_left:
+            current = self.get_flow(flow_run_id)
+            if current.state == RunState.RUNNING:
+                try:
+                    self.set_flow_state(
+                        flow_run_id,
+                        RunState.COMPLETED,
+                        uuid4(),
+                        "complete_after_pause",
+                        expected_version=current.version,
+                    )
+                except ValueError:
+                    pass
+
         self._set_lifecycle(
             flow_run_id,
             lifecycle_action="resume",
@@ -3015,6 +3080,19 @@ class InMemoryControlPlane:
                     str(task.flow_run_id) == str(flow_run_id)
                     and task.state == RunState.RUNNING
                 ):
+                    n += 1
+            return n
+
+    def _count_nonterminal_tasks(self, flow_run_id: UUID) -> int:
+        terminal = {
+            RunState.COMPLETED,
+            RunState.FAILED,
+            RunState.CANCELLED,
+        }
+        with self._lock:
+            n = 0
+            for task in self._tasks.values():
+                if str(task.flow_run_id) == str(flow_run_id) and task.state not in terminal:
                     n += 1
             return n
 
@@ -3827,10 +3905,10 @@ class InMemoryControlPlane:
         level: str = "INFO",
         task_run_id: UUID | str | None = None,
     ) -> None:
-        """Persist a user/control-plane log row without taking the FSM lock.
+        """Persist a user log row.
 
-        Used by ``get_run_logger`` and system transition logging. Safe to call
-        from user code and logging handlers; does not mutate run state.
+        Serializes the store insert under ``_lock`` (safe for thread-pool
+        loggers) but does not perform FSM transitions.
         """
         self._insert_log_row(
             {
@@ -3842,17 +3920,19 @@ class InMemoryControlPlane:
         )
 
     def _insert_log_row(self, log: dict[str, Any]) -> None:
-        self._sqlite_conn.execute(
-            "INSERT INTO logs(id,flow_run_id,task_run_id,level,message,timestamp) VALUES(?,?,?,?,?,?)",
-            [
-                str(uuid4()),
-                log["flow_run_id"],
-                log.get("task_run_id"),
-                log["level"],
-                log["message"],
-                self._now(),
-            ],
-        )
+        # sqlite3 connections are not safely concurrent without a lock even in WAL mode.
+        with self._lock:
+            self._sqlite_conn.execute(
+                "INSERT INTO logs(id,flow_run_id,task_run_id,level,message,timestamp) VALUES(?,?,?,?,?,?)",
+                [
+                    str(uuid4()),
+                    log["flow_run_id"],
+                    log.get("task_run_id"),
+                    log["level"],
+                    log["message"],
+                    self._now(),
+                ],
+            )
 
     def _insert_artifact_row(self, artifact: dict[str, Any]) -> None:
         self._sqlite_conn.execute(

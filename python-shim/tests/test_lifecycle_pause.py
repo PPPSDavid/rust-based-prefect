@@ -136,7 +136,8 @@ def test_drain_pause_holds_scheduling_until_inflight_finishes(tmp_path: Path) ->
     assert settled["interrupt_mode"] == "drain"
 
     resumed = plane.resume_flow_run(run.run_id)
-    assert resumed["state"] == "RUNNING"
+    # In-process body already stored a result with no pending tasks → COMPLETED.
+    assert resumed["state"] == "COMPLETED"
 
 
 def test_cancel_sets_terminate_lifecycle(tmp_path: Path) -> None:
@@ -183,3 +184,78 @@ def test_resume_rejects_gate_only_pause(tmp_path: Path) -> None:
     plane.set_flow_state(record.run_id, RunState.PAUSED, uuid4(), "gate_wait")
     with pytest.raises(ValueError, match="operator pause"):
         plane.resume_flow_run(record.run_id)
+    with pytest.raises(ValueError, match="gate waits"):
+        plane.pause_flow_run(record.run_id, mode="drain")
+
+
+def test_terminate_pause_fences_late_completed(tmp_path: Path) -> None:
+    plane = _plane(tmp_path)
+    set_control_plane(plane)
+    started = threading.Event()
+    release = threading.Event()
+
+    @task
+    def slow() -> str:
+        started.set()
+        assert release.wait(timeout=5)
+        return "late"
+
+    @flow
+    def f() -> str:
+        return slow.submit().result()
+
+    thread = threading.Thread(target=f, daemon=True)
+    thread.start()
+    assert started.wait(timeout=5)
+    run = plane.latest_flow()
+    assert run is not None
+    tasks = list(plane._tasks.values())
+    assert tasks
+    task_id = tasks[0].task_run_id
+
+    detail = plane.pause_flow_run(run.run_id, mode="terminate")
+    assert detail["state"] == "PAUSED"
+    assert plane.get_task_run(task_id).state == RunState.CANCELLED
+
+    release.set()
+    thread.join(timeout=5)
+    # Body returned, but CANCELLED must not resurrect to COMPLETED.
+    assert plane.get_task_run(task_id).state == RunState.CANCELLED
+
+
+def test_drain_resume_completes_when_result_already_stored(tmp_path: Path) -> None:
+    plane = _plane(tmp_path)
+    set_control_plane(plane)
+    started = threading.Event()
+    release = threading.Event()
+
+    @task
+    def slow() -> str:
+        started.set()
+        assert release.wait(timeout=5)
+        return "done"
+
+    @flow
+    def g() -> str:
+        return slow.submit().result()
+
+    thread = threading.Thread(target=g, daemon=True)
+    thread.start()
+    assert started.wait(timeout=5)
+    run = plane.latest_flow()
+    assert run is not None
+    plane.pause_flow_run(run.run_id, mode="drain")
+    release.set()
+    thread.join(timeout=5)
+
+    settled = None
+    for _ in range(50):
+        settled = plane.get_flow_run_detail(run.run_id)
+        assert settled is not None
+        if settled["state"] == "PAUSED":
+            break
+        time.sleep(0.05)
+    assert settled is not None
+    assert settled["state"] == "PAUSED"
+    resumed = plane.resume_flow_run(run.run_id)
+    assert resumed["state"] == "COMPLETED"

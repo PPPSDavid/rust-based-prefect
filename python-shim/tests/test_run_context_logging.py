@@ -125,3 +125,41 @@ def test_logger_does_not_require_holding_flow_for_list(tmp_path: Path) -> None:
     run_id = f()
     page = plane.list_logs(run_id, limit=50)
     assert any(i["message"] == "persisted" for i in page.items)
+
+
+def test_concurrent_logger_writes_are_safe(tmp_path: Path) -> None:
+    import threading
+
+    plane = _plane(tmp_path)
+    set_control_plane(plane)
+    errors: list[BaseException] = []
+
+    @flow
+    def f() -> UUID:
+        run_id = get_run_context().flow_run_id
+
+        def _worker(i: int) -> None:
+            try:
+                for j in range(20):
+                    # Direct plane writes stress the store lock (ContextVars are
+                    # not inherited by raw threads without copy_context).
+                    plane.append_log(
+                        flow_run_id=run_id,
+                        message=f"msg-{i}-{j}",
+                        level="INFO",
+                    )
+            except BaseException as exc:  # noqa: BLE001 — capture for assertion
+                errors.append(exc)
+
+        threads = [threading.Thread(target=_worker, args=(i,)) for i in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=5)
+        return run_id
+
+    run_id = f()
+    assert errors == []
+    page = plane.list_logs(run_id, limit=2000)
+    user_msgs = [i for i in page.items if str(i["message"]).startswith("msg-")]
+    assert len(user_msgs) == 8 * 20

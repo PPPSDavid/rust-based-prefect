@@ -1,7 +1,7 @@
 """Prefect-shaped ``get_run_logger`` → control-plane log rows (P3.1).
 
-User log emission must not hold the control-plane FSM lock; ``append_log``
-performs a store insert only.
+``append_log`` serializes the store insert under the plane ``RLock`` (safe for
+concurrent handlers) but does not perform FSM transitions.
 """
 
 from __future__ import annotations
