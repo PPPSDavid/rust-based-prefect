@@ -257,6 +257,29 @@ def explicit_orphan_fail_flow(n: int) -> int:
     return dbl.submit(n).result()
 
 
+@task
+def setup() -> None:
+    return None
+
+
+@task(persist_result=True)
+def expensive(x: int) -> dict:
+    return {"x": x, "n": 42, "items": [1, 2, 3]}
+
+
+@task
+def volatile(x: int) -> int:
+    return x + 1
+
+
+@flow(name="persist_result_demo")
+def persist_result_demo_flow(n: int = 7) -> int:
+    """Seed flow for UI e2e: None marker + JSON-safe persist_result payload."""
+    setup.submit()
+    payload = expensive.submit(n)
+    return volatile.submit(payload.result()["n"]).result()
+
+
 FLOW_REGISTRY = {
     "simple_flow": simple_flow,
     "wide_flow": wide_flow,
@@ -271,6 +294,7 @@ FLOW_REGISTRY = {
     "wait_all_inline_subflow": wait_all_inline_subflow,
     "detach_orphan_fail_flow": detach_orphan_fail_flow,
     "explicit_orphan_fail_flow": explicit_orphan_fail_flow,
+    "persist_result_demo": persist_result_demo_flow,
 }
 
 
@@ -335,6 +359,7 @@ def benchmark_run(req: BenchmarkRequest) -> dict[str, float | int | str | bool |
         "wait_all_inline_subflow": wait_all_inline_subflow,
         "detach_orphan_fail": detach_orphan_fail_flow,
         "explicit_orphan_fail": explicit_orphan_fail_flow,
+        "persist_result": persist_result_demo_flow,
         # Backwards-compatible aliases for existing scripts.
         "mapped": wide_flow,
         "chained": long_chain_flow,
@@ -346,7 +371,7 @@ def benchmark_run(req: BenchmarkRequest) -> dict[str, float | int | str | bool |
             detail=(
                 "Unsupported flavor. Use one of: simple, wide, long_chain, failing, "
                 "gated, wait_all_ok, wait_all_orphan_fail, wait_all_inline_subflow, "
-                "detach_orphan_fail, explicit_orphan_fail"
+                "detach_orphan_fail, explicit_orphan_fail, persist_result"
             ),
         )
     start = time.perf_counter()

@@ -10,8 +10,8 @@ Use this to avoid guessing validation. Prefer package `AGENTS.md` for ownership.
 | Static planner / forecast / DAG IR | `python3 -m pytest static-planner/tests` |
 | Schedules / deployments / workers | shim tests matching schedule/deploy + optional server smoke |
 | `perf_matrix.py` / recipes / thresholds | `python3 -m pytest benchmarks/tests` then `perf_matrix.py run --preset lite …` to `/tmp` |
-| Frontend run/DAG UI | `npm --prefix frontend run build` (+ e2e if UX-critical); remember `localhost:4173` |
-| Cancel / retry semantics | MEMORY_BANK lifecycle section + API/shim tests; do not claim task-resume parity |
+| Cancel / retry / `persist_result` | MEMORY_BANK lifecycle + `docs/how-to/task-resume-and-persist.md` + `python-shim/tests/test_task_resume_cache.py`; do not claim Prefect cache_policy parity |
+| Frontend run/DAG / result UI | `npm --prefix frontend run build` (+ `frontend/e2e/persist-result-ui.spec.ts` when result display changes); remember `localhost:4173` |
 | Agent/MCP tooling | `python3 scripts/verify_code_review_graph.py` |
 
 Default full gate (before declaring done):

@@ -84,7 +84,10 @@ class SqliteStore:
                 parent_task_run_id TEXT,
                 root_flow_run_id TEXT,
                 execution_mode TEXT,
-                depth INTEGER NOT NULL DEFAULT 0
+                depth INTEGER NOT NULL DEFAULT 0,
+                resume_from_flow_run_id TEXT,
+                resume_lineage_id TEXT,
+                parameters_fingerprint TEXT
             );
             CREATE TABLE IF NOT EXISTS task_runs (
                 seq INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -177,6 +180,7 @@ class SqliteStore:
                 parent_flow_run_id TEXT,
                 parent_task_run_id TEXT,
                 parent_deployment_run_id TEXT,
+                resume_from_flow_run_id TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
                 started_at TEXT,
@@ -275,6 +279,16 @@ class SqliteStore:
             conn.execute(
                 "ALTER TABLE flow_runs ADD COLUMN depth INTEGER NOT NULL DEFAULT 0"
             )
+        if "resume_from_flow_run_id" not in flow_cols:
+            conn.execute(
+                "ALTER TABLE flow_runs ADD COLUMN resume_from_flow_run_id TEXT"
+            )
+        if "resume_lineage_id" not in flow_cols:
+            conn.execute("ALTER TABLE flow_runs ADD COLUMN resume_lineage_id TEXT")
+        if "parameters_fingerprint" not in flow_cols:
+            conn.execute(
+                "ALTER TABLE flow_runs ADD COLUMN parameters_fingerprint TEXT"
+            )
         if "kind" not in col_names:
             conn.execute(
                 "ALTER TABLE task_runs ADD COLUMN kind TEXT NOT NULL DEFAULT 'task'"
@@ -315,6 +329,10 @@ class SqliteStore:
         if "parent_deployment_run_id" not in dep_run_cols:
             conn.execute(
                 "ALTER TABLE deployment_runs ADD COLUMN parent_deployment_run_id TEXT"
+            )
+        if "resume_from_flow_run_id" not in dep_run_cols:
+            conn.execute(
+                "ALTER TABLE deployment_runs ADD COLUMN resume_from_flow_run_id TEXT"
             )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_deployments_work_pool ON deployments(work_pool_id)"

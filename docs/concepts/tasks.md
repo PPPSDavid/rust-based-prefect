@@ -42,6 +42,22 @@ end_ping = task(name="ping-end")(ping_body)
 
 See **[DAG and forecast](dag-and-forecast.md)** for how this appears in the UI.
 
+## Persist results and resume on retry
+
+On **flow-run resume** (deployment retry or `prepare_resume`), IronFlow may skip already-**COMPLETED** DAG nodes when **flow/deployment parameters** and **submit/`map` inputs** still match:
+
+- Return value **`None`** → auto skip (marker only)
+- Non-`None` → skip only with **`@task(persist_result=True)`** and a **JSON-safe** payload (size-capped)
+- `map` children key by `map_index` + input fingerprint
+
+```python
+@task(persist_result=True)
+def expensive(x: int) -> dict:
+    return {"x": x, "n": 42}
+```
+
+Fresh runs never auto-hit. Cache hits do not re-fire `transition_hooks`. This is **not** Prefect `cache_policy` parity. Full guide: **[How to resume tasks and persist results](../how-to/task-resume-and-persist.md)**.
+
 ## Transition hooks
 
 Tasks accept the same **`transition_hooks`** mechanism as flows: **`TransitionHookSpec`** + **`on_transition`**, with optional **`from_state`** / **`to_state`** filters. See **[Flows](flows.md)** and the compatibility matrix for behavior and differences from Prefect’s hook names.

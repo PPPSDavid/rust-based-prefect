@@ -119,6 +119,11 @@ PAGES: list[tuple[str, str, str]] = [
         "Global slots, rate_limit, and tag caps.",
     ),
     (
+        "How to resume tasks and persist results",
+        "how-to/task-resume-and-persist/",
+        "DAG resume on retry, persist_result, JSON allowlist.",
+    ),
+    (
         "How to port from Prefect",
         "how-to/port-from-prefect/",
         "Import swap and subset limits.",
@@ -180,6 +185,7 @@ with gen_open("llms.txt", "w") as f:
             "how-to/subflows/": "how-to/subflows.md",
             "how-to/choose-task-runners/": "how-to/choose-task-runners.md",
             "how-to/concurrency-limits/": "how-to/concurrency-limits.md",
+            "how-to/task-resume-and-persist/": "how-to/task-resume-and-persist.md",
             "how-to/port-from-prefect/": "how-to/port-from-prefect.md",
             "compatibility/": "compatibility.md",
             "reference/env-vars/": "reference/env-vars.md",

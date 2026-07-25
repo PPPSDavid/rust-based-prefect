@@ -21,7 +21,10 @@ CREATE TABLE IF NOT EXISTS flow_runs (
     parent_task_run_id TEXT,
     root_flow_run_id TEXT,
     execution_mode TEXT,
-    depth INTEGER NOT NULL DEFAULT 0
+    depth INTEGER NOT NULL DEFAULT 0,
+    resume_from_flow_run_id TEXT,
+    resume_lineage_id TEXT,
+    parameters_fingerprint TEXT
 );
 CREATE TABLE IF NOT EXISTS task_runs (
     seq BIGSERIAL PRIMARY KEY,
@@ -115,10 +118,25 @@ CREATE TABLE IF NOT EXISTS deployment_runs (
     parent_flow_run_id TEXT,
     parent_task_run_id TEXT,
     parent_deployment_run_id TEXT,
+    resume_from_flow_run_id TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     started_at TEXT,
     finished_at TEXT
+);
+CREATE TABLE IF NOT EXISTS task_result_cache (
+    lineage_id TEXT NOT NULL,
+    planned_node_id TEXT NOT NULL,
+    map_index INTEGER NOT NULL,
+    task_name TEXT NOT NULL,
+    is_none_result INTEGER NOT NULL,
+    has_payload INTEGER NOT NULL,
+    payload_json TEXT,
+    input_fingerprint TEXT NOT NULL DEFAULT '',
+    source_flow_run_id TEXT NOT NULL,
+    source_task_run_id TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (lineage_id, planned_node_id, map_index)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_deployment_runs_idempotency
     ON deployment_runs(deployment_id, idempotency_key)
@@ -214,6 +232,26 @@ class PostgresStore:
     def ensure_schema(self) -> None:
         with self._raw.cursor() as cur:
             cur.execute(_SCHEMA_SQL)
+            # Additive upgrades for DBs created before resume / param-fingerprint columns.
+            cur.execute(
+                "ALTER TABLE flow_runs ADD COLUMN IF NOT EXISTS "
+                "resume_from_flow_run_id TEXT"
+            )
+            cur.execute(
+                "ALTER TABLE flow_runs ADD COLUMN IF NOT EXISTS resume_lineage_id TEXT"
+            )
+            cur.execute(
+                "ALTER TABLE flow_runs ADD COLUMN IF NOT EXISTS "
+                "parameters_fingerprint TEXT"
+            )
+            cur.execute(
+                "ALTER TABLE deployment_runs ADD COLUMN IF NOT EXISTS "
+                "resume_from_flow_run_id TEXT"
+            )
+            cur.execute(
+                "ALTER TABLE task_result_cache ADD COLUMN IF NOT EXISTS "
+                "input_fingerprint TEXT NOT NULL DEFAULT ''"
+            )
 
     def close(self) -> None:
         try:
