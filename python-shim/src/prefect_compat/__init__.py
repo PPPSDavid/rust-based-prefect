@@ -1,7 +1,3 @@
-from .decorators import flow, set_control_plane, task, wait
-from .errors import FlowChildrenFailed
-from .gates import GateFuture, gate
-from .hooks import TransitionContext, TransitionHookSpec, on_transition
 from .concurrency import (
     ConcurrencyLimitError,
     ConcurrencySlotTimeoutError,
@@ -13,7 +9,14 @@ from .concurrency import (
     list_concurrency_limits,
     rate_limit,
 )
-from .runtime import InMemoryControlPlane, RunState
+from .context import MissingContextError, RunContext, get_run_context
+from .decorators import flow, set_control_plane, task, wait
+from .errors import FlowChildrenFailed
+from .gates import GateFuture, gate
+from .hooks import TransitionContext, TransitionHookSpec, on_transition
+from .lifecycle import InterruptMode
+from .run_logging import get_run_logger
+from .runtime import FlowRunSchedulingHeld, InMemoryControlPlane, RunState
 from .subflows import SubflowFuture, deployment_ref
 from .task_runners import (
     ProcessPoolTaskRunner,
@@ -50,4 +53,10 @@ __all__ = [
     "list_concurrency_limits",
     "ConcurrencyLimitError",
     "ConcurrencySlotTimeoutError",
+    "get_run_context",
+    "get_run_logger",
+    "RunContext",
+    "MissingContextError",
+    "InterruptMode",
+    "FlowRunSchedulingHeld",
 ]

@@ -12,7 +12,7 @@ Last updated: 2026-07-25.
 ## Core Architecture
 
 - `rust-engine/`: deterministic state-machine kernel and append-only event model.
-- `python-shim/`: Prefect-style ergonomics (`@flow`, `@task`, `submit`, `map`, `wait_for`, **`deployment_ref` / subflows**) with compatibility runtime + optional FastAPI server. **`ThreadPoolTaskRunner`**: concurrent `submit` + `map`; process-pool `submit` still sync.
+- `python-shim/`: Prefect-style ergonomics (`@flow`, `@task`, `submit`, `map`, `wait_for`, **`deployment_ref` / subflows**) with compatibility runtime + optional FastAPI server. **`ThreadPoolTaskRunner`**: concurrent `submit` + `map`. **`ProcessPoolTaskRunner`**: registered child processes per task (cancel/terminate SIGTERM→SIGKILL).
 - `static-planner/`: static graph IR + forecast for supported flow subset (`@flow` body, `submit`/`map`, repeated tasks, `@task(name=...)`, UI DAG logical/expanded).
 - `benchmarks/`: `perf_matrix.py` (control-plane matrix) and `compare_prefect_vs_ironflow.py` (A/B vs Prefect).
 
@@ -53,31 +53,33 @@ Last updated: 2026-07-25.
 - Perf gate: `python3 benchmarks/perf_matrix.py run --preset lite --repetitions 1 --warmups 0 --jobs 2`
 - CRG setup/verify: `bash scripts/setup_code_review_graph.sh`
 
-## Run lifecycle: cancel / retry
+## Run lifecycle: cancel / pause / retry
 
 **Current behavior:**
 
-- **Cancel** (`POST /api/flow-runs/{id}/cancel`): sets flow run state to `CANCELLED` and marks in-flight task runs `CANCELLED` in the control plane / SQLite read model. Long-running task bodies are not cooperatively interrupted unless they poll cancellation themselves (no default hook yet).
-- **Retry** (`POST /api/flow-runs/{id}/retry`): for deployment-backed runs, triggers a **new** deployment run → **new** flow run with **`resume_from_flow_run_id`**. Eligible completed tasks may skip (see below); this is **not** full Prefect task-resume / `cache_policy` parity.
+- **Cancel** (`POST /api/flow-runs/{id}/cancel`): `CANCELLED` + in-flight task rows cancelled; records `lifecycle_action=cancel`, `interrupt_mode=terminate`. Under **`ProcessPoolTaskRunner`**, registered children get SIGTERM→grace→SIGKILL (`process_workers.py`). Thread-pool bodies remain cooperative-only.
+- **Pause** (`POST …/pause` with required `mode=drain|terminate`): drain blocks new starts and settles `PAUSED`; terminate cancels RUNNING rows then kills process workers and holds `PAUSED`. Resume is operator-pause only (`POST …/resume`) — after terminate, in-process runs call `prepare_resume` (P1); deployment-backed use retry-with-`resume_from`. Plan: `docs/plans/flow-run-lifecycle-control.md`.
+- **Retry** (`POST /api/flow-runs/{id}/retry`): for deployment-backed runs, triggers a **new** deployment run → **new** flow run with **`resume_from_flow_run_id`**. Eligible completed tasks may skip (see below).
 
 **Task resume (Phase 1 — landed):**
 
 - Design: **`docs/plans/task-result-cache.md`**. User guide: **`docs/how-to/task-resume-and-persist.md`**.
 - Skip on resume when prior return was **`None`** (auto) or **`@task(persist_result=True)`** stored a JSON-safe payload, **and** flow/deployment params + submit/`map` input fingerprints match. `map` uses `map_index`. Cache hits do not re-fire transition hooks. Non-persisted non-`None` recomputes. UI shows persisted results on Task Runs / Artifacts.
-- Follow-ups: native Rust `resume_from` on deployment ops (Python merge bridge today), subflow/gate policies, clearer UI skipped-vs-rerun.
+- Follow-ups: native Rust `resume_from` on deployment ops (Python merge bridge today), subflow/gate policies, clearer UI skipped-vs-rerun; UI pause-mode chooser (P3.2e).
 
 **Useful test scenario (manual / E2E):**
 
 - Flow: fast task → `sleep` ~10s task → downstream task. Trigger → cancel while sleeping → retry → wait for completion. With `persist_result` / `None` markers, expect eligible tasks to skip on retry. UI visual: `scripts/seed_persist_result_ui.py` + `frontend/e2e/persist-result-ui.spec.ts`.
 
+
 ## Next High-Value Work
 
-**P0 docs truth (nav / `llms.txt` / matrix / UI checklist / port guide)** is the current docs-hygiene bar; gap-canvas backlog proposal lives in PR [#60](https://github.com/PPPSDavid/rust-based-prefect/pull/60) (`docs/plans/prefect-gap-canvas.md` when merged).
+Gap canvas: `docs/plans/prefect-gap-canvas.md` (from PR #60 lineage).
 
-1. **P1 task resume on retry** — Phase 1 (Goal A) landed on this branch; follow-ups: native Rust `resume_from`, subflow/gate policies, clearer UI skipped-vs-rerun (see section above).
-2. **P3 logging helpers** (`get_run_logger` / `log_prints`) + cooperative cancel polling.
-3. Postgres Rust schedule/gate (Tier B follow-up) + optional Alembic upgrade CLI / HA services.
-4. Keep CI + `perf_matrix` regression thresholds healthy (including `--preset gcl`).
-5. Optional: async `concurrency` / CLI `gcl` / UI admin for concurrency limits.
+1. **P3.2e / P3.5** — UI/CLI pause chooser + lifecycle E2E smoke; `log_prints=` optional.
+2. **P4** concurrency ops (lease-on-cancel, CLI `gcl`, UI admin).
+3. Postgres Rust schedule/gate + HA follow-ups (P2).
+4. Keep CI + `perf_matrix` lite gate healthy (including `--preset gcl`).
+5. P1 resume follow-ups: native Rust `resume_from`, subflow/gate policies, clearer UI skipped-vs-rerun.
 6. Move remaining projection write hot paths from Python into Rust-backed implementation.
 7. Optional: Cloud embeddings path if NL `semantic_search` becomes important; keep decision log current (`docs/agent/DECISION_LOG.md`).

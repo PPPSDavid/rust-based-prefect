@@ -4,7 +4,7 @@ import contextvars
 import inspect
 import sys
 import textwrap
-from concurrent.futures import Future, ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from functools import wraps
 from collections.abc import Mapping
 from pathlib import Path
@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from .subflows import SubflowFuture
 
 from .cancellation import FlowRunCancelled
+from .context import bind_flow_metadata, bind_task_run, bound_flow_parameters
 from .errors import FlowChildrenFailed
 from .hooks import (
     TransitionContext,
@@ -25,8 +26,10 @@ from .hooks import (
     dispatch_transition_hooks,
 )
 from .result_codec import fingerprint_parameters, fingerprint_task_inputs
+from .process_workers import ProcessWorkerTerminated, run_in_registered_process
 from .runtime import (
     FlowRunRecord,
+    FlowRunSchedulingHeld,
     InMemoryControlPlane,
     RunState,
     SetStateResult,
@@ -328,15 +331,63 @@ class TaskWrapper:
         not a Python-only state write.
         """
         try:
-            result = self(*args, **kwargs)
-            if task_run is not None:
-                self._finalize_completed_task(
-                    task_run,
-                    result,
-                    cache_hit=False,
-                    input_fingerprint=input_fingerprint,
+            runner = _ACTIVE_TASK_RUNNER.get()
+            use_process = task_run is not None and isinstance(
+                runner, ProcessPoolTaskRunner
+            )
+            if use_process:
+                # Resolve futures on the parent, then run the picklable body in a child.
+                resolved_args = tuple(_resolve(v) for v in args)
+                resolved_kwargs = {k: _resolve(v) for k, v in kwargs.items()}
+                result = run_in_registered_process(
+                    flow_run_id=task_run.flow_run_id,
+                    task_run_id=task_run.task_run_id,
+                    fn=self.fn,
+                    args=resolved_args,
+                    kwargs=resolved_kwargs,
                 )
+            elif task_run is not None:
+                with bind_task_run(task_run.task_run_id, self.name):
+                    result = self(*args, **kwargs)
+            else:
+                result = self(*args, **kwargs)
+            if task_run is not None:
+                try:
+                    st = _CONTROL_PLANE.get_task_run(task_run.task_run_id).state
+                except Exception:
+                    st = None
+                # Fence late COMPLETED after cancel/terminate pause.
+                if st == RunState.CANCELLED:
+                    return result
+                if st in (RunState.RUNNING, RunState.PENDING, None):
+                    self._finalize_completed_task(
+                        task_run,
+                        result,
+                        cache_hit=False,
+                        input_fingerprint=input_fingerprint,
+                    )
             return result
+        except ProcessWorkerTerminated:
+            # Cancel/terminate may kill the child before the task row flips to
+            # CANCELLED — never invent FAILED for an intentional process kill.
+            if task_run is not None:
+                try:
+                    st = _CONTROL_PLANE.get_task_run(task_run.task_run_id).state
+                except Exception:
+                    st = None
+                if st in (RunState.RUNNING, RunState.PENDING):
+                    try:
+                        _CONTROL_PLANE.record_task_event(
+                            task_run.task_run_id,
+                            "task_cancelled",
+                            {
+                                "task_name": self.name,
+                                "interrupt_reason": "process_terminated",
+                            },
+                        )
+                    except Exception:
+                        pass
+            raise
         except Exception as exc:
             if isinstance(exc, FlowRunCancelled):
                 raise
@@ -346,6 +397,8 @@ class TaskWrapper:
                     st = _CONTROL_PLANE.get_task_run(task_run.task_run_id).state
                 except Exception:
                     st = None
+                if st == RunState.CANCELLED:
+                    raise
                 if st in (RunState.RUNNING, RunState.PENDING):
                     _CONTROL_PLANE.record_task_event(
                         task_run.task_run_id,
@@ -416,6 +469,12 @@ class TaskWrapper:
         input_fingerprint: str | None = None,
         fire_hooks: bool = True,
     ) -> None:
+        try:
+            st = _CONTROL_PLANE.get_task_run(task_run.task_run_id).state
+        except Exception:
+            st = None
+        if st == RunState.CANCELLED:
+            return
         summary_extra = _CONTROL_PLANE.store_task_result_for_resume(
             task_run.flow_run_id,
             task_run.task_run_id,
@@ -573,6 +632,7 @@ class TaskWrapper:
         to_run: list[tuple[TaskRunRecord | None, Any, int, str | None]],
         exc: Exception,
     ) -> None:
+        cancelled_by_kill = isinstance(exc, ProcessWorkerTerminated)
         for task_run, _v, _index, _fp in to_run:
             if task_run is None:
                 continue
@@ -581,6 +641,19 @@ class TaskWrapper:
             except Exception:
                 st = None
             if st not in (RunState.RUNNING, RunState.PENDING):
+                continue
+            if cancelled_by_kill:
+                try:
+                    _CONTROL_PLANE.record_task_event(
+                        task_run.task_run_id,
+                        "task_cancelled",
+                        {
+                            "task_name": self.name,
+                            "interrupt_reason": "process_terminated",
+                        },
+                    )
+                except Exception:
+                    pass
                 continue
             _CONTROL_PLANE.record_task_event(
                 task_run.task_run_id,
@@ -637,9 +710,21 @@ class TaskWrapper:
                     None,
                 )
         try:
+            if task_run is not None:
+                with bind_task_run(task_run.task_run_id, self.name):
+                    return self.fn(value)
             return self.fn(value)
         finally:
             self._release_tag_leases(lease_ids)
+
+    def _map_body_in_context(self, task_run: TaskRunRecord | None, value: Any) -> Any:
+        """Run a map body with flow ContextVars + optional task binding copied in."""
+        if self.tags:
+            return self._run_tagged_map_body(task_run, value)
+        if task_run is not None:
+            with bind_task_run(task_run.task_run_id, self.name):
+                return self.fn(value)
+        return self.fn(value)
 
     def _map_thread_pool(
         self,
@@ -657,17 +742,14 @@ class TaskWrapper:
             return [f for f in futures if f is not None]
         mx = min(len(to_run), runner.resolve_max_workers())
 
+        def _one(item: tuple[TaskRunRecord | None, Any, int, str | None]) -> Any:
+            task_run, value, _index, _fp = item
+            ctx = contextvars.copy_context()
+            return ctx.run(self._map_body_in_context, task_run, value)
+
         with ThreadPoolExecutor(max_workers=mx) as pool:
             try:
-                if self.tags:
-                    outs = list(
-                        pool.map(
-                            lambda m: self._run_tagged_map_body(m[0], m[1]),
-                            to_run,
-                        )
-                    )
-                else:
-                    outs = list(pool.map(self.fn, [m[1] for m in to_run]))
+                outs = list(pool.map(_one, to_run))
             except Exception as exc:
                 self._fail_map_task_runs(to_run, exc)
                 raise
@@ -679,7 +761,12 @@ class TaskWrapper:
         wait_for: list[TaskFuture[Any] | SubflowFuture[Any] | GateFuture[Any]] | None,
         runner: ProcessPoolTaskRunner,
     ) -> list[TaskFuture[T]]:
-        """Map via child processes; task body must be picklable (single positional arg per value)."""
+        """Map via registered child processes (parallel up to ``max_workers``).
+
+        A thread-pool orchestrator waits on each registered process so cancel /
+        terminate can SIGTERM→SIGKILL in-flight map items. Task body must be
+        picklable (single positional arg per value).
+        """
         if wait_for:
             wait(wait_for)
         if not vals:
@@ -687,72 +774,82 @@ class TaskWrapper:
         to_run, futures = self._prepare_map_task_runs(vals)
         if not to_run:
             return [f for f in futures if f is not None]
-        mx = min(len(to_run), runner.resolve_max_workers())
         fn = self.fn
-        if self.tags:
-            # Tag slots on the parent; bodies run in children (process pool cannot share GCL).
-            # Outer threads acquire/release while ProcessPoolExecutor runs picklable bodies.
-            from concurrent.futures import ThreadPoolExecutor
+        mx = min(len(to_run), runner.resolve_max_workers())
 
-            with ProcessPoolExecutor(max_workers=mx) as pool:
+        def _one(item: tuple[TaskRunRecord | None, Any, int, str | None]) -> Any:
+            task_run, v, _index, _fp = item
+            lease_ids: list[str] = []
+            if task_run is not None and self.tags:
+                from .concurrency import (
+                    ConcurrencyLimitError,
+                    acquire_tag_slots_for_task,
+                )
 
-                def _one(
-                    item: tuple[TaskRunRecord | None, Any, int, str | None],
-                ) -> Any:
-                    task_run, v, _index, _fp = item
-                    lease_ids: list[str] = []
-                    if task_run is not None:
-                        from .concurrency import (
-                            ConcurrencyLimitError,
-                            acquire_tag_slots_for_task,
-                        )
-
+                try:
+                    lease_ids = acquire_tag_slots_for_task(
+                        self.tags,
+                        task_run_id=str(task_run.task_run_id),
+                        plane=_CONTROL_PLANE,
+                    )
+                except ConcurrencyLimitError:
+                    _CONTROL_PLANE.record_task_event(
+                        task_run.task_run_id,
+                        "task_cancelled",
+                        {
+                            "task_name": self.name,
+                            "error": "tag concurrency limit denied (limit=0)",
+                        },
+                    )
+                    raise
+                _CONTROL_PLANE.record_task_event(
+                    task_run.task_run_id, "task_running", None
+                )
+                th = self._transition_hooks
+                if th:
+                    _emit_task_single_hook_edge(
+                        th,
+                        task_run,
+                        self.name,
+                        RunState.PENDING,
+                        RunState.RUNNING,
+                        "task_running",
+                        None,
+                    )
+            try:
+                if task_run is None:
+                    return fn(v)
+                try:
+                    return run_in_registered_process(
+                        flow_run_id=task_run.flow_run_id,
+                        task_run_id=task_run.task_run_id,
+                        fn=fn,
+                        args=(v,),
+                    )
+                except ProcessWorkerTerminated:
+                    try:
+                        st = _CONTROL_PLANE.get_task_run(task_run.task_run_id).state
+                    except Exception:
+                        st = None
+                    if st in (RunState.RUNNING, RunState.PENDING):
                         try:
-                            lease_ids = acquire_tag_slots_for_task(
-                                self.tags,
-                                task_run_id=str(task_run.task_run_id),
-                                plane=_CONTROL_PLANE,
-                            )
-                        except ConcurrencyLimitError:
                             _CONTROL_PLANE.record_task_event(
                                 task_run.task_run_id,
                                 "task_cancelled",
                                 {
                                     "task_name": self.name,
-                                    "error": "tag concurrency limit denied (limit=0)",
+                                    "interrupt_reason": "process_terminated",
                                 },
                             )
-                            raise
-                        _CONTROL_PLANE.record_task_event(
-                            task_run.task_run_id, "task_running", None
-                        )
-                        th = self._transition_hooks
-                        if th:
-                            _emit_task_single_hook_edge(
-                                th,
-                                task_run,
-                                self.name,
-                                RunState.PENDING,
-                                RunState.RUNNING,
-                                "task_running",
-                                None,
-                            )
-                    try:
-                        return pool.submit(fn, v).result()
-                    finally:
-                        self._release_tag_leases(lease_ids)
+                        except Exception:
+                            pass
+                    raise
+            finally:
+                self._release_tag_leases(lease_ids)
 
-                with ThreadPoolExecutor(max_workers=mx) as orchestrator:
-                    try:
-                        outs = list(orchestrator.map(_one, to_run))
-                    except Exception as exc:
-                        self._fail_map_task_runs(to_run, exc)
-                        raise
-            return self._finalize_map_task_runs(to_run, outs, futures)
-
-        with ProcessPoolExecutor(max_workers=mx) as pool:
+        with ThreadPoolExecutor(max_workers=mx) as pool:
             try:
-                outs = list(pool.map(fn, [m[1] for m in to_run]))
+                outs = list(pool.map(_one, to_run))
             except Exception as exc:
                 self._fail_map_task_runs(to_run, exc)
                 raise
@@ -841,6 +938,14 @@ def flow(
                     max_workers=resolved_runner.resolve_max_workers()
                 )
                 submit_exec_token = _ACTIVE_SUBMIT_EXECUTOR.set(submit_executor)
+            elif isinstance(resolved_runner, ProcessPoolTaskRunner):
+                # Wait on registered children off the coordinating thread so
+                # cancel/terminate can observe in-flight PIDs (and flow code can
+                # interleave after submit() before .result()).
+                submit_executor = ThreadPoolExecutor(
+                    max_workers=resolved_runner.resolve_max_workers()
+                )
+                submit_exec_token = _ACTIVE_SUBMIT_EXECUTOR.set(submit_executor)
             try:
                 dep_run_id = _ACTIVE_DEPLOYMENT_RUN.get()
                 parent_flow_run_id = None
@@ -886,107 +991,132 @@ def flow(
                     parameters_fingerprint=parameters_fingerprint,
                 )
                 _ACTIVE_FLOW_RUN.set(record.run_id)
-                if dep_run_id is not None:
-                    _CONTROL_PLANE.attach_flow_run_to_deployment_run(
-                        dep_run_id, record.run_id
+                flow_params = bound_flow_parameters(f, args, kwargs)
+                with bind_flow_metadata(flow_name, flow_params):
+                    if dep_run_id is not None:
+                        _CONTROL_PLANE.attach_flow_run_to_deployment_run(
+                            dep_run_id, record.run_id
+                        )
+                    manifest_info = _compile_forecast_for_flow(f, flow_name)
+                    _CONTROL_PLANE.save_flow_manifest(
+                        run_id=record.run_id,
+                        manifest=manifest_info["manifest"],
+                        forecast=manifest_info["forecast"],
+                        warnings=manifest_info["warnings"],
+                        fallback_required=manifest_info["fallback_required"],
+                        source=manifest_info["source"],
                     )
-                manifest_info = _compile_forecast_for_flow(f, flow_name)
-                _CONTROL_PLANE.save_flow_manifest(
-                    run_id=record.run_id,
-                    manifest=manifest_info["manifest"],
-                    forecast=manifest_info["forecast"],
-                    warnings=manifest_info["warnings"],
-                    fallback_required=manifest_info["fallback_required"],
-                    source=manifest_info["source"],
-                )
-                start_transitions: list[tuple[RunState, UUID, str, int | None]] = [
-                    (RunState.PENDING, uuid4(), "propose", 0),
-                    (RunState.RUNNING, uuid4(), "start", 1),
-                ]
-                # Parent cancel can land after create_flow_run but before this
-                # optimistic PENDING→RUNNING batch; treat that as cancellation
-                # instead of surfacing a raw version-conflict ValueError.
-                pre_start = _CONTROL_PLANE.get_flow(record.run_id)
-                if pre_start.state == RunState.CANCELLED:
-                    raise FlowRunCancelled(
-                        f"flow run {record.run_id} was cancelled"
-                    )
-                try:
-                    batch_results = _CONTROL_PLANE.set_flow_states_batch(
-                        record.run_id, start_transitions
-                    )
-                except ValueError as exc:
-                    if "version conflict" in str(exc):
+                    start_transitions: list[
+                        tuple[RunState, UUID, str, int | None]
+                    ] = [
+                        (RunState.PENDING, uuid4(), "propose", 0),
+                        (RunState.RUNNING, uuid4(), "start", 1),
+                    ]
+                    # Parent cancel can land after create_flow_run but before this
+                    # optimistic PENDING→RUNNING batch; treat that as cancellation
+                    # instead of surfacing a raw version-conflict ValueError.
+                    pre_start = _CONTROL_PLANE.get_flow(record.run_id)
+                    if pre_start.state == RunState.CANCELLED:
+                        raise FlowRunCancelled(
+                            f"flow run {record.run_id} was cancelled"
+                        )
+                    try:
+                        batch_results = _CONTROL_PLANE.set_flow_states_batch(
+                            record.run_id, start_transitions
+                        )
+                    except ValueError as exc:
+                        if "version conflict" in str(exc):
+                            current = _CONTROL_PLANE.get_flow(record.run_id)
+                            if current.state == RunState.CANCELLED:
+                                raise FlowRunCancelled(
+                                    f"flow run {record.run_id} was cancelled"
+                                ) from exc
+                        raise
+                    if fh:
+                        _emit_flow_hooks_for_batch(
+                            fh,
+                            record.run_id,
+                            RunState.SCHEDULED,
+                            start_transitions,
+                            batch_results,
+                        )
+                    try:
+                        result = f(*args, **kwargs)
+                        _drain_submit_executor(submit_executor, submit_exec_token)
+                        submit_executor = None
+                        submit_exec_token = None
                         current = _CONTROL_PLANE.get_flow(record.run_id)
                         if current.state == RunState.CANCELLED:
                             raise FlowRunCancelled(
                                 f"flow run {record.run_id} was cancelled"
-                            ) from exc
-                    raise
-                if fh:
-                    _emit_flow_hooks_for_batch(
-                        fh,
-                        record.run_id,
-                        RunState.SCHEDULED,
-                        start_transitions,
-                        batch_results,
-                    )
-                try:
-                    result = f(*args, **kwargs)
-                    _drain_submit_executor(submit_executor, submit_exec_token)
-                    submit_executor = None
-                    submit_exec_token = None
-                    current = _CONTROL_PLANE.get_flow(record.run_id)
-                    if current.state == RunState.CANCELLED:
-                        raise FlowRunCancelled(
-                            f"flow run {record.run_id} was cancelled"
-                        )
-                    if completion_mode == "wait_all":
-                        _finalize_wait_all(
-                            record.run_id, result, fh, current
-                        )
-                    else:
-                        _finalize_explicit(record.run_id, result, fh, current)
-                    return result
-                except FlowRunCancelled:
-                    if (
-                        _CONTROL_PLANE.get_flow(record.run_id).state
-                        != RunState.CANCELLED
-                    ):
-                        prev = _CONTROL_PLANE.get_flow(record.run_id).state
-                        cancelled = _CONTROL_PLANE.set_flow_state(
-                            record.run_id,
-                            RunState.CANCELLED,
-                            uuid4(),
-                            "cancel",
-                            expected_version=2,
-                        )
-                        if fh and cancelled.status == "applied":
-                            _emit_flow_transition(
-                                fh, record.run_id, prev, RunState.CANCELLED, "cancel"
                             )
-                    raise
-                except FlowChildrenFailed:
-                    raise
-                except Exception:
-                    if (
-                        _CONTROL_PLANE.get_flow(record.run_id).state
-                        == RunState.CANCELLED
-                    ):
+                        if completion_mode == "wait_all":
+                            _finalize_wait_all(
+                                record.run_id, result, fh, current
+                            )
+                        else:
+                            _finalize_explicit(record.run_id, result, fh, current)
+                        return result
+                    except FlowRunCancelled:
+                        current = _CONTROL_PLANE.get_flow(record.run_id)
+                        if current.state != RunState.CANCELLED:
+                            prev = current.state
+                            cancelled = _CONTROL_PLANE.set_flow_state(
+                                record.run_id,
+                                RunState.CANCELLED,
+                                uuid4(),
+                                "cancel",
+                                expected_version=current.version,
+                            )
+                            if fh and cancelled.status == "applied":
+                                _emit_flow_transition(
+                                    fh,
+                                    record.run_id,
+                                    prev,
+                                    RunState.CANCELLED,
+                                    "cancel",
+                                )
                         raise
-                    prev = _CONTROL_PLANE.get_flow(record.run_id).state
-                    failed = _CONTROL_PLANE.set_flow_state(
-                        record.run_id,
-                        RunState.FAILED,
-                        uuid4(),
-                        "fail",
-                        expected_version=2,
-                    )
-                    if fh and failed.status == "applied":
-                        _emit_flow_transition(
-                            fh, record.run_id, prev, RunState.FAILED, "fail"
+                    except FlowRunSchedulingHeld:
+                        # Operator drain blocked a later submit — keep pause, do not FAILED.
+                        current = _CONTROL_PLANE.get_flow(record.run_id)
+                        if _CONTROL_PLANE.has_operator_pause(record.run_id):
+                            if current.state == RunState.RUNNING:
+                                try:
+                                    _CONTROL_PLANE.set_flow_state(
+                                        record.run_id,
+                                        RunState.PAUSED,
+                                        uuid4(),
+                                        "operator_pause_drain_held",
+                                        expected_version=current.version,
+                                    )
+                                except ValueError:
+                                    pass
+                            raise
+                        raise
+                    except FlowChildrenFailed:
+                        raise
+                    except Exception:
+                        current = _CONTROL_PLANE.get_flow(record.run_id)
+                        if current.state == RunState.CANCELLED:
+                            raise
+                        # Pause/cancel lifecycle is set before PAUSED/CANCELLED
+                        # settles; process kill must not invent FAILED mid-race.
+                        if _CONTROL_PLANE.has_operator_interrupt(record.run_id):
+                            raise
+                        prev = current.state
+                        failed = _CONTROL_PLANE.set_flow_state(
+                            record.run_id,
+                            RunState.FAILED,
+                            uuid4(),
+                            "fail",
+                            expected_version=current.version,
                         )
-                    raise
+                        if fh and failed.status == "applied":
+                            _emit_flow_transition(
+                                fh, record.run_id, prev, RunState.FAILED, "fail"
+                            )
+                        raise
             finally:
                 _drain_submit_executor(submit_executor, submit_exec_token)
                 _ACTIVE_FLOW_RUN.reset(flow_token)
@@ -1016,6 +1146,10 @@ def _finalize_explicit(
     fh: tuple[TransitionHookSpec, ...] | None,
     current: FlowRunRecord,
 ) -> None:
+    if _CONTROL_PLANE.has_operator_pause(flow_run_id):
+        # Drain-pending or settled PAUSED — do not auto-complete.
+        _CONTROL_PLANE.set_flow_result(flow_run_id, result)
+        return
     prev = current.state
     done = _CONTROL_PLANE.set_flow_state(
         flow_run_id,
@@ -1045,6 +1179,10 @@ def _finalize_wait_all(
     prev = current.state
     if prev == RunState.CANCELLED:
         raise FlowRunCancelled(f"flow run {flow_run_id} was cancelled")
+    if _CONTROL_PLANE.has_operator_pause(flow_run_id):
+        # Operator drain/terminate pause wins over auto-complete (incl. drain-pending).
+        _CONTROL_PLANE.set_flow_result(flow_run_id, result)
+        return
 
     if state_name == "COMPLETED":
         done = _CONTROL_PLANE.set_flow_state(
