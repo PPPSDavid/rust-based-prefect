@@ -1,11 +1,18 @@
 # Tier B — Executable delivery plan (4 PRs)
 
-**Status:** In progress (B3/B5)  
-**Last updated:** 2026-07-15  
+**Status:** Complete (core) — B0–B3/B5 merged (#49/#52/#56/#57)  
+**Last updated:** 2026-07-25  
 **RFC:** [self-hosted-storage-rfc.md](self-hosted-storage-rfc.md)  
 **Tracking overview:** [self-hosted-docker-auth.md](self-hosted-docker-auth.md)
 
 Collapse the earlier B0–B5 checklist into **four shippable PRs**. Prefer this document for sequencing; keep the tracking plan for Prefect mapping and docs matrix.
+
+**Prefect guides to borrow / enhance from** (structure and operator expectations, not parity claims):
+
+- [Local Prefect server (CLI)](https://docs.prefect.io/v3/how-to-guides/self-hosted/server-cli)
+- [Prefect server in Docker](https://docs.prefect.io/v3/how-to-guides/self-hosted/server-docker)
+- [Prefect Server via Docker Compose](https://docs.prefect.io/v3/how-to-guides/self-hosted/docker-compose)
+- [Secure a self-hosted Prefect server](https://docs.prefect.io/v3/advanced/security-settings)
 
 ## Non-negotiables
 
@@ -21,7 +28,7 @@ Collapse the earlier B0–B5 checklist into **four shippable PRs**. Prefer this 
 | **1 — B0** | `cursor/tier-b0-store-*` | Storage RFC + `persistence/` SQLite extract | Merged (#49) |
 | **2 — B1** | `cursor/tier-b1-postgres-*` | Postgres store + dialect adapter; Rust `bind_db` DSN + claim/lease; CI Postgres job | Merged (#52) |
 | **3 — B2** | `cursor/tier-b2-http-workers-*` | Claim / started / finished HTTP API; worker mode without file DB | Merged (#56) |
-| **4 — B3/B5** | `cursor/tier-b-compose-*` | Compose file(s), images, GHA compose smoke, GHCR docs | This PR |
+| **4 — B3/B5** | `cursor/tier-b-compose-*` | Compose file(s), images, GHA compose smoke, how-to docs | Merged (#57) |
 
 ## PR 2 detail (B1)
 
@@ -50,9 +57,8 @@ Collapse the earlier B0–B5 checklist into **four shippable PRs**. Prefer this 
 - Tests: `test_http_worker.py` (exclusivity, pool filter, lease reclaim, execute roundtrip)
 - Docs: `docs/how-to/worker-http-mode.md`, env-vars, COMPATIBILITY
 
-**Deferred**
+**Still open (follow-ups)**
 
-- Services process split (B3) and production compose (B5)
 - Removing `file` worker mode (semver major)
 
 ## PR 4 detail (B3/B5)

@@ -2,7 +2,7 @@
 
 IronFlow self-hosted security follows the **Prefect OSS subset**: optional **HTTP Basic Authentication** on `/api/*` routes. There is **no built-in RBAC**, user accounts, or API keys (those are Prefect Cloud features).
 
-**Prefect reference:** [Secure a self-hosted Prefect server](https://docs.prefect.io/v3/advanced/security-settings)
+**Prefect example to borrow from:** [Secure a self-hosted Prefect server](https://docs.prefect.io/v3/advanced/security-settings) — same Basic auth string pattern (`SERVER` vs client). IronFlow does **not** yet ship Prefect’s CSRF toggles; prefer a reverse proxy for TLS and edge auth.
 
 ## Basic authentication
 

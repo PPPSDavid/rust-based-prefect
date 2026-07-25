@@ -1,12 +1,14 @@
 # Use Postgres for the control plane (Tier B1)
 
-**Audience:** operators testing multi-process / compose prep  
+**Audience:** operators running multi-process or Compose stacks  
 **Default remains SQLite** for local zero-config.
+
+**Prefect example to borrow from:** [Local Prefect server — database](https://docs.prefect.io/v3/how-to-guides/self-hosted/server-cli) (SQLite default; Postgres for multi-process). IronFlow uses `IRONFLOW_DATABASE_URL` instead of Prefect’s asyncpg URL setting; there is no `ironflow server database upgrade` CLI yet.
 
 ## When to use it
 
-- You need a networked database shared by an API process (workers still need HTTP claim in B2).
-- You want to validate `IRONFLOW_DATABASE_URL` before shipping compose images.
+- You need a networked database for the API + services process (compose default).
+- HTTP workers still talk to the **API**, not the DB — see [HTTP workers](worker-http-mode.md).
 
 ## Setup
 
@@ -26,6 +28,6 @@ On first connect IronFlow creates the control-plane tables (flow/task runs, depl
 
 - Rust `bind_db` accepts the Postgres DSN for **claim / lease / mark started|finished / attach**.
 - Schedule ticks and most CRUD use the Python path on Postgres in this slice (sqlite-shaped SQL via an adapter).
-- File-mode workers that open the SQLite file directly are **not** a Postgres substitute — wait for HTTP workers (B2).
+- File-mode workers that open the SQLite file directly are **not** a Postgres substitute — use [HTTP workers](worker-http-mode.md) for multi-process / Compose (do not share a SQLite file with the API).
 
-See also: [self-hosted storage RFC](../plans/self-hosted-storage-rfc.md), [environment variables](../reference/env-vars.md).
+See also: [Docker Compose](docker-compose.md), [self-hosted storage RFC](../plans/self-hosted-storage-rfc.md), [environment variables](../reference/env-vars.md).

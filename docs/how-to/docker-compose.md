@@ -4,7 +4,7 @@ Production-shaped stack: **Postgres**, **API server** (no embedded worker/schedu
 **background services**, and **HTTP worker(s)**. Workers never share a filesystem
 with the server.
 
-**Prefect reference:** [Prefect Server via Docker Compose](https://docs.prefect.io/v3/how-to-guides/self-hosted/docker-compose)
+**Prefect example to borrow from:** [Prefect Server via Docker Compose](https://docs.prefect.io/v3/how-to-guides/self-hosted/docker-compose) — same **process layout** (Postgres + API without embeds + background services + worker). IronFlow does **not** include Prefect’s Redis messaging or a compose UI service yet (see [Compatibility](../compatibility.md)).
 
 For a single-container quickstart, see [Docker quickstart](docker-quickstart.md).
 

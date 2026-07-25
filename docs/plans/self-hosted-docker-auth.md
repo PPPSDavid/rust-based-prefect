@@ -1,10 +1,10 @@
 # Self-Hosted Docker & Access Control Plan (IronFlow)
 
-**Status:** Tier A + C shipped; Tier B in progress (see tier-b + storage RFC)  
-**Last updated:** 2026-07-14  
+**Status:** Tier A + C + Tier B **core** shipped (#57); deferred items remain (HA services, B4 Redis, UI image, GHCR automation, migrator CLI) — see [tier-b plan](self-hosted-docker-tier-b.md)  
+**Last updated:** 2026-07-25  
 **Scope:** `deploy/docker/`, `python-shim/`, `rust-engine/`, `frontend/`, `scripts/`, `docs/`, `COMPATIBILITY.md`  
 **User-facing docs (target):** see §13 Documentation matrix  
-**Prefect references (baseline, not parity claims):**
+**Prefect references (good examples to borrow / enhance from — not parity claims):**
 
 - [Run a local Prefect server (CLI)](https://docs.prefect.io/v3/how-to-guides/self-hosted/server-cli)
 - [Run the Prefect server in Docker](https://docs.prefect.io/v3/how-to-guides/self-hosted/server-docker)
@@ -15,20 +15,20 @@ This document is the **tracking plan** for making IronFlow a credible **self-hos
 
 ---
 
-## 1. Problem statement
+## 1. Problem statement (historical)
 
-IronFlow already supports a **split control plane / worker** model in code and docs (`docs/SELF_HOSTED_SERVER.md`, `ironflow worker start`, `IRONFLOW_ENABLE_LOCAL_WORKER=0`), but there is **no official container story** and **no API authentication**. Teams evaluating IronFlow as a faster, self-hosted Prefect alternative hit these blockers immediately:
+Before Tiers A/C/B, IronFlow had a split control plane / worker model in code (`docs/SELF_HOSTED_SERVER.md`, `ironflow worker start`) but **no official container story**, **no API authentication**, and workers that claimed only via **shared SQLite/JSONL**. Those blockers motivated this plan.
 
-| Gap | Impact |
+| Original gap | Status after #57 |
 | --- | --- |
-| No Dockerfiles / published images | Cannot deploy without bespoke scripting |
-| Server binds `127.0.0.1` by default | Broken inside containers without manual flags |
-| UI is a separate Vite app with hardcoded API origin | Extra compose service + proxy config |
-| Workers claim runs via **shared SQLite/JSONL**, not HTTP | Multi-host workers require shared filesystem (unlike Prefect compose) |
-| No auth on `/api/*` | Unacceptable for any shared network |
-| No Postgres / Redis path | Cannot scale API or match Prefect multi-worker mode |
+| No Dockerfiles / published images | **Shipped** — `deploy/docker/Dockerfile.*` (+ GHCR publish automation still deferred) |
+| Server binds `127.0.0.1` by default | **Shipped** — container `CMD` uses `0.0.0.0:8000` |
+| UI separate / hardcoded API origin | **Remaining** — Vite UI exists; not a first-class compose service yet |
+| Workers claim via shared SQLite only | **Shipped** — `IRONFLOW_WORKER_MODE=http` (+ file mode kept for local/dev) |
+| No auth on `/api/*` | **Shipped** — Basic auth (`IRONFLOW_*_AUTH_STRING`) |
+| No Postgres / Redis path | **Postgres shipped**; **Redis deferred** (B4) |
 
-**Goal:** Ship **Tier A** and **Tier C** quickly for a secured single-container dev path, then deliver **Tier B** as the full production-compose track — including **technical pre-steps** (network DB, HTTP workers, services split) before the Prefect-shaped `docker compose` stack.
+**Goal (met for core):** Tier A + C + Tier B production-shaped compose (Postgres + API + services + HTTP workers). Follow-ups: HA services leader election, Alembic-style migrator CLI, Redis/multi-worker API, UI image, GHCR automation.
 
 ---
 
@@ -36,26 +36,27 @@ IronFlow already supports a **split control plane / worker** model in code and d
 
 | Piece | Location | Notes |
 | --- | --- | --- |
-| API server | `python-shim/src/prefect_compat/server.py` | FastAPI; embedded scheduler + optional embedded worker on startup |
-| Scheduler | Same process (thread or Rust background) | `deployment_maintenance_tick()` |
-| Standalone worker | `ironflow worker start` / `ironflow serve` | Opens `InMemoryControlPlane` at `IRONFLOW_HISTORY_PATH`; **claims via SQLite**, not HTTP |
+| API server | `python-shim/src/prefect_compat/server.py` | FastAPI; embedded scheduler + optional embedded worker on startup (dev). Compose disables embeds. |
+| Background services | `ironflow server services start` (`prefect_compat.services`) | Schedule ticks / lease reclaim when API has embeds off |
+| Standalone worker | `ironflow worker start` / `ironflow serve` | **`file`** mode: shared history/SQLite. **`http`** mode: claim API only (compose / multi-host) |
 | Deploy CLI | `ironflow deploy` | HTTP to API (`DeployClient`) |
-| Persistence | JSONL + SQLite sidecar | Path from `IRONFLOW_HISTORY_PATH` (default `data/ironflow_history.jsonl`) |
+| Persistence | JSONL + SQLite **or** Postgres | `IRONFLOW_HISTORY_PATH` (file default); `IRONFLOW_DATABASE_URL` for Postgres |
 | Native engine | Bundled in PyPI wheel `ironflow-prefect-compat` | Prefer wheel-based images over repo clone |
+| Compose | `deploy/docker/compose.yml` | Postgres + API + services + HTTP worker; GHA smoke |
 | Launcher | `scripts/ironflow_server.py` | Dev helper; starts uvicorn + optional Vite |
 
-**Key constraint (today):** Server and standalone workers share a **local SQLite file** derived from `IRONFLOW_HISTORY_PATH`. Workers **claim via direct DB access**, not HTTP. Tier **B** removes this constraint; until B5 lands, only **B-fast** (shared volume) is available for split containers.
+**Dev vs production:** File/SQLite + embedded worker remains the fast local path. Production-shaped compose uses Postgres + HTTP workers + a dedicated services process — no shared worker filesystem (Prefect compose-shaped; Redis still deferred).
 
 ---
 
 ## 3. Prefect mapping (what we match vs defer)
 
-| Prefect doc tier | Prefect behavior | IronFlow target |
+| Prefect doc tier | Prefect behavior | IronFlow status |
 | --- | --- | --- |
-| **Minimal Docker** ([server-docker](https://docs.prefect.io/v3/how-to-guides/self-hosted/server-docker)) | Single `prefecthq/prefect:3-latest` container, `--host 0.0.0.0`, UI on 4200 | **Tier A** — single `ironflow/server` image, API on 8000, optional bundled UI or separate static image |
-| **Docker Compose** ([docker-compose](https://docs.prefect.io/v3/how-to-guides/self-hosted/docker-compose)) | Postgres + Redis + server + services + **HTTP worker** | **Tier B** — pre-steps (B0–B4) then production compose (B5); optional **B-fast** interim shared-volume compose |
-| **Server CLI** ([server-cli](https://docs.prefect.io/v3/how-to-guides/self-hosted/server-cli)) | SQLite default; Postgres + Redis for `--workers N` | **Tier B0–B1** for DB; document `ironflow server database upgrade` in B1 |
-| **Security** ([security-settings](https://docs.prefect.io/v3/advanced/security-settings)) | `PREFECT_SERVER_API_AUTH_STRING` / `PREFECT_API_AUTH_STRING`; no OSS RBAC | **Tier C** — mirror env var names with `IRONFLOW_*` prefix |
+| **Minimal Docker** ([server-docker](https://docs.prefect.io/v3/how-to-guides/self-hosted/server-docker)) | Single `prefecthq/prefect:3-latest` container, `--host 0.0.0.0`, UI on 4200 | **Tier A shipped** — `Dockerfile.server`, API on 8000; UI not bundled in that image |
+| **Docker Compose** ([docker-compose](https://docs.prefect.io/v3/how-to-guides/self-hosted/docker-compose)) | Postgres + Redis + server + services + **HTTP worker** | **Tier B core shipped (#57)** — Postgres + API + services + HTTP worker; Redis / UI image / HA deferred; B-fast skipped |
+| **Server CLI** ([server-cli](https://docs.prefect.io/v3/how-to-guides/self-hosted/server-cli)) | SQLite default; Postgres + Redis for `--workers N` | **B0–B1 shipped** — SQLite default, Postgres via `IRONFLOW_DATABASE_URL`; `ironflow server database upgrade` still deferred; no `--workers N` / Redis yet |
+| **Security** ([security-settings](https://docs.prefect.io/v3/advanced/security-settings)) | `PREFECT_SERVER_API_AUTH_STRING` / `PREFECT_API_AUTH_STRING`; no OSS RBAC | **Tier C shipped** — `IRONFLOW_*` Basic auth; CSRF deferred |
 
 **Explicit non-goals (this plan):**
 
@@ -307,32 +308,30 @@ Parallel (optional, labeled interim):
 
 **Recommended first PR:** Tier **A + C1/C2** (secured single-container server).
 
-**Recommended first Tier B PR:** **B0 RFC + B0.2 storage interface refactor** (no user-visible behavior change).
-
-**Tier B is “complete” when B5 smoke passes** — not when B-fast alone works.
+**Tier B core is complete** — B5 compose smoke passes (#57). B-fast was skipped.
 
 ---
 
 ## 7. Acceptance criteria (plan complete)
 
-The plan is **done** when:
+**Core done (shipped):**
 
 **Tier A + C**
-- [ ] Official server Docker image + `docs/how-to/docker-quickstart.md`
-- [ ] `IRONFLOW_SERVER_API_AUTH_STRING` / `IRONFLOW_API_AUTH_STRING` implemented and tested
-- [ ] `docs/how-to/secure-self-hosted.md` covers basic auth + reverse-proxy OIDC
+- [x] Official server Docker image + `docs/how-to/docker-quickstart.md`
+- [x] `IRONFLOW_SERVER_API_AUTH_STRING` / `IRONFLOW_API_AUTH_STRING` implemented and tested
+- [x] `docs/how-to/secure-self-hosted.md` covers basic auth + reverse-proxy notes
 
-**Tier B (production compose)**
-- [ ] B0 RFC approved; storage abstraction merged
-- [ ] Postgres backend + `ironflow server database upgrade` + migration tests in CI
-- [ ] HTTP worker mode default in containers; file mode documented as dev-only
-- [ ] `ironflow server services start` (or equivalent) with single-leader scheduler
-- [ ] `deploy/docker/compose.yml` (B5) with postgres + server + services + worker (+ optional ui)
-- [ ] No shared filesystem required between workers and server
-- [ ] `scripts/docker_compose_smoke.sh` passes against B5 stack
-- [ ] Documentation matrix (§13) rows landed
+**Tier B (production compose core)**
+- [x] B0 RFC approved; storage abstraction merged (#49)
+- [x] Postgres backend + Rust claim bind + CI Postgres job (#52) — *schema auto-creates; Alembic-style upgrade CLI deferred*
+- [x] HTTP worker mode in containers; file mode documented as local/dev (#56)
+- [x] `ironflow server services start` (#57) — *single replica; HA advisory lock deferred*
+- [x] `deploy/docker/compose.yml` with postgres + server + services + worker (#57) — *optional UI not in compose*
+- [x] No shared filesystem required between workers and server
+- [x] `scripts/docker_compose_smoke.sh` + GHA workflow against compose stack
+- [x] Documentation matrix (§13) how-to rows landed (status polish in this docs PR)
 
-**Explicitly not required for plan complete:** B4 Redis, Helm chart, Prefect Cloud RBAC
+**Explicitly not required for core complete:** B4 Redis, multi-worker uvicorn, HA services leader election, `ironflow server database upgrade` / file→Postgres migrator, compose UI image, GHCR publish automation, Helm, Prefect Cloud RBAC.
 
 ---
 
@@ -367,16 +366,15 @@ curl -sf http://127.0.0.1:8000/health
 **Tier B5 compose:**
 
 ```bash
-docker compose -f deploy/docker/compose.yml up -d
-docker compose exec server ironflow server database upgrade -y
 bash scripts/docker_compose_smoke.sh
-docker compose -f deploy/docker/compose.yml down
+# or interactively:
+# docker compose -f deploy/docker/compose.yml up --build
 ```
 
 **Tier B1 Postgres (CI / local):**
 
 ```bash
-docker compose -f deploy/docker/compose.postgres.yml up -d
+# Prefer GHA `services.postgres` / local Postgres 16+; tables are created on first connect.
 IRONFLOW_DATABASE_URL=postgresql://ironflow:ironflow@localhost:5432/ironflow \
   uv run pytest python-shim/tests/test_postgres_store.py
 ```
@@ -401,16 +399,16 @@ cargo test --manifest-path rust-engine/Cargo.toml
 
 | PR / branch | Tier | Status | Notes |
 | --- | --- | --- | --- |
-| `cursor/self-hosted-docker-auth-plan-b5da` | — | Plan doc | PR #45 |
-| `cursor/docker-tier-a-c-b5da` | A, C | In progress | Server image + basic auth |
-| *(this PR / B0)* | B0 | In progress | RFC + SQLite persistence extract |
-| *(pending)* | B1 | Not started | Postgres + Rust bind + migrations |
-| *(pending)* | B2 | Merged (#56) | HTTP worker protocol |
-| *(pending)* | B3/B5 | In flight | Services split + compose stack |
-| *(pending)* | B4 | Not started | Redis / multi-worker API (optional) |
-| *(pending)* | B-fast | Not started | Interim shared-volume compose (optional) |
+| `cursor/self-hosted-docker-auth-plan-b5da` | — | Merged | Plan doc (#45) |
+| `cursor/docker-tier-a-c-b5da` | A, C | Merged | Server image + basic auth |
+| B0 | B0 | Merged (#49) | RFC + SQLite persistence extract |
+| B1 | B1 | Merged (#52) | Postgres + Rust claim bind (migrator CLI still deferred) |
+| B2 | B2 | Merged (#56) | HTTP worker protocol |
+| B3/B5 | B3/B5 | Merged (#57) | Services split + compose stack + GHA smoke |
+| *(follow-up)* | B4 | Not started | Redis / multi-worker API (optional) |
+| *(skipped)* | B-fast | Skipped | Prefer HTTP-worker compose over shared-volume interim |
 
-Update this table as work lands.
+Update this table as follow-up work lands.
 
 ---
 
@@ -424,16 +422,15 @@ See **§13 Documentation matrix** for the full checklist. Minimum cross-links:
 
 ---
 
-## 12. Open questions
+## 12. Open questions (remaining)
+
+**Resolved:** B-fast skipped; Rust `bind_db` accepts Postgres DSN for claim/lease; workers use HTTP in compose (no shared DB volume); JSONL remains optional file-mode sidecar.
+
+**Still open:**
 
 1. **GHCR vs Docker Hub** — default publish registry for official images?
-2. **Embed UI in server image** — nginx sidecar in server container vs always-separate `Dockerfile.ui`?
-3. **JSONL fate** — keep as audit log alongside Postgres, or drop after B1?
-4. **Rust Postgres vs HTTP-only workers** — does `rust-engine` connect to Postgres directly, or only server Python + HTTP for workers? (RFC B0)
-5. **B-fast** — ship at all, or skip straight to B5 pre-steps?
-6. **Helm chart** — community contribution or first-party after B5 stabilizes?
-
-Resolve in B0 RFC; do not block Tier A on these.
+2. **Embed UI in server image** — nginx sidecar vs always-separate `Dockerfile.ui`?
+3. **Helm chart** — community contribution or first-party after compose stabilizes?
 
 ---
 
