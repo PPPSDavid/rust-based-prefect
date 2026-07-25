@@ -61,3 +61,9 @@ Fresh runs never auto-hit. Cache hits do not re-fire `transition_hooks`. This is
 ## Transition hooks
 
 Tasks accept the same **`transition_hooks`** mechanism as flows: **`TransitionHookSpec`** + **`on_transition`**, with optional **`from_state`** / **`to_state`** filters. See **[Flows](flows.md)** and the compatibility matrix for behavior and differences from Prefect’s hook names.
+
+## Runtime context and logging
+
+Use **`get_run_context()`** / **`get_run_logger()`** inside task bodies the same way as in flows. When the task runs in-process (sequential / thread submit or thread map), `RunContext.task_run_id` / `task_name` are set and logger rows associate to that task run.
+
+Process-pool mapped bodies do **not** inherit ContextVars — prefer logging from the coordinating flow thread, or use thread/sequential runners when you need task-scoped logs.

@@ -35,3 +35,28 @@ Flows support **`transition_hooks`**: a sequence of **`TransitionHookSpec`** val
 Hooks run **after** a successful control-plane transition, **in process**, without holding the control-plane lock. They are **not** the same API names as Prefect’s `on_running` / `on_failure` hooks; map your logic to explicit **edges** (for example `PENDING` → `RUNNING`). For full semantics (including the batched start path and error handling), see **[Compatibility matrix](../compatibility.md)**.
 
 Relevant exports: `TransitionHookSpec`, `on_transition`, `TransitionContext` from `prefect_compat`.
+
+## Runtime context and logging
+
+Inside an active flow (or task) body:
+
+```python
+from prefect_compat import get_run_context, get_run_logger
+
+@flow
+def pipeline(n: int) -> int:
+    ctx = get_run_context()  # flow_run_id, flow_name, parameters, …
+    log = get_run_logger()
+    log.info("starting with n=%s run=%s", n, ctx.flow_run_id)
+    return n
+```
+
+`get_run_logger()` messages appear under **`GET /api/flow-runs/{id}/logs`** and the UI Logs tab. Outside a run, the logger writes to stderr and does not persist. See **[Tasks](tasks.md)** for task-scoped association.
+
+## Operator pause / cancel (subset)
+
+- **Cancel** — `POST /api/flow-runs/{id}/cancel` (always terminate semantics for the control plane).
+- **Pause** — `POST /api/flow-runs/{id}/pause` with required JSON `{"mode": "drain"}` or `{"mode": "terminate"}` (no ambiguous default).
+- **Resume** — `POST /api/flow-runs/{id}/resume` for operator pauses only (gate waits are different).
+
+`drain` lets in-flight tasks finish then holds `PAUSED`; further `submit` in the same in-process body raises `FlowRunSchedulingHeld`. `terminate` cancels RUNNING task rows (late `COMPLETED` is fenced) and holds `PAUSED`, but does **not** OS-kill thread-pool bodies yet. Resume does not re-enter an already-exited `@flow()` body — if a result was stored, resume completes the run. See **[lifecycle plan](../plans/flow-run-lifecycle-control.md)**.

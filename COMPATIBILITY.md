@@ -39,14 +39,18 @@ Maintainers should use `docs/compatibility_review_workflow.md` before changing t
   - **Flow-run final state (IronFlow extension):** default `@flow(final_state="wait_all")` waits for all non-detached task / gate / subflow children, then resolves the flow terminal state in **Rust** (`resolve_flow_terminal_state`: `CANCELLED` > `FAILED` > all `COMPLETED`). Unobserved failed concurrent `submit`s fail the flow (`FlowChildrenFailed`). Escape hatches: `submit(..., detach=True)` and `@flow(final_state="explicit")` (body return/exception remains authoritative). Not Prefect return-value / `State`-object finalization.
   - **Temporal gate tasks (IronFlow extension):** `gate(name=..., max_wait=...)` inside an active `@flow`; call `.submit(until=datetime | after=timedelta, wait_for=[...])` to insert a **zero-op barrier** task (`kind=gate`, real task-run UUID) that blocks downstream `wait_for` until `open_at`. Default **`max_wait`** safeguard is **`timedelta(days=1)`** (Python definitional default; override per gate). While waiting, the flow run may enter **`PAUSED`**; gate promotion ticks prefer **Rust** (`task_tick_gate_tasks` / bundled in `deployment_maintenance`) with Python fallback. UI: DAG node kind **`gate_task`** with `gate_open_at`. Not Prefect API parity — Prefect has no first-class in-flow calendar gate.
   - **Task resume / result persist (subset):** On flow-run **resume** (deployment retry sets `resume_from_flow_run_id`, or in-process `prepare_resume`), IronFlow may skip `COMPLETED` DAG nodes keyed by `(resume_lineage_id, planned_node_id, map_index, input_fingerprint)` when (a) the prior return was `None` (auto marker), or (b) `@task(persist_result=True)` stored a **JSON-safe** payload (bool/int/float/str/list/dict, size-capped). Resume skips require **matching flow/deployment parameters** and **matching JSON-safe submit/`map` inputs**; otherwise the node recomputes. Applies to `submit` and `map` (thread/process included). Non-persisted non-`None` results recompute. Cache hits advance task FSM events but do **not** re-fire `transition_hooks`. Fresh runs never auto-hit. UI shows persisted results on the Task Runs / Artifacts tabs. Not Prefect `cache_policy` parity; no cross-flow cache by default. User guide: **`docs/how-to/task-resume-and-persist.md`**. Design: `docs/plans/task-result-cache.md`.
+  - **Runtime context (subset):** `get_run_context()` → frozen `RunContext` (`flow_run_id`, `flow_name`, optional `task_run_id` / `task_name`, deployment fields when claimed, bound flow `parameters`). Raises `MissingContextError` outside an active `@flow`.
+  - **Run logging (subset):** `get_run_logger()` returns a stdlib logger that appends to control-plane log rows (`GET /api/flow-runs/{id}/logs` + UI Logs tab) with flow/task association. Outside a run, messages go to stderr (not persisted). `log_prints=` is not yet supported. Process-isolated task workers do not inherit ContextVars for task-scoped logs.
+  - **Operator lifecycle control (subset):** `POST /api/flow-runs/{id}/pause` requires explicit `mode=drain|terminate` (`InterruptMode`) from `SCHEDULED|PENDING|RUNNING` only (not gate-only `PAUSED`); `POST …/resume` resumes operator pauses only. Cancel records `lifecycle_action=cancel` / `interrupt_mode=terminate`. **Drain** blocks new task starts and settles to `PAUSED` when in-flight tasks finish; in-process `@flow()` bodies that try to submit after the hold raise `FlowRunSchedulingHeld` (not marked `FAILED`). **Terminate** pause cancels RUNNING task rows via the task FSM and fences late `COMPLETED` if the body still returns — **process kill of blind `sleep` is not guaranteed** until process-worker terminate (P3.2c). In-process resume completes the run when a result was already stored and no non-terminal tasks remain (does not re-enter the Python flow body). Design: `docs/plans/flow-run-lifecycle-control.md`.
 - Not yet supported (open gaps — not parity claims):
   - full API parity for every Prefect state rule edge case.
   - Prefect `SubflowTask` / `run_deployment` name parity, automatic deployment creation from `@flow`, or subflow parameter schema validation beyond deployment defaults.
   - Opt-in **cross-run** result cache (Goal B); Goal A resume-within-lineage is supported above.
-  - Prefect-shaped logging helpers (`get_run_logger`, `log_prints`); log list/API/UI show control-plane-inserted rows only (not stdlib `logging` / `print`).
-  - Cooperative cancel of long-running task bodies (control-plane cancel is recorded; bodies must poll unless instrumented).
+  - `@flow(log_prints=True)` / `@task(log_prints=True)` print capture.
+  - **Hard terminate** of running task bodies (process worker registry + SIGTERM/SIGKILL); cancel/terminate pause today update control-plane state — thread-pool bodies may continue until they exit unless they poll cancel helpers.
+  - UI pause chooser / lifecycle badges; CLI pause helpers.
   - User-facing artifacts API (`create_markdown` / tables); internal result artifact rows + GET APIs only.
-  - Variables JSON store; settings/profiles module; runtime-context module parity.
+  - Variables JSON store; settings/profiles module.
   - Events → automations / webhooks engine (events + SSE exist; no trigger actions).
   - Async `concurrency` / `rate_limit` helpers, CLI `ironflow gcl` parity, UI concurrency admin page, work-queue / work-pool concurrency.
   - Advanced RRule calendar filters / `COUNT`.
@@ -54,7 +58,7 @@ Maintainers should use `docs/compatibility_review_workflow.md` before changing t
   - advanced cloud/tenant features (RBAC, SSO, workspaces).
   - all blocks, secrets managers, and integration packs.
   - `task.delay()` background tasks; Dask/Ray runners; non-process work pool types.
-  - human-in-the-loop pause/input (temporal `gate` is a different, deliberate mechanism).
+  - human-in-the-loop pause/input forms (temporal `gate` and operator `drain`/`terminate` pause are different mechanisms).
 
 ## Phase 2 static planning compatibility
 
