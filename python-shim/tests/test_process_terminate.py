@@ -30,7 +30,10 @@ def _plane(tmp_path: Path) -> InMemoryControlPlane:
 
 
 def _wait_for_registered_worker(
-    plane: InMemoryControlPlane, *, timeout: float = 10.0
+    plane: InMemoryControlPlane,
+    *,
+    task_name: str | None = None,
+    timeout: float = 10.0,
 ) -> FlowRunRecord:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -38,9 +41,20 @@ def _wait_for_registered_worker(
         if run is not None:
             workers = task_process_registry().snapshot_for_flow(run.run_id)
             if workers:
-                return run
+                if task_name is None:
+                    return run
+                page = plane.list_task_runs(run.run_id, limit=50)
+                if any(
+                    t.get("task_name") == task_name and t.get("state") == "RUNNING"
+                    for t in page.items
+                ):
+                    return run
         time.sleep(0.05)
-    raise AssertionError("expected a registered child process before timeout")
+    raise AssertionError(
+        "expected a registered child process"
+        + (f" for task {task_name!r}" if task_name else "")
+        + " before timeout"
+    )
 
 
 def test_cancel_kills_blind_sleep_process(tmp_path: Path) -> None:
@@ -86,11 +100,15 @@ def test_terminate_pause_then_prepare_resume_reruns_interrupted(tmp_path: Path) 
 
     first = task(return_none, persist_result=True)
     sleepy = task(blind_sleep)
+    # Keep flow parameters identical across attempts (resume fingerprint); vary
+    # only the sleepy task input via a non-parameter holder.
+    sleep_s = [60.0]
 
+    # Same flow callable for both attempts so planned_node_id lineage matches.
     @flow(name="term-resume", task_runner=ProcessPoolTaskRunner(max_workers=1))
     def pipeline() -> str:
         first.submit(1).result()
-        return sleepy.submit(60.0).result()
+        return sleepy.submit(sleep_s[0]).result()
 
     def _run() -> None:
         try:
@@ -100,8 +118,14 @@ def test_terminate_pause_then_prepare_resume_reruns_interrupted(tmp_path: Path) 
 
     thread = threading.Thread(target=_run, daemon=True)
     thread.start()
-    run = _wait_for_registered_worker(plane)
+    # Wait until blind_sleep is running (return_none must already be COMPLETED).
+    run = _wait_for_registered_worker(plane, task_name="blind_sleep")
     assert run is not None
+    prior_tasks = plane.list_task_runs(run.run_id, limit=50).items
+    assert any(
+        t.get("task_name") == "return_none" and t.get("state") == "COMPLETED"
+        for t in prior_tasks
+    )
 
     paused = plane.pause_flow_run(run.run_id, mode="terminate")
     assert paused["state"] == "PAUSED"
@@ -116,20 +140,26 @@ def test_terminate_pause_then_prepare_resume_reruns_interrupted(tmp_path: Path) 
     assert plane.get_flow(run.run_id).state == RunState.CANCELLED
     assert resumed["state"] == "CANCELLED"
 
-    @flow(name="term-resume", task_runner=ProcessPoolTaskRunner(max_workers=1))
-    def pipeline2() -> str:
-        first.submit(1).result()
-        # Short sleep on retry so the test finishes (different input → must recompute).
-        return sleepy.submit(0.2).result()
-
-    assert pipeline2() == "awake"
+    # Short sleep on retry (different task input → must recompute); first task cache-hits.
+    sleep_s[0] = 0.2
+    assert pipeline() == "awake"
     new_run = plane.latest_flow()
     assert new_run is not None
     assert new_run.run_id != run.run_id
     assert new_run.state == RunState.COMPLETED
     assert plane.get_flow(run.run_id).state == RunState.CANCELLED
-    # Cache hit on the None-returning first task.
+    # Cache hit on the None-returning first task (explicit event flag).
     page = plane.list_task_runs(new_run.run_id, limit=50)
     first_rows = [t for t in page.items if t.get("task_name") == "return_none"]
     assert first_rows
     assert any(t.get("state") == "COMPLETED" for t in first_rows)
+    first_ids = {str(t["id"]) for t in first_rows}
+    events = plane.list_events(new_run.run_id, limit=200).items
+    cache_hits = [
+        e
+        for e in events
+        if e.get("event_type") == "task_completed"
+        and str(e.get("task_run_id")) in first_ids
+        and (e.get("data") or {}).get("cache_hit") is True
+    ]
+    assert cache_hits, "expected task_completed event with cache_hit=True"

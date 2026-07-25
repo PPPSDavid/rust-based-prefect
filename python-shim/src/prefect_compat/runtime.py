@@ -43,6 +43,7 @@ RustQueryBridge: Any = _RustQueryBridge
 RustFsmBridge: Any = _RustFsmBridge
 
 SUBFLOW_MAX_DEPTH = 32
+_LIFECYCLE_LOG = logging.getLogger("ironflow.lifecycle")
 
 
 class RunState(StrEnum):
@@ -3297,6 +3298,9 @@ class InMemoryControlPlane:
         life = self._lifecycle_by_flow.get(str(flow_run_id))
         if not life:
             return False
+        # Cancel holds immediately while terminate settles (same race as pause).
+        if life.get("lifecycle_action") == "cancel":
+            return True
         if life.get("lifecycle_action") != "pause":
             return False
         if life.get("pause_drain_pending"):
@@ -3396,6 +3400,12 @@ class InMemoryControlPlane:
                         task.state = RunState.CANCELLED
                         self._update_task_row(task)
         killed = task_process_registry().terminate_flow_workers(flow_run_id)
+        if not killed and running_ids:
+            _LIFECYCLE_LOG.warning(
+                "terminate pause flow %s: no registered process workers; "
+                "in-flight thread bodies are cooperative-only",
+                flow_run_id,
+            )
         try:
             self.set_flow_state(
                 flow_run_id, RunState.PAUSED, uuid4(), "operator_pause_terminate"
@@ -3619,27 +3629,40 @@ class InMemoryControlPlane:
 
         from .process_workers import task_process_registry
 
-        # Fence late COMPLETED before SIGTERM/SIGKILL so the parent wait loop
-        # cannot race a successful result into COMPLETED.
-        now = self._now()
+        # Fence late COMPLETED via task FSM events before SIGTERM/SIGKILL.
+        cancellable = {
+            RunState.SCHEDULED,
+            RunState.PENDING,
+            RunState.RUNNING,
+        }
         with self._lock:
-            self._sqlite_conn.execute(
-                """
-                UPDATE task_runs
-                SET state = 'CANCELLED', updated_at = ?
-                WHERE flow_run_id = ? AND state IN ('SCHEDULED','PENDING','RUNNING')
-                """,
-                [now, str(flow_run_id)],
-            )
-            for task in self._tasks.values():
-                if str(task.flow_run_id) == str(flow_run_id) and task.state.value in {
-                    "SCHEDULED",
-                    "PENDING",
-                    "RUNNING",
-                }:
-                    task.state = RunState.CANCELLED
+            task_ids = [
+                tid
+                for tid, task in self._tasks.items()
+                if str(task.flow_run_id) == str(flow_run_id)
+                and task.state in cancellable
+            ]
+        for tid in task_ids:
+            try:
+                self.record_task_event(
+                    tid,
+                    "task_cancelled",
+                    {"interrupt_reason": "terminated_by_cancel"},
+                )
+            except Exception:
+                with self._lock:
+                    task = self._tasks.get(tid)
+                    if task and task.state in cancellable:
+                        task.state = RunState.CANCELLED
+                        self._update_task_row(task)
 
         killed = task_process_registry().terminate_flow_workers(flow_run_id)
+        if not killed and task_ids:
+            _LIFECYCLE_LOG.warning(
+                "cancel flow %s: no registered process workers; "
+                "in-flight thread bodies are cooperative-only",
+                flow_run_id,
+            )
 
         token = uuid4()
         try:

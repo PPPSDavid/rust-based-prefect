@@ -632,6 +632,7 @@ class TaskWrapper:
         to_run: list[tuple[TaskRunRecord | None, Any, int, str | None]],
         exc: Exception,
     ) -> None:
+        cancelled_by_kill = isinstance(exc, ProcessWorkerTerminated)
         for task_run, _v, _index, _fp in to_run:
             if task_run is None:
                 continue
@@ -640,6 +641,19 @@ class TaskWrapper:
             except Exception:
                 st = None
             if st not in (RunState.RUNNING, RunState.PENDING):
+                continue
+            if cancelled_by_kill:
+                try:
+                    _CONTROL_PLANE.record_task_event(
+                        task_run.task_run_id,
+                        "task_cancelled",
+                        {
+                            "task_name": self.name,
+                            "interrupt_reason": "process_terminated",
+                        },
+                    )
+                except Exception:
+                    pass
                 continue
             _CONTROL_PLANE.record_task_event(
                 task_run.task_run_id,
@@ -747,7 +761,12 @@ class TaskWrapper:
         wait_for: list[TaskFuture[Any] | SubflowFuture[Any] | GateFuture[Any]] | None,
         runner: ProcessPoolTaskRunner,
     ) -> list[TaskFuture[T]]:
-        """Map via child processes; task body must be picklable (single positional arg per value)."""
+        """Map via registered child processes (parallel up to ``max_workers``).
+
+        A thread-pool orchestrator waits on each registered process so cancel /
+        terminate can SIGTERM→SIGKILL in-flight map items. Task body must be
+        picklable (single positional arg per value).
+        """
         if wait_for:
             wait(wait_for)
         if not vals:
@@ -756,64 +775,84 @@ class TaskWrapper:
         if not to_run:
             return [f for f in futures if f is not None]
         fn = self.fn
-        outs: list[Any] = []
-        try:
-            for task_run, v, _index, _fp in to_run:
-                lease_ids: list[str] = []
-                if task_run is not None and self.tags:
-                    from .concurrency import (
-                        ConcurrencyLimitError,
-                        acquire_tag_slots_for_task,
-                    )
+        mx = min(len(to_run), runner.resolve_max_workers())
 
-                    try:
-                        lease_ids = acquire_tag_slots_for_task(
-                            self.tags,
-                            task_run_id=str(task_run.task_run_id),
-                            plane=_CONTROL_PLANE,
-                        )
-                    except ConcurrencyLimitError:
-                        _CONTROL_PLANE.record_task_event(
-                            task_run.task_run_id,
-                            "task_cancelled",
-                            {
-                                "task_name": self.name,
-                                "error": "tag concurrency limit denied (limit=0)",
-                            },
-                        )
-                        raise
-                    _CONTROL_PLANE.record_task_event(
-                        task_run.task_run_id, "task_running", None
-                    )
-                    th = self._transition_hooks
-                    if th:
-                        _emit_task_single_hook_edge(
-                            th,
-                            task_run,
-                            self.name,
-                            RunState.PENDING,
-                            RunState.RUNNING,
-                            "task_running",
-                            None,
-                        )
+        def _one(item: tuple[TaskRunRecord | None, Any, int, str | None]) -> Any:
+            task_run, v, _index, _fp = item
+            lease_ids: list[str] = []
+            if task_run is not None and self.tags:
+                from .concurrency import (
+                    ConcurrencyLimitError,
+                    acquire_tag_slots_for_task,
+                )
+
                 try:
-                    if task_run is None:
-                        outs.append(fn(v))
-                    else:
-                        # One registered process per item for terminate/cancel kill.
-                        outs.append(
-                            run_in_registered_process(
-                                flow_run_id=task_run.flow_run_id,
-                                task_run_id=task_run.task_run_id,
-                                fn=fn,
-                                args=(v,),
+                    lease_ids = acquire_tag_slots_for_task(
+                        self.tags,
+                        task_run_id=str(task_run.task_run_id),
+                        plane=_CONTROL_PLANE,
+                    )
+                except ConcurrencyLimitError:
+                    _CONTROL_PLANE.record_task_event(
+                        task_run.task_run_id,
+                        "task_cancelled",
+                        {
+                            "task_name": self.name,
+                            "error": "tag concurrency limit denied (limit=0)",
+                        },
+                    )
+                    raise
+                _CONTROL_PLANE.record_task_event(
+                    task_run.task_run_id, "task_running", None
+                )
+                th = self._transition_hooks
+                if th:
+                    _emit_task_single_hook_edge(
+                        th,
+                        task_run,
+                        self.name,
+                        RunState.PENDING,
+                        RunState.RUNNING,
+                        "task_running",
+                        None,
+                    )
+            try:
+                if task_run is None:
+                    return fn(v)
+                try:
+                    return run_in_registered_process(
+                        flow_run_id=task_run.flow_run_id,
+                        task_run_id=task_run.task_run_id,
+                        fn=fn,
+                        args=(v,),
+                    )
+                except ProcessWorkerTerminated:
+                    try:
+                        st = _CONTROL_PLANE.get_task_run(task_run.task_run_id).state
+                    except Exception:
+                        st = None
+                    if st in (RunState.RUNNING, RunState.PENDING):
+                        try:
+                            _CONTROL_PLANE.record_task_event(
+                                task_run.task_run_id,
+                                "task_cancelled",
+                                {
+                                    "task_name": self.name,
+                                    "interrupt_reason": "process_terminated",
+                                },
                             )
-                        )
-                finally:
-                    self._release_tag_leases(lease_ids)
-        except Exception as exc:
-            self._fail_map_task_runs(to_run, exc)
-            raise
+                        except Exception:
+                            pass
+                    raise
+            finally:
+                self._release_tag_leases(lease_ids)
+
+        with ThreadPoolExecutor(max_workers=mx) as pool:
+            try:
+                outs = list(pool.map(_one, to_run))
+            except Exception as exc:
+                self._fail_map_task_runs(to_run, exc)
+                raise
         return self._finalize_map_task_runs(to_run, outs, futures)
 
 

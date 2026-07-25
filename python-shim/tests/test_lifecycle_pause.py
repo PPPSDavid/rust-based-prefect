@@ -210,6 +210,13 @@ def test_cancel_sets_terminate_lifecycle(tmp_path: Path) -> None:
     assert detail["state"] == "CANCELLED"
     assert detail["lifecycle_action"] == "cancel"
     assert detail["interrupt_mode"] == "terminate"
+    # Cancel goes through task FSM events (not a silent bulk SQL flip).
+    events = plane.list_events(run.run_id, limit=200).items
+    assert any(
+        e.get("event_type") == "task_cancelled"
+        and (e.get("data") or {}).get("interrupt_reason") == "terminated_by_cancel"
+        for e in events
+    )
     release.set()
     thread.join(timeout=5)
 

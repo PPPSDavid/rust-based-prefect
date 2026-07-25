@@ -82,6 +82,11 @@ class TaskProcessRegistry:
                 if str(e.flow_run_id) == str(flow_run_id)
             ]
 
+    def clear(self) -> None:
+        """Drop all registry entries (test isolation). Does not kill processes."""
+        with self._lock:
+            self._by_task.clear()
+
     def terminate_flow_workers(
         self, flow_run_id: UUID, *, grace_seconds: float | None = None
     ) -> list[str]:
