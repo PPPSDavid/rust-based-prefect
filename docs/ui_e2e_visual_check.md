@@ -10,7 +10,7 @@ Use this checklist to quickly verify the full backend-to-UI path.
 Start both with:
 
 ```bash
-python scripts/ironflow_server.py start
+python scripts/flowoxide_server.py start
 ```
 
 ## 1) Seed test runs

@@ -1,6 +1,6 @@
 # How to use concurrency limits
 
-IronFlow supports Prefect-style **global concurrency limits** (named slots) and **tag-based task limits**. Both share one Rust-backed SQLite slot ledger. Deployment concurrency (`concurrency_limit` on a deployment) is separate — it only caps concurrent **deployment runs**.
+FlowOxide supports Prefect-style **global concurrency limits** (named slots) and **tag-based task limits**. Both share one Rust-backed SQLite slot ledger. Deployment concurrency (`concurrency_limit` on a deployment) is separate — it only caps concurrent **deployment runs**.
 
 Normative scope: **[Compatibility matrix](../compatibility.md)** · Design notes: **[`docs/plans/concurrency-limits.md`](../plans/concurrency-limits.md)** · Concepts: **[Tasks](../concepts/tasks.md)**.
 
@@ -93,7 +93,7 @@ With a limit of 2, at most two tagged task runs hold slots (and are `RUNNING`) a
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `IRONFLOW_TASK_TAG_SLOT_WAIT_SECONDS` | `1.0` | Poll interval while waiting for tag slots |
+| `FLOWOXIDE_TASK_TAG_SLOT_WAIT_SECONDS` | `1.0` | Poll interval while waiting for tag slots |
 
 ## Relation to deployment concurrency
 

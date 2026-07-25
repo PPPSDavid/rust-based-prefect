@@ -1,6 +1,6 @@
 # DAG visualization and static forecast
 
-IronFlow combines a **static planner** (pre-run graph forecast) with a **run DAG tab** in the local UI so you can inspect wide and long flows without scrolling through hundreds of identical boxes.
+FlowOxide combines a **static planner** (pre-run graph forecast) with a **run DAG tab** in the local UI so you can inspect wide and long flows without scrolling through hundreds of identical boxes.
 
 ## What is the DAG?
 
@@ -23,7 +23,7 @@ Use **Aggregated fan-out** to understand structure; use **Task runs** to debug i
 
 ## Static forecast (`static-planner/`)
 
-When a `@flow` starts, IronFlow compiles the flow function source into a **manifest** (nodes + edges) and a **forecast** (task count, critical path, parallelism). This powers the **Aggregated fan-out** DAG mode and assigns **`planned_node_id`** values to task runs at execution time.
+When a `@flow` starts, FlowOxide compiles the flow function source into a **manifest** (nodes + edges) and a **forecast** (task count, critical path, parallelism). This powers the **Aggregated fan-out** DAG mode and assigns **`planned_node_id`** values to task runs at execution time.
 
 ### What the planner analyzes
 

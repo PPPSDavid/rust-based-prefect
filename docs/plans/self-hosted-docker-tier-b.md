@@ -34,7 +34,7 @@ Collapse the earlier B0–B5 checklist into **four shippable PRs**. Prefer this 
 
 **In scope**
 
-- `PostgresStore` + `IRONFLOW_DATABASE_URL`
+- `PostgresStore` + `FLOWOXIDE_DATABASE_URL`
 - SQLite→Postgres SQL dialect adapter for control-plane executes
 - Rust `bind_db` with `database_url`; claim/mark/attach on Postgres (`FOR UPDATE SKIP LOCKED`)
 - GHA `services.postgres` job + `test_postgres_store.py`
@@ -43,7 +43,7 @@ Collapse the earlier B0–B5 checklist into **four shippable PRs**. Prefer this 
 **Deferred to follow-ups (still Rust destination)**
 
 - Full Rust schedule tick / gate / ui_write on Postgres (Python fallback today via unknown-op)
-- Alembic-style numbered migrations CLI (`ironflow server database upgrade`)
+- Alembic-style numbered migrations CLI (`flowoxide server database upgrade`)
 - One-shot migrator from JSONL/SQLite files
 
 ## PR 3 detail (B2)
@@ -52,7 +52,7 @@ Collapse the earlier B0–B5 checklist into **four shippable PRs**. Prefer this 
 
 - `POST /api/workers/claim`, `…/runs/{id}/started`, `…/finished` (+ heartbeat) in `routes/workers.py`
 - Claim response enrichment with `deployment.flow_name` / `entrypoint`
-- `WorkerHttpClient` + `IRONFLOW_WORKER_MODE=http` / `--worker-mode`
+- `WorkerHttpClient` + `FLOWOXIDE_WORKER_MODE=http` / `--worker-mode`
 - CLI `worker start` / `serve` HTTP path (API URL + auth; no history path)
 - Tests: `test_http_worker.py` (exclusivity, pool filter, lease reclaim, execute roundtrip)
 - Docs: `docs/how-to/worker-http-mode.md`, env-vars, COMPATIBILITY
@@ -65,7 +65,7 @@ Collapse the earlier B0–B5 checklist into **four shippable PRs**. Prefer this 
 
 **In scope**
 
-- `ironflow server services start` + `prefect_compat.services.run_services_loop`
+- `flowoxide server services start` + `prefect_compat.services.run_services_loop`
 - `Dockerfile.{server,services,worker}` with Postgres extra where needed
 - `deploy/docker/compose.yml` (+ optional `compose.auth.yml`)
 - `scripts/docker_compose_smoke.sh` + GHA workflow

@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ironflow-static-planner"
+name = "flowoxide-static-planner"
 version = "0.2.0"
 description = "Static graph IR and forecasting for Prefect-style usage subset."
 requires-python = ">=3.11"

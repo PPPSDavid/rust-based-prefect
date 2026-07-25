@@ -15,7 +15,7 @@ SMOKE_TEST = "python-shim/tests/test_compat.py::test_submit_chain_and_map"
 
 _RUST_BUILD_FAILURE_SUFFIX = " See docs/INSTALL.md §4 (Build the Rust engine) — ensure rustup stable is installed."
 _SMOKE_FAILURE_SUFFIX = (
-    " See docs/INSTALL.md §5 (Check that it works) and verify IRONFLOW_RUST_LIB if a "
+    " See docs/INSTALL.md §5 (Check that it works) and verify FLOWOXIDE_RUST_LIB if a "
     "non-default native lib path is used."
 )
 
@@ -107,7 +107,7 @@ def _smoke_verify() -> tuple[bool, str]:
 
 
 def _rust_lib_env_set() -> bool:
-    return bool(os.environ.get("IRONFLOW_RUST_LIB", "").strip())
+    return bool(os.environ.get("FLOWOXIDE_RUST_LIB", "").strip())
 
 
 def _native_check() -> int:
@@ -117,7 +117,7 @@ def _native_check() -> int:
         from prefect_compat.rust_bridge import native_library_available
     except ImportError as exc:
         print(f"[error] Cannot import prefect_compat: {exc}")
-        print("[hint] Install: python -m pip install ironflow-prefect-compat")
+        print("[hint] Install: python -m pip install flowoxide-prefect-compat")
         print("[hint] See docs/INSTALL.md §1 (PyPI — pip / uv).")
         return 1
 
@@ -125,10 +125,10 @@ def _native_check() -> int:
     print(f"native_library_available: {native_ok}")
 
     if not native_ok and not _rust_lib_env_set():
-        print("[error] Native library is not available and IRONFLOW_RUST_LIB is unset.")
+        print("[error] Native library is not available and FLOWOXIDE_RUST_LIB is unset.")
         print("[hint] Supported wheels bundle the native library (docs/INSTALL.md §1).")
         print(
-            "[hint] Source builds: docs/INSTALL.md §4; IRONFLOW_RUST_LIB: docs/how-to/setup.md."
+            "[hint] Source builds: docs/INSTALL.md §4; FLOWOXIDE_RUST_LIB: docs/how-to/setup.md."
         )
         return 1
 

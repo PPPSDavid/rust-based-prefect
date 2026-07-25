@@ -1,6 +1,6 @@
 # Quick start: PyPI install (no clone)
 
-Run a minimal `@flow` / `@task` example after **`pip install ironflow-prefect-compat`** — no repository clone, no `PYTHONPATH`, and no API server.
+Run a minimal `@flow` / `@task` example after **`pip install flowoxide-prefect-compat`** — no repository clone, no `PYTHONPATH`, and no API server.
 
 **Prerequisites:** Python **3.11** or **3.12** (see [Installation](INSTALL.md) for wheel platform notes).
 
@@ -8,7 +8,7 @@ Run a minimal `@flow` / `@task` example after **`pip install ironflow-prefect-co
 
 ```bash
 python -m pip install --upgrade pip
-python -m pip install ironflow-prefect-compat
+python -m pip install flowoxide-prefect-compat
 ```
 
 Verify the Rust engine loaded (expect `True` on supported wheels):
@@ -21,7 +21,7 @@ If you see `False`, see [Troubleshooting](reference/troubleshooting.md).
 
 ## 2. Save and run a tiny flow
 
-Create `hello_ironflow.py` anywhere on your machine:
+Create `hello_flowoxide.py` anywhere on your machine:
 
 ```python
 from prefect_compat import InMemoryControlPlane, flow, set_control_plane, task, wait
@@ -54,8 +54,8 @@ def main() -> None:
     plane = InMemoryControlPlane()
     set_control_plane(plane)
     result = example_flow(5)
-    print(f"ironflow_result={result}")
-    print(f"ironflow_events={len(plane.events())}")
+    print(f"flowoxide_result={result}")
+    print(f"flowoxide_events={len(plane.events())}")
 
 
 if __name__ == "__main__":
@@ -65,20 +65,20 @@ if __name__ == "__main__":
 Run it:
 
 ```bash
-python hello_ironflow.py
+python hello_flowoxide.py
 ```
 
 Typical output:
 
 ```text
-ironflow_result=26
-ironflow_events=15
+flowoxide_result=26
+flowoxide_events=15
 ```
 
 | Line | Meaning |
 | --- | --- |
-| `ironflow_result=26` | Flow return value from `submit`, `map`, and `aggregate`. |
-| `ironflow_events=15` | Append-only control-plane events for this run (stable for the same code/version). |
+| `flowoxide_result=26` | Flow return value from `submit`, `map`, and `aggregate`. |
+| `flowoxide_events=15` | Append-only control-plane events for this run (stable for the same code/version). |
 
 ## 3. What this proves
 
@@ -92,5 +92,5 @@ ironflow_events=15
 | --- | --- |
 | Start the API and deploy with the CLI | [Quickstart: first deployment](quickstart-first-deployment.md) |
 | Run the repo demo with more examples | [Quick start (demo flow)](QUICKSTART_DEMO.md) (requires clone) |
-| Map Prefect concepts | [Prefect → IronFlow](PREFECT_IRONFLOW_MAPPING.md) |
+| Map Prefect concepts | [Prefect → FlowOxide](PREFECT_FLOWOXIDE_MAPPING.md) |
 | Supported vs unsupported features | [Compatibility matrix](compatibility.md) |

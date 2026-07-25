@@ -66,18 +66,18 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: ironflow
-          POSTGRES_PASSWORD: ironflow
-          POSTGRES_DB: ironflow_b1
+          POSTGRES_USER: flowoxide
+          POSTGRES_PASSWORD: flowoxide
+          POSTGRES_DB: flowoxide_b1
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U ironflow -d ironflow_b1"
+          --health-cmd "pg_isready -U flowoxide -d flowoxide_b1"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
     env:
-      IRONFLOW_DATABASE_URL: postgresql://ironflow:ironflow@127.0.0.1:5432/ironflow_b1
+      FLOWOXIDE_DATABASE_URL: postgresql://flowoxide:flowoxide@127.0.0.1:5432/flowoxide_b1
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -122,10 +122,10 @@ jobs:
           done
       - name: Smoke install wheel
         shell: bash
-        # Job env sets IRONFLOW_DATABASE_URL for Postgres tests; clear it so the
+        # Job env sets FLOWOXIDE_DATABASE_URL for Postgres tests; clear it so the
         # bare wheel venv (no psycopg) can import prefect_compat for native smoke.
         env:
-          IRONFLOW_DATABASE_URL: ""
+          FLOWOXIDE_DATABASE_URL: ""
         run: |
           python -m venv /tmp/ifwh
           . /tmp/ifwh/bin/activate
@@ -133,11 +133,11 @@ jobs:
           python -c "from prefect_compat.rust_bridge import native_library_available as n; assert n(); print('native ok')"
       - uses: actions/upload-artifact@v4
         with:
-          name: ironflow-prefect-compat-wheel-linux-${{ matrix.python-version }}
+          name: flowoxide-prefect-compat-wheel-linux-${{ matrix.python-version }}
           path: python-shim/wheelhouse/*.whl
 
   wheel-linux-aarch64:
-    name: Linux aarch64 wheel (bundled ironflow_engine)
+    name: Linux aarch64 wheel (bundled flowoxide_engine)
     # Native ARM64 (e.g. Raspberry Pi self-hosted runner). See .github/SELF_HOSTED_CI_RUNNER.md
     runs-on: [self-hosted, linux, ARM64]
     steps:
@@ -161,7 +161,7 @@ jobs:
           CIBW_ARCHS_LINUX: "aarch64"
           CIBW_SKIP: "*musllinux*"
           CIBW_BEFORE_ALL_LINUX: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal && ln -sf /root/.cargo/bin/cargo /usr/local/bin/cargo && ln -sf /root/.cargo/bin/rustc /usr/local/bin/rustc"
-          CIBW_ENVIRONMENT: "IRONFLOW_FORCE_PLATFORM_WHEEL=1 PATH=/root/.cargo/bin:$PATH"
+          CIBW_ENVIRONMENT: "FLOWOXIDE_FORCE_PLATFORM_WHEEL=1 PATH=/root/.cargo/bin:$PATH"
         run: cibuildwheel --platform linux --output-dir python-shim/wheelhouse python-shim
       - name: Verify aarch64 wheel artifacts exist
         shell: bash
@@ -171,7 +171,7 @@ jobs:
           ls python-shim/wheelhouse/*cp312*aarch64*.whl
       - uses: actions/upload-artifact@v4
         with:
-          name: ironflow-prefect-compat-wheel-linux-aarch64
+          name: flowoxide-prefect-compat-wheel-linux-aarch64
           path: python-shim/wheelhouse/*.whl
 
   wheel-windows:
@@ -212,7 +212,7 @@ jobs:
           & $py -c "from prefect_compat.rust_bridge import native_library_available as n; assert n(); print('native ok')"
       - uses: actions/upload-artifact@v4
         with:
-          name: ironflow-prefect-compat-wheel-windows-${{ matrix.python-version }}
+          name: flowoxide-prefect-compat-wheel-windows-${{ matrix.python-version }}
           path: python-shim/wheelhouse/*.whl
 
   wheel-macos:
@@ -250,7 +250,7 @@ jobs:
           python -c "from prefect_compat.rust_bridge import native_library_available as n; assert n(); print('native ok')"
       - uses: actions/upload-artifact@v4
         with:
-          name: ironflow-prefect-compat-wheel-macos-${{ matrix.python-version }}
+          name: flowoxide-prefect-compat-wheel-macos-${{ matrix.python-version }}
           path: python-shim/wheelhouse/*.whl
 
   frontend:

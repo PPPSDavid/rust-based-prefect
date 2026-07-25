@@ -1,5 +1,5 @@
 //! Postgres ports of deployment claim / lease hot paths.
-//! Called from `ironflow_control` when `bind_db` attached a Postgres client.
+//! Called from `flowoxide_control` when `bind_db` attached a Postgres client.
 
 use chrono::{Duration, Utc};
 use postgres::Client;

@@ -1,30 +1,30 @@
 # Self-hosted server (API, workers, deployments)
 
-This guide is the **IronFlow** counterpart to Prefect’s self-hosted walkthroughs: how to run the **optional HTTP API**, what **workers** and **deployments** mean here, and how **scheduling** fits in. It assumes you already completed **[Installation](INSTALL.md)** (clone, Python env, `cargo build`).
+This guide is the **FlowOxide** counterpart to Prefect’s self-hosted walkthroughs: how to run the **optional HTTP API**, what **workers** and **deployments** mean here, and how **scheduling** fits in. It assumes you already completed **[Installation](INSTALL.md)** (clone, Python env, `cargo build`).
 
 If you only need a minimal in-process flow with no network stack, use **[Quick start (demo flow)](QUICKSTART_DEMO.md)** first.
 
-**Prefect docs to borrow / enhance from** (operator shape and page structure — IronFlow remains a subset; see **[Compatibility](compatibility.md)**):
+**Prefect docs to borrow / enhance from** (operator shape and page structure — FlowOxide remains a subset; see **[Compatibility](compatibility.md)**):
 
-| Prefect guide | IronFlow counterpart |
+| Prefect guide | FlowOxide counterpart |
 | --- | --- |
-| [Local server (CLI)](https://docs.prefect.io/v3/how-to-guides/self-hosted/server-cli) | This page + `scripts/ironflow_server.py` / uvicorn |
+| [Local server (CLI)](https://docs.prefect.io/v3/how-to-guides/self-hosted/server-cli) | This page + `scripts/flowoxide_server.py` / uvicorn |
 | [Server in Docker](https://docs.prefect.io/v3/how-to-guides/self-hosted/server-docker) | **[Docker quickstart](how-to/docker-quickstart.md)** |
 | [Docker Compose](https://docs.prefect.io/v3/how-to-guides/self-hosted/docker-compose) | **[Docker Compose](how-to/docker-compose.md)** (Postgres + services + HTTP worker; Redis deferred) |
 | [Secure self-hosted](https://docs.prefect.io/v3/advanced/security-settings) | **[Secure a self-hosted server](how-to/secure-self-hosted.md)** (Basic auth; CSRF deferred) |
 
 ## Mental model
 
-| Piece | In IronFlow today |
+| Piece | In FlowOxide today |
 | --- | --- |
 | **Orchestration kernel** | **`rust-engine`** — deterministic state machine and history; Python calls into it via `prefect_compat`. |
 | **“Server”** | A **FastAPI** app: `prefect_compat.server` (uvicorn). It exposes REST endpoints for runs, deployments, and streams. It is **not** the Prefect OSS API or Prefect Cloud. |
-| **Worker** | A process (or thread) that **claims** queued **deployment runs** and executes the referenced `@flow`. Dev default: **in-process** worker. Production compose: **HTTP** worker (`IRONFLOW_WORKER_MODE=http`). |
-| **Background services** | Schedule ticks and lease reclaim — embedded in the API for local dev, or `ironflow server services start` when embeds are off (compose). |
+| **Worker** | A process (or thread) that **claims** queued **deployment runs** and executes the referenced `@flow`. Dev default: **in-process** worker. Production compose: **HTTP** worker (`FLOWOXIDE_WORKER_MODE=http`). |
+| **Background services** | Schedule ticks and lease reclaim — embedded in the API for local dev, or `flowoxide server services start` when embeds are off (compose). |
 | **Deployment** | A **named** binding: flow name, optional `module:function` **entrypoint**, default parameters, pause flag. Stored in the control plane (SQLite or Postgres). |
 | **Schedule** | Deployments support **interval** (`schedule_interval_seconds`), **cron** (`schedule_cron`), and a Rust-first **RRule subset** (`schedule_rrule`), with shared timing state (`schedule_next_run_at`, `schedule_enabled`). Maintenance evaluates due schedules and enqueues deployment runs. |
 
-For Prefect terminology mapping, see **[Prefect → IronFlow](PREFECT_IRONFLOW_MAPPING.md)**. For exact feature boundaries, **[Compatibility](compatibility.md)** is authoritative.
+For Prefect terminology mapping, see **[Prefect → FlowOxide](PREFECT_FLOWOXIDE_MAPPING.md)**. For exact feature boundaries, **[Compatibility](compatibility.md)** is authoritative.
 
 ## Deployment shapes (pick one)
 
@@ -40,7 +40,7 @@ For Prefect terminology mapping, see **[Prefect → IronFlow](PREFECT_IRONFLOW_M
 From the **repository root**, with dependencies installed as in the README:
 
 ```bash
-python scripts/ironflow_server.py start
+python scripts/flowoxide_server.py start
 ```
 
 Typical URLs:
@@ -51,7 +51,7 @@ Typical URLs:
 **Backend only** (no frontend):
 
 ```bash
-python scripts/ironflow_server.py start --backend-only
+python scripts/flowoxide_server.py start --backend-only
 ```
 
 ### Doctor mode
@@ -59,7 +59,7 @@ python scripts/ironflow_server.py start --backend-only
 Run doctor mode from the repository root to print a readiness snapshot for backend dependencies, frontend availability, and Rust library status:
 
 ```bash
-python scripts/ironflow_server.py doctor
+python scripts/flowoxide_server.py doctor
 ```
 
 Use this before `start` when local setup is uncertain, or after failures to confirm which subsystem needs remediation.
@@ -70,7 +70,7 @@ Use this before `start` when local setup is uncertain, or after failures to conf
 python -m uvicorn python-shim.src.prefect_compat.server:app --host 127.0.0.1 --port 8000
 ```
 
-The API uses the same **persistence defaults** as in-process flows: JSONL history (e.g. `data/ironflow_history.jsonl` or `IRONFLOW_HISTORY_PATH`) and a SQLite sidecar for queryable state. For Postgres, set `IRONFLOW_DATABASE_URL` — see **[How to use Postgres](how-to/database-postgres.md)**. Full env list: **[Environment variables](reference/env-vars.md)**.
+The API uses the same **persistence defaults** as in-process flows: JSONL history (e.g. `data/flowoxide_history.jsonl` or `FLOWOXIDE_HISTORY_PATH`) and a SQLite sidecar for queryable state. For Postgres, set `FLOWOXIDE_DATABASE_URL` — see **[How to use Postgres](how-to/database-postgres.md)**. Full env list: **[Environment variables](reference/env-vars.md)**.
 
 ## 2. What starts with the server
 
@@ -80,20 +80,20 @@ When the FastAPI app loads, it:
 2. Starts a **scheduler thread** (unless disabled) that periodically runs `deployment_maintenance_tick()` — reclaims stale leases, marks stale workers offline, and **fires due interval, cron, or RRule schedules**.
 3. Starts a **local worker thread** (unless disabled) that repeatedly **claims** the next `SCHEDULED` deployment run and runs the flow **in that process**.
 
-So a single `ironflow_server.py start` gives you API + **embedded worker + scheduler** for local development. This is a deliberate **single-process** convenience — not the only model. For Prefect-shaped multi-process / Compose layouts, disable the embeds and use [background services](how-to/run-background-services.md) + [HTTP workers](how-to/worker-http-mode.md).
+So a single `flowoxide_server.py start` gives you API + **embedded worker + scheduler** for local development. This is a deliberate **single-process** convenience — not the only model. For Prefect-shaped multi-process / Compose layouts, disable the embeds and use [background services](how-to/run-background-services.md) + [HTTP workers](how-to/worker-http-mode.md).
 
 ### Environment toggles (local worker / scheduler)
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `IRONFLOW_ENABLE_LOCAL_WORKER` | `1` | Set to `0`, `false`, or `no` to **disable** the in-process worker loop (API only; runs stay queued until something else claims them). |
-| `IRONFLOW_ENABLE_SCHEDULER` | `1` | Set to `0`, `false`, or `no` to **disable** the maintenance thread (no periodic schedule ticks or related maintenance from this process). |
-| `IRONFLOW_LOCAL_WORKER_NAME` | `local-worker-1` | Worker name recorded when claiming runs and sending heartbeats. |
+| `FLOWOXIDE_ENABLE_LOCAL_WORKER` | `1` | Set to `0`, `false`, or `no` to **disable** the in-process worker loop (API only; runs stay queued until something else claims them). |
+| `FLOWOXIDE_ENABLE_SCHEDULER` | `1` | Set to `0`, `false`, or `no` to **disable** the maintenance thread (no periodic schedule ticks or related maintenance from this process). |
+| `FLOWOXIDE_LOCAL_WORKER_NAME` | `local-worker-1` | Worker name recorded when claiming runs and sending heartbeats. |
 
 Example — API only, no embedded worker (for experiments or a separate claimant):
 
 ```bash
-IRONFLOW_ENABLE_LOCAL_WORKER=0 python scripts/ironflow_server.py start --backend-only
+FLOWOXIDE_ENABLE_LOCAL_WORKER=0 python scripts/flowoxide_server.py start --backend-only
 ```
 
 ## 3. Deployments and triggering a run
@@ -164,44 +164,44 @@ For production-style **external** orchestration (Kubernetes CronJob, systemd tim
 
 ## 5. Standalone worker and CLI (Tier 1)
 
-IronFlow ships a **Tier 1** deployment CLI and manifest format (not full Prefect parity). After installing the shim, the **`ironflow`** entry point provides:
+FlowOxide ships a **Tier 1** deployment CLI and manifest format (not full Prefect parity). After installing the shim, the **`flowoxide`** entry point provides:
 
 | Command | Purpose |
 | --- | --- |
-| `ironflow init` | Write a starter **`ironflow.yaml`** if missing. |
-| `ironflow deploy` | Create or update deployment(s) from the manifest via the API. |
-| `ironflow serve` | Deploy one entry, run pull steps, then execute a local worker loop for that flow. |
-| `ironflow worker start` | Claim deployment runs — default **`file`** mode (shared history/SQLite) or **`--worker-mode http`** / `IRONFLOW_WORKER_MODE=http` (API claim only). |
+| `flowoxide init` | Write a starter **`flowoxide.yaml`** if missing. |
+| `flowoxide deploy` | Create or update deployment(s) from the manifest via the API. |
+| `flowoxide serve` | Deploy one entry, run pull steps, then execute a local worker loop for that flow. |
+| `flowoxide worker start` | Claim deployment runs — default **`file`** mode (shared history/SQLite) or **`--worker-mode http`** / `FLOWOXIDE_WORKER_MODE=http` (API claim only). |
 
-Full examples, manifest schema, and Python **`deploy()`** / **`serve()`** helpers: **[How to deploy with the CLI and `ironflow.yaml`](how-to/deploy-with-cli.md)**.
+Full examples, manifest schema, and Python **`deploy()`** / **`serve()`** helpers: **[How to deploy with the CLI and `flowoxide.yaml`](how-to/deploy-with-cli.md)**.
 
 ### Split API and worker (two terminals)
 
-**Dev / single-host (`file` mode):** disable the embedded worker and share **`IRONFLOW_HISTORY_PATH`**:
+**Dev / single-host (`file` mode):** disable the embedded worker and share **`FLOWOXIDE_HISTORY_PATH`**:
 
 **Terminal 1 — API + scheduler only:**
 
 ```bash
-IRONFLOW_ENABLE_LOCAL_WORKER=0 python scripts/ironflow_server.py start --backend-only
+FLOWOXIDE_ENABLE_LOCAL_WORKER=0 python scripts/flowoxide_server.py start --backend-only
 ```
 
 **Terminal 2 — deploy manifest, then start worker:**
 
 ```bash
-export IRONFLOW_HISTORY_PATH=data/ironflow_history.jsonl
-ironflow deploy --file ironflow.yaml --all
-ironflow worker start --file ironflow.yaml --name worker-1 --pool default-process-pool
+export FLOWOXIDE_HISTORY_PATH=data/flowoxide_history.jsonl
+flowoxide deploy --file flowoxide.yaml --all
+flowoxide worker start --file flowoxide.yaml --name worker-1 --pool default-process-pool
 ```
 
-Both processes must agree on **`IRONFLOW_HISTORY_PATH`**. Multiple workers with **distinct `--name`** values can claim from the same pool.
+Both processes must agree on **`FLOWOXIDE_HISTORY_PATH`**. Multiple workers with **distinct `--name`** values can claim from the same pool.
 
-**Production-shaped (HTTP / Compose):** disable embeds on the API, run [background services](how-to/run-background-services.md), and start workers with `IRONFLOW_WORKER_MODE=http` (no shared DB volume) — see **[Docker Compose](how-to/docker-compose.md)** and **[HTTP workers](how-to/worker-http-mode.md)**.
+**Production-shaped (HTTP / Compose):** disable embeds on the API, run [background services](how-to/run-background-services.md), and start workers with `FLOWOXIDE_WORKER_MODE=http` (no shared DB volume) — see **[Docker Compose](how-to/docker-compose.md)** and **[HTTP workers](how-to/worker-http-mode.md)**.
 
 ### Expectations vs Prefect
 
-- **Default dev path:** single process via `ironflow_server.py start` (embedded worker + scheduler) — analogous to Prefect’s local [server CLI](https://docs.prefect.io/v3/how-to-guides/self-hosted/server-cli) simplicity, not its full feature set.
-- **Split / compose path:** disable embeds on the API (`IRONFLOW_ENABLE_LOCAL_WORKER=0`, `IRONFLOW_ENABLE_SCHEDULER=0`), run **[background services](how-to/run-background-services.md)**, and use **[HTTP workers](how-to/worker-http-mode.md)** — shaped like Prefect [Docker Compose](https://docs.prefect.io/v3/how-to-guides/self-hosted/docker-compose) (Postgres + worker), without Redis or multi-worker uvicorn yet.
-- **Parity:** IronFlow does **not** offer Prefect Cloud work pools, agents, Redis messaging, CSRF toggles, or full YAML/deploy recipe parity — see **[Compatibility](compatibility.md)**.
+- **Default dev path:** single process via `flowoxide_server.py start` (embedded worker + scheduler) — analogous to Prefect’s local [server CLI](https://docs.prefect.io/v3/how-to-guides/self-hosted/server-cli) simplicity, not its full feature set.
+- **Split / compose path:** disable embeds on the API (`FLOWOXIDE_ENABLE_LOCAL_WORKER=0`, `FLOWOXIDE_ENABLE_SCHEDULER=0`), run **[background services](how-to/run-background-services.md)**, and use **[HTTP workers](how-to/worker-http-mode.md)** — shaped like Prefect [Docker Compose](https://docs.prefect.io/v3/how-to-guides/self-hosted/docker-compose) (Postgres + worker), without Redis or multi-worker uvicorn yet.
+- **Parity:** FlowOxide does **not** offer Prefect Cloud work pools, agents, Redis messaging, CSRF toggles, or full YAML/deploy recipe parity — see **[Compatibility](compatibility.md)**.
 
 ## 6. Related endpoints and UI
 

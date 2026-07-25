@@ -186,7 +186,7 @@ class PostgresStore:
             raise ImportError(
                 "Postgres backend requires psycopg. "
                 "Install with: pip install 'psycopg[binary]' "
-                "(or ironflow-prefect-compat[postgres])."
+                "(or flowoxide-prefect-compat[postgres])."
             ) from exc
         # dict_row yields dict rows; psycopg's generic Row typing is overly narrow for ty.
         raw = psycopg.connect(

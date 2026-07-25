@@ -1,6 +1,6 @@
 # How to run the server and UI
 
-IronFlow can run flows **in-process** with no server. When you want HTTP APIs and an optional local dashboard, use the bundled launcher.
+FlowOxide can run flows **in-process** with no server. When you want HTTP APIs and an optional local dashboard, use the bundled launcher.
 
 ## API backend
 
@@ -12,10 +12,10 @@ python -m uvicorn python-shim.src.prefect_compat.server:app --host 127.0.0.1 --p
 
 ## API + UI helper
 
-**`scripts/ironflow_server.py`** starts the backend and, by default, the **Vite** frontend under `frontend/`:
+**`scripts/flowoxide_server.py`** starts the backend and, by default, the **Vite** frontend under `frontend/`:
 
 ```bash
-python scripts/ironflow_server.py start
+python scripts/flowoxide_server.py start
 ```
 
 Defaults: backend **`127.0.0.1:8000`**, frontend **`http://localhost:4173`**. Useful flags:

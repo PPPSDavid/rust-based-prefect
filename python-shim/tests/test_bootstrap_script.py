@@ -142,19 +142,19 @@ def test_bootstrap_native_check_runs_minimal_flow(monkeypatch, capsys):
     assert "[ok] Native check passed" in out
 
 
-def test_bootstrap_native_check_fails_without_native_or_ironflow_lib(
+def test_bootstrap_native_check_fails_without_native_or_flowoxide_lib(
     monkeypatch, capsys
 ):
     rb = importlib.import_module("prefect_compat.rust_bridge")
     monkeypatch.setattr(rb, "native_library_available", lambda: False)
-    monkeypatch.delenv("IRONFLOW_RUST_LIB", raising=False)
+    monkeypatch.delenv("FLOWOXIDE_RUST_LIB", raising=False)
 
     rc = bootstrap.main(["--native-check"])
     out = capsys.readouterr().out
 
     assert rc == 1
     assert "native_library_available: False" in out
-    assert "IRONFLOW_RUST_LIB" in out
+    assert "FLOWOXIDE_RUST_LIB" in out
 
 
 def test_bootstrap_native_check_mutually_exclusive_with_check_only():
@@ -162,12 +162,12 @@ def test_bootstrap_native_check_mutually_exclusive_with_check_only():
         bootstrap.main(["--native-check", "--check-only"])
 
 
-def test_bootstrap_native_check_passes_when_ironflow_lib_set_despite_native_false(
+def test_bootstrap_native_check_passes_when_flowoxide_lib_set_despite_native_false(
     monkeypatch, capsys
 ):
     rb = importlib.import_module("prefect_compat.rust_bridge")
     monkeypatch.setattr(rb, "native_library_available", lambda: False)
-    monkeypatch.setenv("IRONFLOW_RUST_LIB", "/tmp/ironflow_engine_dummy.so")
+    monkeypatch.setenv("FLOWOXIDE_RUST_LIB", "/tmp/flowoxide_engine_dummy.so")
 
     rc = bootstrap.main(["--native-check"])
     out = capsys.readouterr().out
@@ -184,4 +184,4 @@ def test_docs_reference_bootstrap_and_doctor():
     assert "python scripts/bootstrap.py" in readme
     assert "python scripts/bootstrap.py" in install
     assert "python scripts/bootstrap.py --native-check" in install
-    assert "python scripts/ironflow_server.py doctor" in hosted
+    assert "python scripts/flowoxide_server.py doctor" in hosted

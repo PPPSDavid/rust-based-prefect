@@ -18,12 +18,12 @@
 ### Sources checked
 
 - Prefect docs above (tag limits: as of 3.4.19 backed by global limits named `tag:{tag_name}`)
-- Local: `COMPATIBILITY.md`, `docs/PREFECT_IRONFLOW_MAPPING.md`, `docs/architecture.md`, `docs/benchmark_baseline.md`
+- Local: `COMPATIBILITY.md`, `docs/PREFECT_FLOWOXIDE_MAPPING.md`, `docs/architecture.md`, `docs/benchmark_baseline.md`
 - Code: `python-shim/src/prefect_compat/decorators.py` (`TaskWrapper.submit` / `map`), `runtime.py` (deployments only), `rust-engine/src/deployment_ops.rs` (deployment concurrency + leases), public `__init__.py` exports
 
 ### Gap table
 
-| Prefect surface | IronFlow today | Classification |
+| Prefect surface | FlowOxide today | Classification |
 | --- | --- | --- |
 | Named **global concurrency limits** (slots, CRUD, active flag) | None — no table, API, or SDK | **missing** |
 | `concurrency(...)` / `rate_limit(...)` context (sync/async, `occupy`, `strict`, leases) | None | **missing** |
@@ -35,7 +35,7 @@
 | Deployment flow-run concurrency + collision strategy | **Supported** (`concurrency_limit`, `ENQUEUE` / `CANCEL_NEW`) in Rust claim path + Python fallback | **supported** (deployment-scoped only) |
 | Work pool / work queue concurrency | Explicit non-goal in UI parity checklist | **out of scope** (near term) |
 
-### Current IronFlow support (accurate)
+### Current FlowOxide support (accurate)
 
 - **Supported:** per-deployment concurrent run caps with deterministic claim gating in SQLite (`deployment_ops` / runtime fallback).
 - **Partial:** architecture docs mention “concurrency-limit intent”; benchmarks list global/tag limits as a workload scenario but no recipe enforces them.
@@ -66,11 +66,11 @@
 
 ### Relation to deployment limits
 
-Deployment/work-pool/queue limits are **orthogonal**: they gate **flow runs** in the worker claim path; tags/global GCLs gate **operations / task runs** (and arbitrary Python). IronFlow already has the former; this plan targets the latter under one shared **slot ledger**.
+Deployment/work-pool/queue limits are **orthogonal**: they gate **flow runs** in the worker claim path; tags/global GCLs gate **operations / task runs** (and arbitrary Python). FlowOxide already has the former; this plan targets the latter under one shared **slot ledger**.
 
 ---
 
-## 3. IronFlow-shaped design (recommended)
+## 3. FlowOxide-shaped design (recommended)
 
 ### Decision protocol consensus
 
@@ -132,7 +132,7 @@ Notes:
 3. **`@task(..., tags: Sequence[str] | None = None)`** — persist tags on `TaskRunRecord` / SQLite.
 4. **Runtime gate:** before recording `task_running`, acquire `tag:{t}` for each tag (AND). On failure:
    - limit 0 → fail/abort task run (Prefect abort semantics)
-   - otherwise block with backoff (env e.g. `IRONFLOW_TASK_TAG_SLOT_WAIT_SECONDS`, default 1–30s) then retry while flow run is still active / not cancelled.
+   - otherwise block with backoff (env e.g. `FLOWOXIDE_TASK_TAG_SLOT_WAIT_SECONDS`, default 1–30s) then retry while flow run is still active / not cancelled.
 
 ### Critical interaction with the execution model (plan-time note)
 
@@ -191,7 +191,7 @@ For `map` + thread/process pools: acquire **per worker** immediately before body
 
 ### Phase 4 — API/CLI/UI polish (optional)
 
-- CLI `ironflow gcl …` subset.
+- CLI `flowoxide gcl …` subset.
 - Frontend concurrency admin page (after API stable).
 - Wire into `perf_matrix` a `gcl` / tag-limited recipe (fulfill `docs/benchmark_baseline.md` scenario 4).
 
@@ -259,7 +259,7 @@ For `map` + thread/process pools: acquire **per worker** immediately before body
 | Rust | `rust-engine/src/concurrency_ops.rs` (new), `ffi.rs`, `deployment_ops.rs` (maintenance hook), schema helpers |
 | Shim | `prefect_compat/concurrency.py` (new), `runtime.py`, `decorators.py`, `server.py`, `__init__.py` |
 | Tests | `python-shim/tests/test_concurrency_limits.py`, Rust tests in `concurrency_ops` |
-| Docs | `COMPATIBILITY.md`, `docs/PREFECT_IRONFLOW_MAPPING.md`, `docs/concepts/tasks.md`, this plan |
+| Docs | `COMPATIBILITY.md`, `docs/PREFECT_FLOWOXIDE_MAPPING.md`, `docs/concepts/tasks.md`, this plan |
 | Benchmarks (later) | `benchmarks/perf_matrix.py` recipe + `docs/perf_methodology.md` |
 
 ---

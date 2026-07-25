@@ -73,7 +73,7 @@ def test_map_process_pool_picklable_task(tmp_path, monkeypatch):
 
 
 def test_default_runner_env_sequential(tmp_path, monkeypatch):
-    monkeypatch.setenv("IRONFLOW_TASK_RUNNER", "sequential")
+    monkeypatch.setenv("FLOWOXIDE_TASK_RUNNER", "sequential")
     plane = InMemoryControlPlane(history_path=str(tmp_path / "envseq.jsonl"))
     set_control_plane(plane)
     seen: list[str] = []

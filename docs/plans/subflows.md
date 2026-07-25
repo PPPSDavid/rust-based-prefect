@@ -1,11 +1,11 @@
-# Subflows Design Plan (IronFlow)
+# Subflows Design Plan (FlowOxide)
 
 **Status:** Implemented (Phases 0–5 landed on `main` via PRs #34 and #36)  
 **Last updated:** 2026-07-12  
 **Scope:** `rust-engine/`, `python-shim/`, `static-planner/`, `frontend/`, `benchmarks/`  
 **User-facing docs:** [How to compose flows with subflows](../how-to/subflows.md) · [Flows](../concepts/flows.md) · [Compatibility matrix](../../COMPATIBILITY.md)
 
-This document is the **historical design plan** for IronFlow subflows. Prefer the user guide and compatibility matrix for “how do I use this?”. Keep this file for design rationale and phase history. (`docs/plans/**` is **not** published to the MkDocs site.)
+This document is the **historical design plan** for FlowOxide subflows. Prefer the user guide and compatibility matrix for “how do I use this?”. Keep this file for design rationale and phase history. (`docs/plans/**` is **not** published to the MkDocs site.)
 
 The goal was a **simpler, two-mechanism model** than Prefect’s full subflow matrix, with **deployment-backed execution**, **arbitrary nesting**, and **performance-first** benchmarks per phase.
 
@@ -13,7 +13,7 @@ The goal was a **simpler, two-mechanism model** than Prefect’s full subflow ma
 
 ## 1. Problem statement (original)
 
-Before Phases 0–4, IronFlow had **no first-class subflow support**. Calling one `@flow` from another could create an **unlinked sibling flow run** with no parent relationship, no `.submit()` API, and no deployment routing. That was insufficient for real orchestration where:
+Before Phases 0–4, FlowOxide had **no first-class subflow support**. Calling one `@flow` from another could create an **unlinked sibling flow run** with no parent relationship, no `.submit()` API, and no deployment routing. That was insufficient for real orchestration where:
 
 - Child work may need a **different worker / work pool** than the parent.
 - Parents need **downstream task dependencies** on subflow completion (or fire-and-forget).
@@ -81,7 +81,7 @@ from prefect_compat.deployments import deployment_ref  # new
 def child_flow(n: int) -> int:
     ...
 
-# Registered via ironflow deploy / API — returns a handle
+# Registered via flowoxide deploy / API — returns a handle
 child_deploy = deployment_ref("child-flow/my-deployment")
 
 @flow
@@ -329,14 +329,14 @@ python benchmarks/perf_matrix.py run --preset lite --recipes subflow_inline_dept
 - `docs/how-to/subflows.md` — primary user guide (MkDocs How-to nav).
 - `docs/concepts/flows.md` — overview + link to how-to.
 - `docs/concepts/dag-and-forecast.md` — `inline_subflow` / `subflow_task` node kinds.
-- `docs/PREFECT_IRONFLOW_MAPPING.md` — Prefect nested-flow row.
+- `docs/PREFECT_FLOWOXIDE_MAPPING.md` — Prefect nested-flow row.
 - `docs/index.md`, `docs/concepts/index.md`, `docs/how-to/index.md`, `mkdocs.yml` — discoverability.
 
 Maintainer-only (excluded from published site): this plan under `docs/plans/`.
 
 **Intentionally not in scope (v1):**
 
-- Prefect `SubflowTask` / `run_deployment` API name parity (IronFlow uses `deployment_ref` / `SubflowFuture`).
+- Prefect `SubflowTask` / `run_deployment` API name parity (FlowOxide uses `deployment_ref` / `SubflowFuture`).
 - Subflow parameter schema validation beyond deployment defaults.
 - Automatic deployment creation from `@flow` (users must deploy child flows explicitly).
 

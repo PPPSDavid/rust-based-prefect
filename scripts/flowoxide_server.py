@@ -90,7 +90,7 @@ def _frontend_status(repo_root: Path) -> str:
 
 
 def _rust_library_status(repo_root: Path) -> str:
-    env_override = os.getenv("IRONFLOW_RUST_LIB")
+    env_override = os.getenv("FLOWOXIDE_RUST_LIB")
     if env_override:
         candidate = Path(env_override)
         if candidate.exists():
@@ -101,12 +101,12 @@ def _rust_library_status(repo_root: Path) -> str:
     if not cargo_manifest.exists():
         return "cargo-manifest-missing"
     candidates = [
-        repo_root / "rust-engine" / "target" / "release" / "ironflow_engine.dll",
-        repo_root / "rust-engine" / "target" / "debug" / "ironflow_engine.dll",
-        repo_root / "rust-engine" / "target" / "release" / "libironflow_engine.so",
-        repo_root / "rust-engine" / "target" / "debug" / "libironflow_engine.so",
-        repo_root / "rust-engine" / "target" / "release" / "libironflow_engine.dylib",
-        repo_root / "rust-engine" / "target" / "debug" / "libironflow_engine.dylib",
+        repo_root / "rust-engine" / "target" / "release" / "flowoxide_engine.dll",
+        repo_root / "rust-engine" / "target" / "debug" / "flowoxide_engine.dll",
+        repo_root / "rust-engine" / "target" / "release" / "libflowoxide_engine.so",
+        repo_root / "rust-engine" / "target" / "debug" / "libflowoxide_engine.so",
+        repo_root / "rust-engine" / "target" / "release" / "libflowoxide_engine.dylib",
+        repo_root / "rust-engine" / "target" / "debug" / "libflowoxide_engine.dylib",
     ]
     if any(path.exists() for path in candidates):
         return "ready"
@@ -137,7 +137,7 @@ def _remediation(repo_root: Path, snapshot: dict[str, str]) -> list[str]:
 
     if rust == "env-path-missing":
         hints.append(
-            "IRONFLOW_RUST_LIB points to a missing file — fix the path or unset it."
+            "FLOWOXIDE_RUST_LIB points to a missing file — fix the path or unset it."
         )
     elif rust == "cargo-missing":
         hints.append("Install Rust via https://rustup.rs and reopen your shell.")
@@ -194,7 +194,7 @@ def start(args: argparse.Namespace) -> int:
                 return frontend.returncode or 1
             time.sleep(0.5)
     except KeyboardInterrupt:
-        print("\nStopping IronFlow services...")
+        print("\nStopping FlowOxide services...")
     finally:
         if frontend is not None and frontend.poll() is None:
             frontend.send_signal(signal.SIGINT)
@@ -212,12 +212,12 @@ def start(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="IronFlow local server helper.")
+    parser = argparse.ArgumentParser(description="FlowOxide local server helper.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     start_parser = subparsers.add_parser(
         "start",
-        help="Start IronFlow API and optional UI (similar to `prefect server start`).",
+        help="Start FlowOxide API and optional UI (similar to `prefect server start`).",
     )
     start_parser.add_argument("--host", default="127.0.0.1")
     start_parser.add_argument("--backend-port", type=int, default=8000)

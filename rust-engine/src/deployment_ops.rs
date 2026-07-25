@@ -1,5 +1,5 @@
 //! Deployment queue, scheduling, and worker heartbeats — SQLite hot paths kept in Rust.
-//! Called from `ironflow_control` when `bind_db` has attached a connection.
+//! Called from `flowoxide_control` when `bind_db` has attached a connection.
 
 use std::str::FromStr;
 

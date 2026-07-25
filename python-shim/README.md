@@ -1,6 +1,6 @@
-# ironflow-prefect-compat
+# flowoxide-prefect-compat
 
-**IronFlow** — Prefect-style **`@flow` / `@task`** authoring (`prefect_compat`) backed by a **Rust orchestration kernel** shipped as a **`ctypes`** shared library (`ironflow_engine`).
+**FlowOxide** — Prefect-style **`@flow` / `@task`** authoring (`prefect_compat`) backed by a **Rust orchestration kernel** shipped as a **`ctypes`** shared library (`flowoxide_engine`).
 
 This PyPI distribution bundles **prebuilt native wheels** per platform where CI publishes them (**CPython 3.11 and 3.12**). You **do not** need Rust installed to **use** those wheels; Rust is used **when building** the package from source (for example **sdist** installs when no wheel matches).
 
@@ -10,13 +10,13 @@ This PyPI distribution bundles **prebuilt native wheels** per platform where CI 
 
 ```bash
 python -m pip install --upgrade pip
-python -m pip install ironflow-prefect-compat
+python -m pip install flowoxide-prefect-compat
 ```
 
 With **[uv](https://docs.astral.sh/uv/)**:
 
 ```bash
-uv pip install ironflow-prefect-compat
+uv pip install flowoxide-prefect-compat
 ```
 
 **TestPyPI** (maintainer validation) — use **both** indices so dependencies resolve:
@@ -26,7 +26,7 @@ python -m pip install --upgrade pip
 python -m pip install \
   --index-url https://test.pypi.org/simple/ \
   --extra-index-url https://pypi.org/simple/ \
-  ironflow-prefect-compat
+  flowoxide-prefect-compat
 ```
 
 ## Verify the native library
@@ -35,7 +35,7 @@ python -m pip install \
 python -c "from prefect_compat.rust_bridge import native_library_available; print(native_library_available())"
 ```
 
-Expect **`True`** when the wheel matched your platform. If **`False`**, set **`IRONFLOW_RUST_LIB`** to a built `ironflow_engine` library or see the full docs.
+Expect **`True`** when the wheel matched your platform. If **`False`**, set **`FLOWOXIDE_RUST_LIB`** to a built `flowoxide_engine` library or see the full docs.
 
 ## Documentation
 

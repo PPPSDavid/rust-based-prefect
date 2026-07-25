@@ -29,7 +29,7 @@ def example_flow(total: int = 10) -> int:
 
 
 def run() -> tuple[int, int]:
-    plane = InMemoryControlPlane(history_path=os.environ.get("IRONFLOW_HISTORY_PATH"))
+    plane = InMemoryControlPlane(history_path=os.environ.get("FLOWOXIDE_HISTORY_PATH"))
     set_control_plane(plane)
     result = example_flow(5)
     return result, len(plane.events())
@@ -37,5 +37,5 @@ def run() -> tuple[int, int]:
 
 if __name__ == "__main__":
     value, event_count = run()
-    print(f"ironflow_result={value}")
-    print(f"ironflow_events={event_count}")
+    print(f"flowoxide_result={value}")
+    print(f"flowoxide_events={event_count}")

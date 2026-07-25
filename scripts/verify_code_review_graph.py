@@ -164,7 +164,7 @@ async def _run_mcp_checks() -> tuple[list[str], dict[str, Any]]:
                 issues.append("get_architecture_overview_tool empty/error")
                 _fail(f"architecture is_err={is_err} preview={blob[:160]}")
 
-            # 3) search — must find a known IronFlow symbol without embeddings
+            # 3) search — must find a known FlowOxide symbol without embeddings
             parsed, is_err, blob = await call(
                 "semantic_search_nodes_tool",
                 {"query": "TransitionHookSpec"},

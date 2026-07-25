@@ -201,7 +201,7 @@ def test_flow_without_hooks_has_no_transition_callback(tmp_path) -> None:
 def test_hooks_with_rust_fsm_toggle(
     tmp_path, monkeypatch: pytest.MonkeyPatch, use_rust: str
 ) -> None:
-    monkeypatch.setenv("IRONFLOW_USE_RUST_FSM", use_rust)
+    monkeypatch.setenv("FLOWOXIDE_USE_RUST_FSM", use_rust)
     plane = InMemoryControlPlane(history_path=str(tmp_path / f"rust_{use_rust}.jsonl"))
     set_control_plane(plane)
     edges: list[str] = []

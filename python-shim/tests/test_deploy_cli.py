@@ -36,7 +36,7 @@ def _swap_plane(tmp_path: Path) -> None:
 def _write_manifest(path: Path, *, extra: str = "") -> None:
     path.write_text(
         f"""\
-ironflow-version: "1"
+flowoxide-version: "1"
 deployments:
   - name: cli-deploy-a
     flow_name: simple_flow
@@ -56,10 +56,10 @@ def test_init_creates_yaml(tmp_path: Path) -> None:
     code = main(["init", "--directory", str(tmp_path)])
     assert code == 0
 
-    manifest_path = tmp_path / "ironflow.yaml"
+    manifest_path = tmp_path / "flowoxide.yaml"
     assert manifest_path.is_file()
     text = manifest_path.read_text(encoding="utf-8")
-    assert "ironflow-version:" in text
+    assert "flowoxide-version:" in text
     assert "deployments:" in text
 
     with redirect_stdout(stdout):
@@ -70,7 +70,7 @@ def test_init_creates_yaml(tmp_path: Path) -> None:
 
 def test_deploy_dry_run_prints_action(tmp_path: Path, capsys, monkeypatch) -> None:
     _swap_plane(tmp_path)
-    manifest_path = tmp_path / "ironflow.yaml"
+    manifest_path = tmp_path / "flowoxide.yaml"
     _write_manifest(manifest_path)
 
     http_client = TestClient(app)
@@ -97,7 +97,7 @@ def test_deploy_dry_run_prints_action(tmp_path: Path, capsys, monkeypatch) -> No
 
 def test_deploy_all_with_testclient(tmp_path: Path, capsys, monkeypatch) -> None:
     _swap_plane(tmp_path)
-    manifest_path = tmp_path / "ironflow.yaml"
+    manifest_path = tmp_path / "flowoxide.yaml"
     _write_manifest(manifest_path)
 
     http_client = TestClient(app)

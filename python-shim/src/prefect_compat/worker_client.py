@@ -1,4 +1,4 @@
-"""HTTP client for IronFlow worker claim protocol (Tier B2)."""
+"""HTTP client for FlowOxide worker claim protocol (Tier B2)."""
 
 from __future__ import annotations
 

@@ -5,9 +5,9 @@
 **Scope (when implemented):** `rust-engine/` (aggregation), `python-shim/` (`@flow` completion barrier), docs (`COMPATIBILITY.md`, concepts)  
 **Forbidden on first slice:** Prefect `State` return-object parity, full CRASHED taxonomy, benchmark methodology changes  
 
-This plan rationalizes how a **flow run** terminal state should be derived from its **task runs** and **child flow runs**, and where IronFlow intentionally diverges from Prefect 3.x.
+This plan rationalizes how a **flow run** terminal state should be derived from its **task runs** and **child flow runs**, and where FlowOxide intentionally diverges from Prefect 3.x.
 
-User-facing docs after implement: update [Flows](../concepts/flows.md), [Compatibility matrix](../../COMPATIBILITY.md), [Prefect → IronFlow](../PREFECT_IRONFLOW_MAPPING.md). Subflow fire-and-forget notes in [How to compose flows with subflows](../how-to/subflows.md).
+User-facing docs after implement: update [Flows](../concepts/flows.md), [Compatibility matrix](../../COMPATIBILITY.md), [Prefect → FlowOxide](../PREFECT_FLOWOXIDE_MAPPING.md). Subflow fire-and-forget notes in [How to compose flows with subflows](../how-to/subflows.md).
 
 ---
 
@@ -28,15 +28,15 @@ Important consequence: **a failed task does not fail the flow** unless the flow 
 - thread `return_state=True` and manually inspect / return states, or
 - accept “green flow, red tasks” as normal.
 
-For ~99% of IronFlow workloads, the desired invariant is simpler:
+For ~99% of FlowOxide workloads, the desired invariant is simpler:
 
 > **A flow run is `COMPLETED` only when every counted child work item under that run completed successfully.**
 
-That matches dashboard intuition, static forecasts (“all planned nodes done”), and deterministic control-plane reasoning. IronFlow’s goals (determinism, performance, predictability) justify **not** copying Prefect’s return-value / `State`-object rules as the default.
+That matches dashboard intuition, static forecasts (“all planned nodes done”), and deterministic control-plane reasoning. FlowOxide’s goals (determinism, performance, predictability) justify **not** copying Prefect’s return-value / `State`-object rules as the default.
 
 ---
 
-## 2. What IronFlow does today
+## 2. What FlowOxide does today
 
 Authoritative path: `python-shim/src/prefect_compat/decorators.py` (`@flow` wrapper).
 
@@ -136,7 +136,7 @@ This reuses the same priority idea as UI `_aggregate_state`, but:
 
 ### 4.4 Explicit intentional deviations from Prefect
 
-Document in `COMPATIBILITY.md` as **supported IronFlow semantics** (partial / extension), not “bug vs Prefect”:
+Document in `COMPATIBILITY.md` as **supported FlowOxide semantics** (partial / extension), not “bug vs Prefect”:
 
 - Default final state is **child-state aggregation**, not return-value inspection.
 - No requirement to return `State` objects or iterables of states.

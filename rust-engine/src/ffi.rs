@@ -26,7 +26,7 @@ fn cstr_to_string(ptr: *const c_char) -> Result<String, String> {
 }
 
 #[no_mangle]
-pub extern "C" fn ironflow_query(
+pub extern "C" fn flowoxide_query(
     db_path: *const c_char,
     kind: *const c_char,
     params_json: *const c_char,
@@ -48,7 +48,7 @@ pub extern "C" fn ironflow_query(
 }
 
 #[no_mangle]
-pub extern "C" fn ironflow_free_string(ptr: *mut c_char) {
+pub extern "C" fn flowoxide_free_string(ptr: *mut c_char) {
     if ptr.is_null() {
         return;
     }
@@ -94,7 +94,7 @@ fn deployment_schedulers() -> &'static Mutex<HashMap<u64, DeploymentSchedulerHan
 }
 
 /// Stop background scheduler thread for `handle` (no-op if none).
-fn ironflow_deployment_scheduler_stop_internal(handle: u64) {
+fn flowoxide_deployment_scheduler_stop_internal(handle: u64) {
     if handle == 0 {
         return;
     }
@@ -1053,7 +1053,7 @@ fn opt_str_from_field(body: &Value, key: &str) -> Option<String> {
 
 /// Opaque control-plane engine handle (per Python ``InMemoryControlPlane``). Handle ``0`` is invalid.
 #[no_mangle]
-pub extern "C" fn ironflow_engine_new() -> u64 {
+pub extern "C" fn flowoxide_engine_new() -> u64 {
     let h = NEXT_ENGINE_HANDLE.fetch_add(1, Ordering::Relaxed);
     let ctx = Arc::new(Mutex::new(EngineContext {
         engine: Engine::new(),
@@ -1069,17 +1069,17 @@ pub extern "C" fn ironflow_engine_new() -> u64 {
 }
 
 #[no_mangle]
-pub extern "C" fn ironflow_engine_free(handle: u64) {
+pub extern "C" fn flowoxide_engine_free(handle: u64) {
     if handle == 0 {
         return;
     }
-    ironflow_deployment_scheduler_stop_internal(handle);
+    flowoxide_deployment_scheduler_stop_internal(handle);
     engines().lock().expect("engine map poisoned").remove(&handle);
 }
 
 /// Spawn a background thread that periodically runs `deployment_maintenance` under the engine mutex.
 #[no_mangle]
-pub extern "C" fn ironflow_deployment_scheduler_start(
+pub extern "C" fn flowoxide_deployment_scheduler_start(
     handle: u64,
     interval_ms: u64,
     stale_after_seconds: i64,
@@ -1087,7 +1087,7 @@ pub extern "C" fn ironflow_deployment_scheduler_start(
     if handle == 0 {
         return false;
     }
-    ironflow_deployment_scheduler_stop_internal(handle);
+    flowoxide_deployment_scheduler_stop_internal(handle);
     let stop = Arc::new(AtomicBool::new(false));
     let stop_t = Arc::clone(&stop);
     let sleep_ms = interval_ms.max(50);
@@ -1123,14 +1123,14 @@ pub extern "C" fn ironflow_deployment_scheduler_start(
 }
 
 #[no_mangle]
-pub extern "C" fn ironflow_deployment_scheduler_stop(handle: u64) {
-    ironflow_deployment_scheduler_stop_internal(handle);
+pub extern "C" fn flowoxide_deployment_scheduler_stop(handle: u64) {
+    flowoxide_deployment_scheduler_stop_internal(handle);
 }
 
 /// JSON in / JSON out control dispatch (FSM transitions, registration, replay checkpoints).
 /// Response is either ``{"ok":true,...}`` or ``{"ok":false,"error":{...}}``.
 #[no_mangle]
-pub extern "C" fn ironflow_control(
+pub extern "C" fn flowoxide_control(
     handle: u64,
     op: *const c_char,
     json_in: *const c_char,

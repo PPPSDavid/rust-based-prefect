@@ -1,16 +1,16 @@
 # Flows
 
-A **flow** is a Python function decorated with **`@flow`** from **`prefect_compat`** (not `prefect`). When you invoke it, IronFlow creates a **flow run** in the control plane: the Rust engine records state transitions and append-only history for that run and its task runs.
+A **flow** is a Python function decorated with **`@flow`** from **`prefect_compat`** (not `prefect`). When you invoke it, FlowOxide creates a **flow run** in the control plane: the Rust engine records state transitions and append-only history for that run and its task runs.
 
 ## Basics
 
-- Import: `from prefect_compat import flow` (see [Prefect → IronFlow](../PREFECT_IRONFLOW_MAPPING.md)).
+- Import: `from prefect_compat import flow` (see [Prefect → FlowOxide](../PREFECT_FLOWOXIDE_MAPPING.md)).
 - A flow coordinates **task runs** by calling **`task.submit(...)`**, **`task.map(...)`**, and **`wait(...)`** on futures—see **[Tasks](tasks.md)**.
 - You typically register a control plane (for example **`InMemoryControlPlane`**) with **`set_control_plane`** before executing the flow; see **[Quick start (demo flow)](../QUICKSTART_DEMO.md)**.
 
 ## Final state (`wait_all` default)
 
-By default IronFlow uses **`@flow(final_state="wait_all")`**: after the flow body returns, it drains in-process submits, waits for non-detached children (including deployment-backed subflows), then resolves the flow terminal state in **Rust** from contributing task-run rows (`CANCELLED` > `FAILED` > all `COMPLETED`). Unobserved failed concurrent submits fail the flow (`FlowChildrenFailed`).
+By default FlowOxide uses **`@flow(final_state="wait_all")`**: after the flow body returns, it drains in-process submits, waits for non-detached children (including deployment-backed subflows), then resolves the flow terminal state in **Rust** from contributing task-run rows (`CANCELLED` > `FAILED` > all `COMPLETED`). Unobserved failed concurrent submits fail the flow (`FlowChildrenFailed`).
 
 Escape hatches:
 
@@ -21,14 +21,14 @@ Design notes: **[flow-run final state plan](../plans/flow-run-final-state.md)**.
 
 ## Subflows (nesting flows)
 
-IronFlow supports **two** nesting mechanisms:
+FlowOxide supports **two** nesting mechanisms:
 
 1. **Inline (blocking)** — call another `@flow` as a normal Python function inside the parent. Same process; parent waits for the return value; child run is linked (`execution_mode=inline`).
 2. **Deployment-backed (subflow as task)** — `deployment_ref("deployment-name").submit(...).result()` enqueues work on a deployment’s work pool. Returns a **`SubflowFuture`** that works with **`wait_for`** / **`wait`**. Under `wait_all`, omitting `.result()` still waits unless **`detach=True`**.
 
 Step-by-step examples, UI notes, and choosing between the two: **[How to compose flows with subflows](../how-to/subflows.md)**. Supported subset and limits: **[Compatibility matrix](../compatibility.md)**.
 
-## Transition hooks (IronFlow extension)
+## Transition hooks (FlowOxide extension)
 
 Flows support **`transition_hooks`**: a sequence of **`TransitionHookSpec`** values built with **`on_transition(fn, from_state=..., to_state=...)`**. Use **`None`** for `from_state` or `to_state` to match any state on that side.
 

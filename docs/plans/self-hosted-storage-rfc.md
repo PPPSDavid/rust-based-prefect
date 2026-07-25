@@ -7,7 +7,7 @@
 
 ## 1. Goal
 
-Unlock production compose (Postgres + multi-host HTTP workers) without abandoning IronFlow’s performance model: **claim, schedule tick, gate promotion, and FSM hot paths stay in `rust-engine`**. Python remains HTTP glue and store wiring.
+Unlock production compose (Postgres + multi-host HTTP workers) without abandoning FlowOxide’s performance model: **claim, schedule tick, gate promotion, and FSM hot paths stay in `rust-engine`**. Python remains HTTP glue and store wiring.
 
 ## 2. Topology (target)
 
@@ -29,8 +29,8 @@ Unlock production compose (Postgres + multi-host HTTP workers) without abandonin
                                          └──────────────────┘
 ```
 
-- **Dev / single-node:** SQLite file derived from `IRONFLOW_HISTORY_PATH` (today’s default). Optional embedded worker.
-- **Production compose:** Postgres via `IRONFLOW_DATABASE_URL`; workers talk **only** to the API (no shared volume, no direct DB).
+- **Dev / single-node:** SQLite file derived from `FLOWOXIDE_HISTORY_PATH` (today’s default). Optional embedded worker.
+- **Production compose:** Postgres via `FLOWOXIDE_DATABASE_URL`; workers talk **only** to the API (no shared volume, no direct DB).
 
 ## 3. Decisions
 
@@ -65,9 +65,9 @@ Package: `python-shim/src/prefect_compat/persistence/`
 
 | Variable | Mode | Notes |
 | --- | --- | --- |
-| `IRONFLOW_HISTORY_PATH` | File / SQLite | Existing; `.db` sidecar beside JSONL |
-| `IRONFLOW_DATABASE_URL` | Postgres (B1+) | `postgresql://…`; reserved in B0 factory |
-| `IRONFLOW_SERVER_API_AUTH_STRING` / `IRONFLOW_API_AUTH_STRING` | All networked | Already shipped (Tier C) |
+| `FLOWOXIDE_HISTORY_PATH` | File / SQLite | Existing; `.db` sidecar beside JSONL |
+| `FLOWOXIDE_DATABASE_URL` | Postgres (B1+) | `postgresql://…`; reserved in B0 factory |
+| `FLOWOXIDE_SERVER_API_AUTH_STRING` / `FLOWOXIDE_API_AUTH_STRING` | All networked | Already shipped (Tier C) |
 
 ## 6. Compatibility stance
 

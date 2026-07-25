@@ -19,11 +19,11 @@ def _is_prefect_temp_server_error(stderr: str) -> bool:
     )
 
 
-def test_ironflow_script_e2e(tmp_path):
+def test_flowoxide_script_e2e(tmp_path):
     env = os.environ.copy()
     env["PYTHONPATH"] = str(ROOT / "python-shim" / "src")
-    env["IRONFLOW_HISTORY_PATH"] = str(tmp_path / "script_history.jsonl")
-    script = ROOT / "python-shim" / "examples" / "flow_ironflow.py"
+    env["FLOWOXIDE_HISTORY_PATH"] = str(tmp_path / "script_history.jsonl")
+    script = ROOT / "python-shim" / "examples" / "flow_flowoxide.py"
 
     proc = subprocess.run(
         [sys.executable, str(script)],
@@ -32,8 +32,8 @@ def test_ironflow_script_e2e(tmp_path):
         text=True,
         env=env,
     )
-    assert "ironflow_result=26" in proc.stdout
-    assert "ironflow_events=" in proc.stdout
+    assert "flowoxide_result=26" in proc.stdout
+    assert "flowoxide_events=" in proc.stdout
 
 
 def test_prefect_script_e2e_if_available():

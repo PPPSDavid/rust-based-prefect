@@ -1,4 +1,4 @@
-"""Unit tests for ironflow_engine discovery (env, checkout, packaged resources)."""
+"""Unit tests for flowoxide_engine discovery (env, checkout, packaged resources)."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 def _reload_rust_bridge(
     monkeypatch: pytest.MonkeyPatch, **env: str | None
 ) -> ModuleType:
-    monkeypatch.delenv("IRONFLOW_RUST_LIB", raising=False)
+    monkeypatch.delenv("FLOWOXIDE_RUST_LIB", raising=False)
     for k, v in env.items():
         if v is None:
             monkeypatch.delenv(k, raising=False)
@@ -43,13 +43,13 @@ def test_find_repo_root_none_when_not_in_repo(monkeypatch: pytest.MonkeyPatch) -
     assert rb._find_repo_root_with_rust() is None
 
 
-def test_ironflow_rust_lib_missing_raises(
+def test_flowoxide_rust_lib_missing_raises(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     missing = tmp_path / "missing.so"
-    rb = _reload_rust_bridge(monkeypatch, IRONFLOW_RUST_LIB=str(missing))
-    with pytest.raises(RuntimeError, match="IRONFLOW_RUST_LIB"):
-        rb.load_ironflow_library()
+    rb = _reload_rust_bridge(monkeypatch, FLOWOXIDE_RUST_LIB=str(missing))
+    with pytest.raises(RuntimeError, match="FLOWOXIDE_RUST_LIB"):
+        rb.load_flowoxide_library()
 
 
 def test_packaged_resource_exists_true(monkeypatch: pytest.MonkeyPatch) -> None:

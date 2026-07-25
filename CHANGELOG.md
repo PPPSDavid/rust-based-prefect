@@ -4,6 +4,17 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
+### Changed
+
+- **Project rename: IronFlow → FlowOxide (breaking).** Product, CLI, env vars, Rust crate/FFI symbols, Docker image names, and PyPI package names now use FlowOxide branding.
+  - PyPI: `ironflow-prefect-compat` → **`flowoxide-prefect-compat`** (and `ironflow-static-planner` → **`flowoxide-static-planner`**). PyPI does not rename packages in place — publish the new names on the next release; the old names remain as historical uploads.
+  - CLI: `ironflow` → **`flowoxide`**; manifest **`ironflow.yaml`** → **`flowoxide.yaml`**.
+  - Environment: `IRONFLOW_*` → **`FLOWOXIDE_*`** (for example `FLOWOXIDE_HISTORY_PATH`, `FLOWOXIDE_RUST_LIB`, `FLOWOXIDE_API_URL`).
+  - Rust: crate `ironflow-engine` → **`flowoxide-engine`**; cdylib / FFI `ironflow_*` → **`flowoxide_*`**.
+  - Helpers: `scripts/ironflow_server.py` → **`scripts/flowoxide_server.py`**; docs mapping page renamed to `PREFECT_FLOWOXIDE_MAPPING.md`.
+  - GitHub repository URL (`rust-based-prefect`) and Pages site path are unchanged for continuity/SEO.
+
+
 ## [0.2.0] — 2026-07-12
 
 ### Added

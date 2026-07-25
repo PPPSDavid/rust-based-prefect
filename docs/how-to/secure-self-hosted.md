@@ -1,8 +1,8 @@
-# How to secure a self-hosted IronFlow server
+# How to secure a self-hosted FlowOxide server
 
-IronFlow self-hosted security follows the **Prefect OSS subset**: optional **HTTP Basic Authentication** on `/api/*` routes. There is **no built-in RBAC**, user accounts, or API keys (those are Prefect Cloud features).
+FlowOxide self-hosted security follows the **Prefect OSS subset**: optional **HTTP Basic Authentication** on `/api/*` routes. There is **no built-in RBAC**, user accounts, or API keys (those are Prefect Cloud features).
 
-**Prefect example to borrow from:** [Secure a self-hosted Prefect server](https://docs.prefect.io/v3/advanced/security-settings) — same Basic auth string pattern (`SERVER` vs client). IronFlow does **not** yet ship Prefect’s CSRF toggles; prefer a reverse proxy for TLS and edge auth.
+**Prefect example to borrow from:** [Secure a self-hosted Prefect server](https://docs.prefect.io/v3/advanced/security-settings) — same Basic auth string pattern (`SERVER` vs client). FlowOxide does **not** yet ship Prefect’s CSRF toggles; prefer a reverse proxy for TLS and edge auth.
 
 ## Basic authentication
 
@@ -10,14 +10,14 @@ Set the same `user:password` string on the server and on every client that calls
 
 | Variable | Where | Purpose |
 | --- | --- | --- |
-| `IRONFLOW_SERVER_API_AUTH_STRING` | API server process / container | Require `Authorization: Basic …` on `/api/*` |
-| `IRONFLOW_API_AUTH_STRING` | CLI, scripts, workers (HTTP clients) | Send credentials on outbound API requests |
+| `FLOWOXIDE_SERVER_API_AUTH_STRING` | API server process / container | Require `Authorization: Basic …` on `/api/*` |
+| `FLOWOXIDE_API_AUTH_STRING` | CLI, scripts, workers (HTTP clients) | Send credentials on outbound API requests |
 
 Example:
 
 ```bash
-export IRONFLOW_SERVER_API_AUTH_STRING='admin:pass'
-export IRONFLOW_API_AUTH_STRING='admin:pass'
+export FLOWOXIDE_SERVER_API_AUTH_STRING='admin:pass'
+export FLOWOXIDE_API_AUTH_STRING='admin:pass'
 
 python -m uvicorn prefect_compat.server:app --host 127.0.0.1 --port 8000
 ```
@@ -28,9 +28,9 @@ With curl, use standard Basic auth (`-u admin:pass`), which encodes the `admin:p
 
 ```bash
 docker run -p 8000:8000 \
-  -e IRONFLOW_SERVER_API_AUTH_STRING='admin:pass' \
-  -v ironflow-data:/data \
-  ironflow-server:local
+  -e FLOWOXIDE_SERVER_API_AUTH_STRING='admin:pass' \
+  -v flowoxide-data:/data \
+  flowoxide-server:local
 ```
 
 Store secrets in a `.env` file or orchestrator secret store — not in source control.
@@ -45,15 +45,15 @@ Store secrets in a `.env` file or orchestrator secret store — not in source co
 
 ## Reverse proxy and OIDC (teams)
 
-For SSO, coarse roles, or TLS termination, place IronFlow behind a reverse proxy (nginx, Traefik, Caddy) with an OIDC layer (for example oauth2-proxy). IronFlow does not consume identity headers today — enforcement is at the proxy.
+For SSO, coarse roles, or TLS termination, place FlowOxide behind a reverse proxy (nginx, Traefik, Caddy) with an OIDC layer (for example oauth2-proxy). FlowOxide does not consume identity headers today — enforcement is at the proxy.
 
 Typical pattern:
 
 1. Terminate TLS at the proxy.
-2. Require IdP login before traffic reaches IronFlow.
+2. Require IdP login before traffic reaches FlowOxide.
 3. Optionally restrict write methods (`POST`, `PATCH`, `DELETE`) to an admin group at the proxy.
 
-## What IronFlow does not provide (OSS)
+## What FlowOxide does not provide (OSS)
 
 - Per-user accounts or admin UI
 - Role-based access control on deployments or work pools

@@ -21,7 +21,7 @@ class BinaryDistribution(Distribution):
     """Treat native-enabled builds as platform wheels (platlib), not purelib."""
 
     def has_ext_modules(self) -> bool:
-        skip_native = os.environ.get("IRONFLOW_SKIP_NATIVE_BUILD", "").lower() in (
+        skip_native = os.environ.get("FLOWOXIDE_SKIP_NATIVE_BUILD", "").lower() in (
             "1",
             "true",
             "yes",
@@ -34,13 +34,13 @@ class bdist_wheel(_bdist_wheel):
 
     def finalize_options(self) -> None:
         super().finalize_options()
-        skip_native = os.environ.get("IRONFLOW_SKIP_NATIVE_BUILD", "").lower() in (
+        skip_native = os.environ.get("FLOWOXIDE_SKIP_NATIVE_BUILD", "").lower() in (
             "1",
             "true",
             "yes",
         )
         force_platform = os.environ.get(
-            "IRONFLOW_FORCE_PLATFORM_WHEEL", ""
+            "FLOWOXIDE_FORCE_PLATFORM_WHEEL", ""
         ).lower() in ("1", "true", "yes")
         # build_py stages the cdylib later in the build lifecycle, so decide purity
         # from intent. Keep Linux pure for auditwheel repair to attach manylinux tags,

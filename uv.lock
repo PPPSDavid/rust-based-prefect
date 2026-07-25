@@ -4,9 +4,9 @@ requires-python = ">=3.11"
 
 [manifest]
 members = [
-    "ironflow",
-    "ironflow-prefect-compat",
-    "ironflow-static-planner",
+    "flowoxide",
+    "flowoxide-prefect-compat",
+    "flowoxide-static-planner",
 ]
 
 [[package]]
@@ -87,6 +87,76 @@ wheels = [
 ]
 
 [[package]]
+name = "flowoxide"
+version = "0.0.0"
+source = { virtual = "." }
+
+[package.dev-dependencies]
+dev = [
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "networkx" },
+    { name = "psycopg", extra = ["binary"] },
+    { name = "pydantic" },
+    { name = "pytest" },
+    { name = "pyyaml" },
+    { name = "rich" },
+    { name = "ruff" },
+    { name = "ty" },
+    { name = "uvicorn" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "fastapi", specifier = ">=0.115,<1" },
+    { name = "httpx", specifier = ">=0.27,<1" },
+    { name = "networkx", specifier = ">=3,<4" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.1,<4" },
+    { name = "pydantic", specifier = ">=2,<3" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pyyaml", specifier = ">=6,<7" },
+    { name = "rich", specifier = ">=13,<14" },
+    { name = "ruff", specifier = ">=0.8,<1" },
+    { name = "ty", specifier = ">=0.0.1,<1" },
+    { name = "uvicorn", specifier = ">=0.30,<1" },
+]
+
+[[package]]
+name = "flowoxide-prefect-compat"
+version = "0.2.0"
+source = { editable = "python-shim" }
+dependencies = [
+    { name = "pydantic" },
+    { name = "pyyaml" },
+]
+
+[package.optional-dependencies]
+postgres = [
+    { name = "psycopg", extra = ["binary"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "psycopg", extras = ["binary"], marker = "extra == 'postgres'", specifier = ">=3.1,<4" },
+    { name = "pydantic", specifier = ">=2,<3" },
+    { name = "pyyaml", specifier = ">=6,<7" },
+]
+provides-extras = ["postgres"]
+
+[[package]]
+name = "flowoxide-static-planner"
+version = "0.2.0"
+source = { editable = "static-planner" }
+dependencies = [
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pydantic", specifier = ">=2,<3" }]
+
+[[package]]
 name = "h11"
 version = "0.16.0"
 source = { registry = "https://pypi.org/simple" }
@@ -140,76 +210,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/72/34/14ca021ce8e5dfedc
 wheels = [
     { url = "https://files.pythonhosted.org/packages/cb/b1/3846dd7f199d53cb17f49cba7e651e9ce294d8497c8c150530ed11865bb8/iniconfig-2.3.0-py3-none-any.whl", hash = "sha256:f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12", size = 7484, upload-time = "2025-10-18T21:55:41.639Z" },
 ]
-
-[[package]]
-name = "ironflow"
-version = "0.0.0"
-source = { virtual = "." }
-
-[package.dev-dependencies]
-dev = [
-    { name = "fastapi" },
-    { name = "httpx" },
-    { name = "networkx" },
-    { name = "psycopg", extra = ["binary"] },
-    { name = "pydantic" },
-    { name = "pytest" },
-    { name = "pyyaml" },
-    { name = "rich" },
-    { name = "ruff" },
-    { name = "ty" },
-    { name = "uvicorn" },
-]
-
-[package.metadata]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "fastapi", specifier = ">=0.115,<1" },
-    { name = "httpx", specifier = ">=0.27,<1" },
-    { name = "networkx", specifier = ">=3,<4" },
-    { name = "psycopg", extras = ["binary"], specifier = ">=3.1,<4" },
-    { name = "pydantic", specifier = ">=2,<3" },
-    { name = "pytest", specifier = ">=8,<9" },
-    { name = "pyyaml", specifier = ">=6,<7" },
-    { name = "rich", specifier = ">=13,<14" },
-    { name = "ruff", specifier = ">=0.8,<1" },
-    { name = "ty", specifier = ">=0.0.1,<1" },
-    { name = "uvicorn", specifier = ">=0.30,<1" },
-]
-
-[[package]]
-name = "ironflow-prefect-compat"
-version = "0.2.0"
-source = { editable = "python-shim" }
-dependencies = [
-    { name = "pydantic" },
-    { name = "pyyaml" },
-]
-
-[package.optional-dependencies]
-postgres = [
-    { name = "psycopg", extra = ["binary"] },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "psycopg", extras = ["binary"], marker = "extra == 'postgres'", specifier = ">=3.1,<4" },
-    { name = "pydantic", specifier = ">=2,<3" },
-    { name = "pyyaml", specifier = ">=6,<7" },
-]
-provides-extras = ["postgres"]
-
-[[package]]
-name = "ironflow-static-planner"
-version = "0.2.0"
-source = { editable = "static-planner" }
-dependencies = [
-    { name = "pydantic" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "pydantic", specifier = ">=2,<3" }]
 
 [[package]]
 name = "markdown-it-py"

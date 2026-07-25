@@ -23,16 +23,16 @@ from ..worker import resolve_worker_mode, run_http_worker_loop, run_worker_loop
 from ..worker_client import WorkerHttpClient
 
 DEFAULT_API_URL = "http://127.0.0.1:8000"
-DEFAULT_MANIFEST = "ironflow.yaml"
-DEFAULT_HISTORY_PATH = str(Path("data") / "ironflow_history.jsonl")
+DEFAULT_MANIFEST = "flowoxide.yaml"
+DEFAULT_HISTORY_PATH = str(Path("data") / "flowoxide_history.jsonl")
 
 
 def _default_api_url() -> str:
-    return os.getenv("IRONFLOW_API_URL", DEFAULT_API_URL).rstrip("/")
+    return os.getenv("FLOWOXIDE_API_URL", DEFAULT_API_URL).rstrip("/")
 
 
 def _default_history_path() -> str:
-    return os.getenv("IRONFLOW_HISTORY_PATH", DEFAULT_HISTORY_PATH)
+    return os.getenv("FLOWOXIDE_HISTORY_PATH", DEFAULT_HISTORY_PATH)
 
 
 def _epilog(examples: list[str]) -> str:
@@ -106,7 +106,7 @@ def cmd_init(args: argparse.Namespace) -> int:
         print(f"exists: {manifest_path}")
         return 0
 
-    template_name = "ironflow.yaml"
+    template_name = "flowoxide.yaml"
     if args.recipe != "process":
         print(
             f"Warning: recipe {args.recipe!r} is not specialized yet; "
@@ -129,8 +129,8 @@ def cmd_deploy(args: argparse.Namespace) -> int:
     if not manifest_path.is_file():
         print(
             f"Error: manifest not found: {manifest_path}\n"
-            f"  ironflow init --directory {manifest_path.parent}\n"
-            f"  ironflow deploy --file {manifest_path} --all",
+            f"  flowoxide init --directory {manifest_path.parent}\n"
+            f"  flowoxide deploy --file {manifest_path} --all",
             file=sys.stderr,
         )
         return 1
@@ -185,7 +185,7 @@ def _build_flow_registry(spec: DeploymentSpec) -> dict[str, Callable[..., Any]]:
 
 def _setup_local_control_plane(history_path: str | None = None) -> InMemoryControlPlane:
     path = history_path or _default_history_path()
-    os.environ.setdefault("IRONFLOW_HISTORY_PATH", path)
+    os.environ.setdefault("FLOWOXIDE_HISTORY_PATH", path)
     plane = InMemoryControlPlane(history_path=path)
     set_control_plane(plane)
     return plane
@@ -266,8 +266,8 @@ def cmd_serve(args: argparse.Namespace) -> int:
         if mode == "http":
             print(f"api_url: {api_url}")
             print(
-                "Tip: HTTP mode does not open IRONFLOW_HISTORY_PATH; "
-                "set IRONFLOW_ENABLE_LOCAL_WORKER=0 on the API server.",
+                "Tip: HTTP mode does not open FLOWOXIDE_HISTORY_PATH; "
+                "set FLOWOXIDE_ENABLE_LOCAL_WORKER=0 on the API server.",
                 file=sys.stderr,
             )
             with WorkerHttpClient(api_url) as worker_client:
@@ -282,7 +282,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
             plane = _setup_local_control_plane()
             print(f"history_path: {plane._history_path}")
             print(
-                "Tip: disable the in-process server worker with IRONFLOW_ENABLE_LOCAL_WORKER=0 "
+                "Tip: disable the in-process server worker with FLOWOXIDE_ENABLE_LOCAL_WORKER=0 "
                 "when running a standalone serve/worker process.",
                 file=sys.stderr,
             )
@@ -316,7 +316,7 @@ def cmd_worker_start(args: argparse.Namespace) -> int:
     from ..server import FLOW_REGISTRY
 
     pool_name = args.pool or DEFAULT_WORK_POOL_NAME
-    worker_name = args.name or "ironflow-worker"
+    worker_name = args.name or "flowoxide-worker"
     work_pool_id = pool_name
     api_url = args.api_url or _default_api_url()
     mode = resolve_worker_mode(getattr(args, "worker_mode", None))
@@ -346,9 +346,9 @@ def cmd_worker_start(args: argparse.Namespace) -> int:
         if mode == "http":
             print(f"api_url: {api_url}")
             print(
-                "Tip: HTTP mode needs only IRONFLOW_API_URL (+ auth); "
-                "no shared IRONFLOW_HISTORY_PATH. Disable the server embed with "
-                "IRONFLOW_ENABLE_LOCAL_WORKER=0.",
+                "Tip: HTTP mode needs only FLOWOXIDE_API_URL (+ auth); "
+                "no shared FLOWOXIDE_HISTORY_PATH. Disable the server embed with "
+                "FLOWOXIDE_ENABLE_LOCAL_WORKER=0.",
                 file=sys.stderr,
             )
             with WorkerHttpClient(api_url) as worker_client:
@@ -364,8 +364,8 @@ def cmd_worker_start(args: argparse.Namespace) -> int:
             plane = _setup_local_control_plane()
             print(f"history_path: {plane._history_path}")
             print(
-                "Tip: set IRONFLOW_HISTORY_PATH to the server data dir and "
-                "IRONFLOW_ENABLE_LOCAL_WORKER=0 on the API server for split-process workers.",
+                "Tip: set FLOWOXIDE_HISTORY_PATH to the server data dir and "
+                "FLOWOXIDE_ENABLE_LOCAL_WORKER=0 on the API server for split-process workers.",
                 file=sys.stderr,
             )
             run_worker_loop(
@@ -383,13 +383,13 @@ def cmd_worker_start(args: argparse.Namespace) -> int:
 
 def _build_parser() -> argparse.ArgumentParser:
     try:
-        pkg_version = version("ironflow-prefect-compat")
+        pkg_version = version("flowoxide-prefect-compat")
     except Exception:
         pkg_version = "0.0.0"
 
     parser = argparse.ArgumentParser(
-        prog="ironflow",
-        description="IronFlow deployment CLI (init, deploy, serve, worker).",
+        prog="flowoxide",
+        description="FlowOxide deployment CLI (init, deploy, serve, worker).",
     )
     parser.add_argument(
         "--version",
@@ -401,13 +401,13 @@ def _build_parser() -> argparse.ArgumentParser:
 
     init_parser = subparsers.add_parser(
         "init",
-        help="Write ironflow.yaml template if it does not exist.",
+        help="Write flowoxide.yaml template if it does not exist.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=_epilog(
             [
-                "ironflow init",
-                "ironflow init --directory ./deploy",
-                "ironflow init --recipe process --directory .",
+                "flowoxide init",
+                "flowoxide init --directory ./deploy",
+                "flowoxide init --recipe process --directory .",
             ]
         ),
     )
@@ -420,7 +420,7 @@ def _build_parser() -> argparse.ArgumentParser:
     init_parser.add_argument(
         "--directory",
         default=".",
-        help="Directory for ironflow.yaml (default: current directory).",
+        help="Directory for flowoxide.yaml (default: current directory).",
     )
     init_parser.set_defaults(func=cmd_init)
 
@@ -430,10 +430,10 @@ def _build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=_epilog(
             [
-                "ironflow deploy --file ironflow.yaml --name my-deployment",
-                "ironflow deploy --file ironflow.yaml --all",
-                "ironflow deploy --file ironflow.yaml --all --dry-run",
-                "ironflow deploy --all --api-url http://127.0.0.1:8000",
+                "flowoxide deploy --file flowoxide.yaml --name my-deployment",
+                "flowoxide deploy --file flowoxide.yaml --all",
+                "flowoxide deploy --file flowoxide.yaml --all --dry-run",
+                "flowoxide deploy --all --api-url http://127.0.0.1:8000",
             ]
         ),
     )
@@ -454,7 +454,7 @@ def _build_parser() -> argparse.ArgumentParser:
     deploy_parser.add_argument(
         "--api-url",
         default=None,
-        help=f"API base URL (default: IRONFLOW_API_URL or {DEFAULT_API_URL}).",
+        help=f"API base URL (default: FLOWOXIDE_API_URL or {DEFAULT_API_URL}).",
     )
     deploy_parser.add_argument(
         "--dry-run",
@@ -469,9 +469,9 @@ def _build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=_epilog(
             [
-                "ironflow serve --file ironflow.yaml --name my-deployment",
-                "ironflow serve --name my-deployment --pool default-process-pool",
-                "ironflow serve --name my-deployment --worker-name prod-worker-1",
+                "flowoxide serve --file flowoxide.yaml --name my-deployment",
+                "flowoxide serve --name my-deployment --pool default-process-pool",
+                "flowoxide serve --name my-deployment --worker-name prod-worker-1",
             ]
         ),
     )
@@ -484,7 +484,7 @@ def _build_parser() -> argparse.ArgumentParser:
     serve_parser.add_argument(
         "--api-url",
         default=None,
-        help=f"API base URL (default: IRONFLOW_API_URL or {DEFAULT_API_URL}).",
+        help=f"API base URL (default: FLOWOXIDE_API_URL or {DEFAULT_API_URL}).",
     )
     serve_parser.add_argument(
         "--pool",
@@ -501,7 +501,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         choices=["http", "file"],
         help="Claim transport: http (API only) or file (shared DB). "
-        "Default: IRONFLOW_WORKER_MODE or file.",
+        "Default: FLOWOXIDE_WORKER_MODE or file.",
     )
     serve_parser.set_defaults(func=cmd_serve)
 
@@ -517,12 +517,12 @@ def _build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=_epilog(
             [
-                "ironflow worker start --pool default-process-pool",
-                "ironflow worker start --name worker-1 --lease-seconds 30",
-                "ironflow worker start --file ironflow.yaml",
-                "IRONFLOW_WORKER_MODE=http IRONFLOW_API_URL=http://127.0.0.1:8000 "
-                "ironflow worker start",
-                "IRONFLOW_HISTORY_PATH=data/ironflow_history.jsonl ironflow worker start",
+                "flowoxide worker start --pool default-process-pool",
+                "flowoxide worker start --name worker-1 --lease-seconds 30",
+                "flowoxide worker start --file flowoxide.yaml",
+                "FLOWOXIDE_WORKER_MODE=http FLOWOXIDE_API_URL=http://127.0.0.1:8000 "
+                "flowoxide worker start",
+                "FLOWOXIDE_HISTORY_PATH=data/flowoxide_history.jsonl flowoxide worker start",
             ]
         ),
     )
@@ -534,7 +534,7 @@ def _build_parser() -> argparse.ArgumentParser:
     worker_start.add_argument(
         "--name",
         default=None,
-        help="Worker name (default: ironflow-worker).",
+        help="Worker name (default: flowoxide-worker).",
     )
     worker_start.add_argument(
         "--lease-seconds",
@@ -557,7 +557,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         choices=["http", "file"],
         help="Claim transport: http (API only) or file (shared DB). "
-        "Default: IRONFLOW_WORKER_MODE or file.",
+        "Default: FLOWOXIDE_WORKER_MODE or file.",
     )
     worker_start.set_defaults(func=cmd_worker_start)
 
@@ -579,8 +579,8 @@ def _build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=_epilog(
             [
-                "ironflow server services start",
-                "IRONFLOW_DATABASE_URL=postgresql://… ironflow server services start",
+                "flowoxide server services start",
+                "FLOWOXIDE_DATABASE_URL=postgresql://… flowoxide server services start",
             ]
         ),
     )
@@ -588,13 +588,13 @@ def _build_parser() -> argparse.ArgumentParser:
         "--interval-ms",
         type=int,
         default=None,
-        help="Tick interval ms (default: IRONFLOW_SCHEDULER_INTERVAL_MS or 1000).",
+        help="Tick interval ms (default: FLOWOXIDE_SCHEDULER_INTERVAL_MS or 1000).",
     )
     services_start.add_argument(
         "--stale-seconds",
         type=int,
         default=None,
-        help="Stale worker threshold (default: IRONFLOW_SCHEDULER_STALE_SECONDS or 120).",
+        help="Stale worker threshold (default: FLOWOXIDE_SCHEDULER_STALE_SECONDS or 120).",
     )
     services_start.set_defaults(func=cmd_server_services_start)
 
@@ -606,7 +606,7 @@ def cmd_server_services_start(args: argparse.Namespace) -> int:
     stop_event = threading.Event()
     interval = args.interval_ms
     stale = args.stale_seconds
-    print("ironflow server services start")
+    print("flowoxide server services start")
     print(f"history_path: {plane._history_path}")
     if getattr(plane, "_store", None) is not None:
         print(f"store_backend: {plane._store.backend_kind}")

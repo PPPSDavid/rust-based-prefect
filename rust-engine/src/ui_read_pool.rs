@@ -1,4 +1,4 @@
-//! Thread-local SQLite read connection pool for ``ironflow_query``.
+//! Thread-local SQLite read connection pool for ``flowoxide_query``.
 //!
 //! Each thread reuses one ``Connection`` per database path instead of opening a new
 //! handle on every query. Safe under WAL: readers do not block writers on other

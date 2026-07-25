@@ -1,4 +1,4 @@
 {
-  "name": "ironflow",
+  "name": "flowoxide",
   "install": "bash .cursor/cloud-install.sh"
 }

@@ -36,10 +36,10 @@ def test_uvicorn_server_with_basic_auth(tmp_path: Path) -> None:
     env["PYTHONPATH"] = os.pathsep.join(
         [str(shim_src), env.get("PYTHONPATH", "")]
     ).strip(os.pathsep)
-    env["IRONFLOW_HISTORY_PATH"] = str(history)
-    env["IRONFLOW_SERVER_API_AUTH_STRING"] = "admin:pass"
-    env["IRONFLOW_ENABLE_LOCAL_WORKER"] = "0"
-    env["IRONFLOW_ENABLE_SCHEDULER"] = "0"
+    env["FLOWOXIDE_HISTORY_PATH"] = str(history)
+    env["FLOWOXIDE_SERVER_API_AUTH_STRING"] = "admin:pass"
+    env["FLOWOXIDE_ENABLE_LOCAL_WORKER"] = "0"
+    env["FLOWOXIDE_ENABLE_SCHEDULER"] = "0"
 
     proc = subprocess.Popen(
         [

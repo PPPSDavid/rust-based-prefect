@@ -42,9 +42,9 @@ def _swap_plane(tmp_path: Path) -> InMemoryControlPlane:
 
 
 def test_resolve_worker_mode_defaults_file(monkeypatch) -> None:
-    monkeypatch.delenv("IRONFLOW_WORKER_MODE", raising=False)
+    monkeypatch.delenv("FLOWOXIDE_WORKER_MODE", raising=False)
     assert resolve_worker_mode() == "file"
-    monkeypatch.setenv("IRONFLOW_WORKER_MODE", "HTTP")
+    monkeypatch.setenv("FLOWOXIDE_WORKER_MODE", "HTTP")
     assert resolve_worker_mode() == "http"
     assert resolve_worker_mode("file") == "file"
 

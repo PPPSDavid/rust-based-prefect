@@ -13,7 +13,7 @@ A **task** is a Python callable decorated with **`@task`** from **`prefect_compa
 
 ## Repeated and aliased tasks
 
-IronFlow treats each **`submit`** (or **`map`** site) as its own graph node, even when the Python function or task name repeats.
+FlowOxide treats each **`submit`** (or **`map`** site) as its own graph node, even when the Python function or task name repeats.
 
 **Same task, multiple calls** (e.g. status at start and end of a flow):
 

@@ -573,7 +573,7 @@ def load_matrix_run_json(path: Path) -> dict[str, Any]:
     if isinstance(raw, list):
         raise ValueError(
             f"{path}: expected a JSON object from `perf_matrix.py run`, but found a JSON array. "
-            "Files such as `docs/perf_comparison.json` (Prefect vs IronFlow A/B) are not valid "
+            "Files such as `docs/perf_comparison.json` (Prefect vs FlowOxide A/B) are not valid "
             "inputs for `perf_matrix.py compare`; pass two outputs from `perf_matrix.py run`."
         )
     if not isinstance(raw, dict):
@@ -2122,7 +2122,7 @@ def run_suite(
 def build_run_markdown(payload: dict[str, Any], out_json: Path) -> str:
     meta = payload.get("metadata") or {}
     lines = [
-        "# IronFlow Deterministic Performance Matrix",
+        "# FlowOxide Deterministic Performance Matrix",
         "",
         f"- Generated: `{meta.get('timestamp_utc', '')}`",
         f"- Git SHA: `{meta.get('git_sha', '')}`",

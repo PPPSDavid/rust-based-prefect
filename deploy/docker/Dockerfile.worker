@@ -1,23 +1,23 @@
-# IronFlow HTTP worker image — Tier B2/B5.
+# FlowOxide HTTP worker image — Tier B2/B5.
 #
 # Build from repo root after building a local wheel into dist/wheels/:
 #   docker build -f deploy/docker/Dockerfile.worker \
-#     --build-arg INSTALL_MODE=local -t ironflow-worker:local .
+#     --build-arg INSTALL_MODE=local -t flowoxide-worker:local .
 
 ARG PYTHON_VERSION=3.12
 FROM python:${PYTHON_VERSION}-slim AS runtime
 
-ARG IRONFLOW_VERSION=0.2.0
+ARG FLOWOXIDE_VERSION=0.2.0
 ARG INSTALL_MODE=pypi
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /opt/ironflow
+WORKDIR /opt/flowoxide
 
 # HTTP workers need httpx for WorkerHttpClient. FastAPI is also required today
-# because `ironflow worker start` imports FLOW_REGISTRY from prefect_compat.server
+# because `flowoxide worker start` imports FLOW_REGISTRY from prefect_compat.server
 # (which imports fastapi at module load). Keep this until FLOW_REGISTRY is split out.
 RUN pip install --no-cache-dir \
     "httpx>=0.27,<1" \
@@ -25,22 +25,22 @@ RUN pip install --no-cache-dir \
 
 COPY dist/wheels/ /tmp/wheels/
 RUN if [ "$INSTALL_MODE" = "local" ]; then \
-      WHEEL="$(ls /tmp/wheels/ironflow_prefect_compat-*.whl | head -n 1)"; \
+      WHEEL="$(ls /tmp/wheels/flowoxide_prefect_compat-*.whl | head -n 1)"; \
       pip install --no-cache-dir "$WHEEL"; \
     else \
-      pip install --no-cache-dir "ironflow-prefect-compat==${IRONFLOW_VERSION}"; \
+      pip install --no-cache-dir "flowoxide-prefect-compat==${FLOWOXIDE_VERSION}"; \
     fi \
     && rm -rf /tmp/wheels
 
-ENV IRONFLOW_WORKER_MODE=http \
-    IRONFLOW_API_URL=http://server:8000 \
-    IRONFLOW_HISTORY_PATH=/tmp/ironflow_worker_import.jsonl \
-    IRONFLOW_ENABLE_LOCAL_WORKER=0 \
-    IRONFLOW_ENABLE_SCHEDULER=0 \
+ENV FLOWOXIDE_WORKER_MODE=http \
+    FLOWOXIDE_API_URL=http://server:8000 \
+    FLOWOXIDE_HISTORY_PATH=/tmp/flowoxide_worker_import.jsonl \
+    FLOWOXIDE_ENABLE_LOCAL_WORKER=0 \
+    FLOWOXIDE_ENABLE_SCHEDULER=0 \
     PYTHONUNBUFFERED=1
 
 COPY deploy/docker/entrypoint-server.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["ironflow", "worker", "start", "--worker-mode", "http", "--name", "compose-worker-1"]
+CMD ["flowoxide", "worker", "start", "--worker-mode", "http", "--name", "compose-worker-1"]

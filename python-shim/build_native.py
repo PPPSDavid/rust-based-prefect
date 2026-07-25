@@ -20,11 +20,11 @@ _NATIVE_DEST = _PYTHON_SHIM_ROOT / "src" / "prefect_compat" / "native"
 def _artifact_filename() -> str | None:
     system = platform.system()
     if system == "Linux":
-        return "libironflow_engine.so"
+        return "libflowoxide_engine.so"
     if system == "Darwin":
-        return "libironflow_engine.dylib"
+        return "libflowoxide_engine.dylib"
     if system == "Windows":
-        return "ironflow_engine.dll"
+        return "flowoxide_engine.dll"
     return None
 
 
@@ -37,19 +37,19 @@ def _release_artifact_path() -> Path | None:
 
 def maybe_build_and_stage_native_library() -> None:
     """When ``cargo`` is available and the repo layout is present, build release cdylib into native/."""
-    if os.environ.get("IRONFLOW_SKIP_NATIVE_BUILD", "").lower() in ("1", "true", "yes"):
+    if os.environ.get("FLOWOXIDE_SKIP_NATIVE_BUILD", "").lower() in ("1", "true", "yes"):
         return
     if not _RUST_MANIFEST.is_file():
         warnings.warn(
-            "ironflow: rust-engine manifest not found; skipping native library staging "
+            "flowoxide: rust-engine manifest not found; skipping native library staging "
             f"(expected {_RUST_MANIFEST})",
             stacklevel=2,
         )
         return
     if shutil.which("cargo") is None:
         warnings.warn(
-            "ironflow: cargo not on PATH; wheel/sdist build will not bundle ironflow_engine "
-            "(set IRONFLOW_SKIP_NATIVE_BUILD=1 to silence)",
+            "flowoxide: cargo not on PATH; wheel/sdist build will not bundle flowoxide_engine "
+            "(set FLOWOXIDE_SKIP_NATIVE_BUILD=1 to silence)",
             stacklevel=2,
         )
         return
@@ -57,7 +57,7 @@ def maybe_build_and_stage_native_library() -> None:
     name = _artifact_filename()
     if name is None:
         warnings.warn(
-            f"ironflow: unsupported platform for native staging: {platform.system()}",
+            f"flowoxide: unsupported platform for native staging: {platform.system()}",
             stacklevel=2,
         )
         return
@@ -70,7 +70,7 @@ def maybe_build_and_stage_native_library() -> None:
     built = _release_artifact_path()
     if built is None or not built.is_file():
         raise RuntimeError(
-            f"ironflow: cargo build finished but artifact missing: {built}"
+            f"flowoxide: cargo build finished but artifact missing: {built}"
         )
 
     _NATIVE_DEST.mkdir(parents=True, exist_ok=True)

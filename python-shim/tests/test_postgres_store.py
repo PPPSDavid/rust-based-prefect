@@ -1,4 +1,4 @@
-"""Tier B1 Postgres store + dialect adapter tests (requires IRONFLOW_DATABASE_URL)."""
+"""Tier B1 Postgres store + dialect adapter tests (requires FLOWOXIDE_DATABASE_URL)."""
 
 from __future__ import annotations
 
@@ -17,8 +17,8 @@ from prefect_compat.persistence.dialect import rewrite_sqlite_sql_for_postgres
 from prefect_compat.runtime import InMemoryControlPlane
 
 PG_URL = os.getenv(
-    "IRONFLOW_DATABASE_URL",
-    "postgresql://ironflow:ironflow@127.0.0.1:5432/ironflow_b1",
+    "FLOWOXIDE_DATABASE_URL",
+    "postgresql://flowoxide:flowoxide@127.0.0.1:5432/flowoxide_b1",
 )
 
 
@@ -37,7 +37,7 @@ def _pg_available() -> bool:
 
 pytestmark = pytest.mark.skipif(
     not _pg_available(),
-    reason="Postgres not available (set IRONFLOW_DATABASE_URL / start Postgres)",
+    reason="Postgres not available (set FLOWOXIDE_DATABASE_URL / start Postgres)",
 )
 
 
@@ -57,9 +57,9 @@ def test_rewrite_rowid_to_seq() -> None:
 
 
 def test_postgres_store_schema_and_claim(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("IRONFLOW_DATABASE_URL", PG_URL)
+    monkeypatch.setenv("FLOWOXIDE_DATABASE_URL", PG_URL)
     # unique history path so JSONL sidecar does not collide; schema is shared DB
-    history = Path(f"/tmp/ironflow-b1-{uuid.uuid4().hex}.jsonl")
+    history = Path(f"/tmp/flowoxide-b1-{uuid.uuid4().hex}.jsonl")
     store = create_store(history_path=history)
     assert isinstance(store, PostgresStore)
     assert store.backend_kind == "postgres"

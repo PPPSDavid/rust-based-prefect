@@ -20,19 +20,19 @@ def _auth_header(value: str) -> dict[str, str]:
 
 
 def test_basic_authorization_header_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("IRONFLOW_API_AUTH_STRING", "admin:pass")
+    monkeypatch.setenv("FLOWOXIDE_API_AUTH_STRING", "admin:pass")
     assert basic_authorization_header() == _auth_header("admin:pass")
 
 
 def test_server_auth_disabled_allows_api(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("IRONFLOW_SERVER_API_AUTH_STRING", raising=False)
+    monkeypatch.delenv("FLOWOXIDE_SERVER_API_AUTH_STRING", raising=False)
     client = TestClient(app)
     response = client.get("/api/deployments")
     assert response.status_code == 200
 
 
 def test_server_auth_requires_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("IRONFLOW_SERVER_API_AUTH_STRING", "admin:pass")
+    monkeypatch.setenv("FLOWOXIDE_SERVER_API_AUTH_STRING", "admin:pass")
     client = TestClient(app)
 
     unauthorized = client.get("/api/deployments")
@@ -44,7 +44,7 @@ def test_server_auth_requires_credentials(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_server_auth_exempts_health(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("IRONFLOW_SERVER_API_AUTH_STRING", "admin:pass")
+    monkeypatch.setenv("FLOWOXIDE_SERVER_API_AUTH_STRING", "admin:pass")
     client = TestClient(app)
     response = client.get("/health")
     assert response.status_code == 200
@@ -54,14 +54,14 @@ def test_server_auth_exempts_health(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_server_auth_does_not_require_non_api_routes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("IRONFLOW_SERVER_API_AUTH_STRING", "admin:pass")
+    monkeypatch.setenv("FLOWOXIDE_SERVER_API_AUTH_STRING", "admin:pass")
     client = TestClient(app)
     response = client.get("/history/summary")
     assert response.status_code == 200
 
 
 def test_server_auth_rejects_wrong_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("IRONFLOW_SERVER_API_AUTH_STRING", "admin:pass")
+    monkeypatch.setenv("FLOWOXIDE_SERVER_API_AUTH_STRING", "admin:pass")
     client = TestClient(app)
     response = client.get("/api/deployments", headers=_auth_header("wrong:creds"))
     assert response.status_code == 401
@@ -75,8 +75,8 @@ def test_server_auth_provider_callable() -> None:
 def test_empty_auth_env_vars_are_treated_as_disabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("IRONFLOW_SERVER_API_AUTH_STRING", "   ")
-    monkeypatch.setenv("IRONFLOW_API_AUTH_STRING", "")
+    monkeypatch.setenv("FLOWOXIDE_SERVER_API_AUTH_STRING", "   ")
+    monkeypatch.setenv("FLOWOXIDE_API_AUTH_STRING", "")
     assert server_api_auth_string() is None
     assert api_client_auth_string() is None
     assert basic_authorization_header() == {}

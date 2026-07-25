@@ -20,7 +20,7 @@ _LOG = logging.getLogger(__name__)
 
 DEFAULT_LEASE_DURATION = 300.0
 DEFAULT_TAG_WAIT_SECONDS = float(
-    os.getenv("IRONFLOW_TASK_TAG_SLOT_WAIT_SECONDS", "1.0")
+    os.getenv("FLOWOXIDE_TASK_TAG_SLOT_WAIT_SECONDS", "1.0")
 )
 
 

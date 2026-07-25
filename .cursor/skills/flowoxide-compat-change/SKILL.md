@@ -1,9 +1,9 @@
 ---
-name: ironflow-compat-change
-description: Add or change Prefect-compatibility behavior in IronFlow. Use when editing COMPATIBILITY.md, prefect_compat APIs, state semantics, or claiming parity with Prefect.
+name: flowoxide-compat-change
+description: Add or change Prefect-compatibility behavior in FlowOxide. Use when editing COMPATIBILITY.md, prefect_compat APIs, state semantics, or claiming parity with Prefect.
 ---
 
-# IronFlow — compatibility change
+# FlowOxide — compatibility change
 
 1. Read `COMPATIBILITY.md` and `docs/compatibility_review_workflow.md`.
 2. Classify the gap: supported / partial / missing / out of scope.

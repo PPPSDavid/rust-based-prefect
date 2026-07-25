@@ -1,5 +1,5 @@
 //! Gate task promotion — SQLite hot path for temporal barriers.
-//! Called from `ironflow_control` when `bind_db` has attached a connection.
+//! Called from `flowoxide_control` when `bind_db` has attached a connection.
 
 use std::str::FromStr;
 

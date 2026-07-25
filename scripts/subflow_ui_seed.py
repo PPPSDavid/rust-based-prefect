@@ -1,7 +1,7 @@
 """Seed inline + deployment subflow runs into persisted history for UI visual checks.
 
-Writes JSONL to IRONFLOW_HISTORY_PATH and the companion SQLite sidecar (.db) used by
-the API query path. The server must use the same IRONFLOW_HISTORY_PATH.
+Writes JSONL to FLOWOXIDE_HISTORY_PATH and the companion SQLite sidecar (.db) used by
+the API query path. The server must use the same FLOWOXIDE_HISTORY_PATH.
 """
 
 from __future__ import annotations
@@ -131,7 +131,7 @@ def main() -> int:
     parser.add_argument(
         "--history-path",
         default=os.getenv(
-            "IRONFLOW_HISTORY_PATH", str(Path("data") / "ironflow_history.jsonl")
+            "FLOWOXIDE_HISTORY_PATH", str(Path("data") / "flowoxide_history.jsonl")
         ),
     )
     args = parser.parse_args()

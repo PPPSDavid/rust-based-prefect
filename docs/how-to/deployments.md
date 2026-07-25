@@ -1,6 +1,6 @@
 # How to create and update deployments
 
-This guide focuses on deployment lifecycle operations in IronFlow's self-hosted API:
+This guide focuses on deployment lifecycle operations in FlowOxide's self-hosted API:
 
 - create deployments
 - update deployments
@@ -108,6 +108,6 @@ With the default embedded worker enabled, deployment runs progress from `SCHEDUL
 - Cron and RRule scheduling are Rust-preferred when the native engine is available with DB binding.
 - Without that Rust path, cron schedules may require `schedule_next_run_at` to be provided explicitly; simple RRule schedules use the Python fallback.
 - RRule support is intentionally limited to simple frequency/interval rules (`MINUTELY`, `HOURLY`, `DAILY`, `WEEKLY`) plus optional `UNTIL`.
-- IronFlow currently provides a local subset of deployment/worker behavior, not full Prefect Cloud parity.
+- FlowOxide currently provides a local subset of deployment/worker behavior, not full Prefect Cloud parity.
 
-See also: [Self-hosted server](../SELF_HOSTED_SERVER.md), [Compatibility matrix](../compatibility.md), and [Prefect concepts -> IronFlow](../PREFECT_IRONFLOW_MAPPING.md).
+See also: [Self-hosted server](../SELF_HOSTED_SERVER.md), [Compatibility matrix](../compatibility.md), and [Prefect concepts -> FlowOxide](../PREFECT_FLOWOXIDE_MAPPING.md).

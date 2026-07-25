@@ -1,6 +1,6 @@
-# How to set up IronFlow
+# How to set up FlowOxide
 
-If you only need the **`prefect_compat`** library, start with **[Installation](../INSTALL.md)** — **`pip install ironflow-prefect-compat`** or **`uv pip install ironflow-prefect-compat`** from PyPI when a wheel matches your platform.
+If you only need the **`prefect_compat`** library, start with **[Installation](../INSTALL.md)** — **`pip install flowoxide-prefect-compat`** or **`uv pip install flowoxide-prefect-compat`** from PyPI when a wheel matches your platform.
 
 After install, use the **Quick check after any install** on that page: the **`python -c`** one-liner, or (from a repo checkout) **`python scripts/bootstrap.py --native-check`** for a short in-process flow smoke. For clone-based development, **`python scripts/bootstrap.py --check-only`** validates toolchain hints before you build Rust.
 
@@ -31,7 +31,7 @@ Then use `uv run pytest …`, `uv run ruff check .`, etc.
 
 ```bash
 mamba env create -f environment.yml    # or: conda env create -f environment.yml
-conda activate ironflow-dev
+conda activate flowoxide-dev
 ```
 
 **`venv` + pip (transitional, no uv)**
@@ -63,15 +63,15 @@ cargo build --release --manifest-path rust-engine/Cargo.toml
 
 | Variable | Purpose |
 | --- | --- |
-| **`IRONFLOW_RUST_LIB`** | Path to the built `ironflow_engine` shared library if it is **not** under `rust-engine/target/` (for example custom output directory). If unset, the shim searches default `cargo` output paths. Without a native library, some code paths use **Python fallbacks** where implemented—the intended stack is **always** build the `cdylib`. |
-| **`IRONFLOW_HISTORY_PATH`** | When set to a file path, flow history can be **appended as JSONL** for inspection and tooling (see [Environment variables](../reference/env-vars.md) and the repository README). |
+| **`FLOWOXIDE_RUST_LIB`** | Path to the built `flowoxide_engine` shared library if it is **not** under `rust-engine/target/` (for example custom output directory). If unset, the shim searches default `cargo` output paths. Without a native library, some code paths use **Python fallbacks** where implemented—the intended stack is **always** build the `cdylib`. |
+| **`FLOWOXIDE_HISTORY_PATH`** | When set to a file path, flow history can be **appended as JSONL** for inspection and tooling (see [Environment variables](../reference/env-vars.md) and the repository README). |
 | **`PYTHONPATH`** | Set to `python-shim/src` at the repo root so `import prefect_compat` works **without** an editable install (used in **[Quick start](../QUICKSTART_DEMO.md)**). |
 
-Task-runner–related optional variables (**`IRONFLOW_TASK_RUNNER`**, **`IRONFLOW_TASK_RUNNER_THREAD_POOL_MAX_WORKERS`**, **`IRONFLOW_TASK_RUNNER_PROCESS_POOL_MAX_WORKERS`**) are described in **[Runners](../concepts/runners.md)** and **[How to choose a task runner](choose-task-runners.md)**.
+Task-runner–related optional variables (**`FLOWOXIDE_TASK_RUNNER`**, **`FLOWOXIDE_TASK_RUNNER_THREAD_POOL_MAX_WORKERS`**, **`FLOWOXIDE_TASK_RUNNER_PROCESS_POOL_MAX_WORKERS`**) are described in **[Runners](../concepts/runners.md)** and **[How to choose a task runner](choose-task-runners.md)**.
 
 ## 5. Verify
 
-- Run the **[Quick start (demo flow)](../QUICKSTART_DEMO.md)** (`python python-shim/examples/flow_ironflow.py` with `PYTHONPATH` set).
+- Run the **[Quick start (demo flow)](../QUICKSTART_DEMO.md)** (`python python-shim/examples/flow_flowoxide.py` with `PYTHONPATH` set).
 - Optionally run tests from the repo root:
 
 ```bash
@@ -81,7 +81,7 @@ cargo test --manifest-path rust-engine/Cargo.toml
 
 ## 6. Install only `prefect_compat` in another project (narrow path)
 
-Preferred path when available: **`pip install ironflow-prefect-compat`** (production PyPI) or use the TestPyPI index pair documented in **[Installation](../INSTALL.md)**.
+Preferred path when available: **`pip install flowoxide-prefect-compat`** (production PyPI) or use the TestPyPI index pair documented in **[Installation](../INSTALL.md)**.
 
 You can also **`pip install` from Git**:
 
@@ -89,4 +89,4 @@ You can also **`pip install` from Git**:
 python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v0.1.2#subdirectory=python-shim"
 ```
 
-That package **does not** ship `rust-engine`; build the native library separately and set **`IRONFLOW_RUST_LIB`**, or accept Python fallbacks. See also **[Installation](../INSTALL.md)** for the same material with slightly different emphasis.
+That package **does not** ship `rust-engine`; build the native library separately and set **`FLOWOXIDE_RUST_LIB`**, or accept Python fallbacks. See also **[Installation](../INSTALL.md)** for the same material with slightly different emphasis.
