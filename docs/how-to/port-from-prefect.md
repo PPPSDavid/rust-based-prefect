@@ -17,12 +17,12 @@ Use this table when a Prefect import fails or behaves differently. Status values
 | `from prefect import flow, task` | supported | `from prefect_compat import flow, task` |
 | `task.submit` / `wait_for` / `wait` | supported | Same patterns; default flow finalization is **`wait_all`** (see matrix) |
 | `task.map` | supported | Moderate fan-out; pick a runner via [how-to](choose-task-runners.md) |
-| `flow` / `task` retries & timeouts | supported | Control-plane enforced for the documented subset |
-| `get_run_logger` / `log_prints=` | unsupported | No helper yet; use stdlib logging. Logs still appear in UI/API when written to the store by the runtime path |
+| `@task(retries=…)` / `retry_delay_seconds` / `timeout_seconds` | unsupported | Decorators do not accept Prefect retry/timeout kwargs; flow-run **cancel + deployment retry** exist via API/UI, which is a different mechanism |
+| `get_run_logger` / `log_prints=` | unsupported | No authoring helpers. The UI/API log list shows control-plane-inserted rows (transitions/events), not arbitrary `logging` / `print` output |
 | `on_running` / `on_failure` / … hooks | deliberate | Map to `transition_hooks=` + `on_transition(...)` edges |
 | `run_deployment` / nested-flow helpers | partial | Use `deployment_ref(...).submit()` or inline `child_flow(...)` — [subflows](subflows.md) |
 | Blocks (`prefect.blocks.*`) | deliberate | Not in scope; use env vars / your own config |
-| `cache_policy` / task result cache | unsupported | Retry re-runs completed tasks today; resume/cache tracked in PR #50 |
+| `cache_policy` / task result cache | unsupported | Retry re-runs completed tasks today; resume/cache design tracked in PR [#50](https://github.com/PPPSDavid/rust-based-prefect/pull/50) |
 | Variables (`prefect.variables`) | unsupported | Pass parameters or read env / files |
 | Secrets / profiles / settings | unsupported | Env vars + optional [Basic auth](secure-self-hosted.md) |
 | `prefect.runtime` context module | unsupported | No stable `runtime` module; flow/task ids live on control-plane records |

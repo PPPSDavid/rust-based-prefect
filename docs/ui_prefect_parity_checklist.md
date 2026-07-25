@@ -35,9 +35,9 @@ Side-by-side comparison notes for IronFlow UI vs Prefect OSS 3.x.
 ## Work Pools (MVP)
 
 - [x] Process-type work pools list (`WorkPoolsPage`; create process pools)
-- [x] Worker ONLINE/OFFLINE status (`WorkPoolDetailPage` + heartbeat polling)
+- [x] Worker status from heartbeats (`WorkPoolDetailPage` polls workers; runtime marks `ONLINE` / `OFFLINE`)
 - [x] Pool pause/resume
-- [x] Deployment assigned to work pool (shown on deployment detail; default pool name when unset)
+- [x] Deployment shows assigned work pool id (detail field; defaults to `default-process-pool` label when unset — not a full assign/reassign UI)
 
 ## Explicit non-goals (MVP)
 
