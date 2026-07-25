@@ -59,7 +59,7 @@ Expect **`True`** when a matching wheel loaded. **Developing the repo**, integra
 ## Prefect baseline
 
 - Target baseline: **Prefect OSS 3.x** (see `environment.yml` / `requirements-ci.txt` pins). For how Prefect itself describes flows and tasks, see the official [Prefect 3 get started](https://docs.prefect.io/v3/get-started) guide; upstream code is at [prefecthq/prefect](https://github.com/prefecthq/prefect).
-- Compatibility is **subset-based** and validated against expectations in `COMPATIBILITY.md` — this is **not** a full Prefect runtime or Cloud substitute.
+- Compatibility is **subset-based** and validated against expectations in the [compatibility matrix](https://pppsdavid.github.io/rust-based-prefect/compatibility/) — this is **not** a full Prefect runtime or Cloud substitute.
 
 ## Repository lifecycle
 
