@@ -150,8 +150,7 @@ class InMemoryControlPlane:
         self._ensure_default_work_pool()
         self._replay_to_sqlite = self._read_db_empty_unlocked()
         # Apply resume DDL before Rust bind_db so ALTER/CREATE cannot race the native handle.
-        if self._store.backend_kind != "postgres":
-            self._ensure_resume_schema()
+        self._ensure_resume_schema()
         self._rust_bridge = None
         self._rust_fsm_bridge = None
         self._rust_fsm_handle = 0
@@ -865,8 +864,14 @@ class InMemoryControlPlane:
         return rec.run_id
 
     def _ensure_resume_schema(self) -> None:
-        """Lazily add resume columns / cache table (keeps cold create_flow off the critical path)."""
+        """Ensure resume columns / cache table exist (SQLite + Postgres)."""
         if self._resume_schema_ready:
+            return
+        if getattr(self._store, "backend_kind", "sqlite") == "postgres":
+            # Canonical DDL + IF NOT EXISTS upgrades live on PostgresStore.
+            self._store.ensure_schema()
+            self._task_result_cache_ready = True
+            self._resume_schema_ready = True
             return
         flow_cols = {
             c["name"]
@@ -899,6 +904,10 @@ class InMemoryControlPlane:
 
     def _ensure_task_result_cache_table(self) -> None:
         if self._task_result_cache_ready:
+            return
+        if getattr(self._store, "backend_kind", "sqlite") == "postgres":
+            self._store.ensure_schema()
+            self._task_result_cache_ready = True
             return
         self._sqlite_conn.execute(
             """
