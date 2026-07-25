@@ -97,7 +97,7 @@ These are not commitments; shortlist retained for quick scanning (updated July 2
 
 | Candidate | Current Prefect surface | IronFlow status | Why it fits |
 | --- | --- | --- | --- |
-| Docs sitemap / matrix honesty | Prefect `llms.txt` + concept IA | **Partial** — nav/`llms.txt` drift; matrix under-lists open gaps (P0 in canvas) | Cheap; unblocks every later session |
+| Docs sitemap / matrix honesty | Prefect `llms.txt` + concept IA | **Done (P0 / #61)** — re-check Pages/`llms.txt` if nav drifts again | — |
 | Task resume / result store | Retry + caching overlap | **In flight** — PR #50 / `docs/plans/task-result-cache.md`; `main` still re-runs all tasks | Determinism + cancel/retry UX |
 | Runtime DX (context, logging, lifecycle) | Logger/context; **force cancel + pause drain/terminate + resume** | Design: `docs/plans/flow-run-lifecycle-control.md` (**P3.2**); today cancel is state-only | Core after P0–P1; before P2 |
 | UI ops experience & aesthetics | Operate hundreds of flows; modern shell | Surfaces exist; polish lagging — **PU** track `docs/plans/ui-ops-experience.md` (render→confirm) | Parallel priority; not Prefect clone |
