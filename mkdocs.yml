@@ -68,6 +68,8 @@ nav:
       - "How to set up IronFlow": how-to/setup.md
       - "How to run the server and UI": how-to/server-and-ui.md
       - "How to run the server in Docker": how-to/docker-quickstart.md
+      - "How to run IronFlow with Docker Compose": how-to/docker-compose.md
+      - "How to run background services": how-to/run-background-services.md
       - "How to use Postgres for the control plane": how-to/database-postgres.md
       - "How to run workers in HTTP mode": how-to/worker-http-mode.md
       - "How to secure a self-hosted server": how-to/secure-self-hosted.md

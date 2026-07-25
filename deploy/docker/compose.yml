@@ -1,0 +1,88 @@
+# Production-shaped compose stack (Tier B5).
+# Postgres + API + background services + HTTP worker. No shared app volume.
+#
+# From repo root (local wheels required for INSTALL_MODE=local images):
+#   mkdir -p dist/wheels && python -m build --wheel --outdir dist/wheels --directory python-shim
+#   docker compose -f deploy/docker/compose.yml up --build
+#
+# Context is the repository root (see `context: ../..` relative to this file).
+
+name: ironflow
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ironflow
+      POSTGRES_PASSWORD: ironflow
+      POSTGRES_DB: ironflow
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ironflow -d ironflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5432:5432"
+
+  server:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.server
+      args:
+        INSTALL_MODE: ${INSTALL_MODE:-local}
+        IRONFLOW_VERSION: ${IRONFLOW_VERSION:-0.2.0}
+    environment:
+      IRONFLOW_DATABASE_URL: postgresql://ironflow:ironflow@postgres:5432/ironflow
+      IRONFLOW_ENABLE_SCHEDULER: "0"
+      IRONFLOW_ENABLE_LOCAL_WORKER: "0"
+      IRONFLOW_HISTORY_PATH: /data/ironflow_history.jsonl
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/health', timeout=3)",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  services:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.services
+      args:
+        INSTALL_MODE: ${INSTALL_MODE:-local}
+        IRONFLOW_VERSION: ${IRONFLOW_VERSION:-0.2.0}
+    environment:
+      IRONFLOW_DATABASE_URL: postgresql://ironflow:ironflow@postgres:5432/ironflow
+      IRONFLOW_HISTORY_PATH: /data/ironflow_history.jsonl
+      IRONFLOW_SCHEDULER_INTERVAL_MS: "1000"
+      IRONFLOW_SCHEDULER_STALE_SECONDS: "120"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      server:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.worker
+      args:
+        INSTALL_MODE: ${INSTALL_MODE:-local}
+        IRONFLOW_VERSION: ${IRONFLOW_VERSION:-0.2.0}
+    environment:
+      IRONFLOW_API_URL: http://server:8000
+      IRONFLOW_WORKER_MODE: http
+      IRONFLOW_WORK_POOL: default-process-pool
+    depends_on:
+      server:
+        condition: service_healthy

@@ -1,7 +1,7 @@
 # Tier B — Executable delivery plan (4 PRs)
 
-**Status:** In progress (B2)  
-**Last updated:** 2026-07-14  
+**Status:** In progress (B3/B5)  
+**Last updated:** 2026-07-15  
 **RFC:** [self-hosted-storage-rfc.md](self-hosted-storage-rfc.md)  
 **Tracking overview:** [self-hosted-docker-auth.md](self-hosted-docker-auth.md)
 
@@ -20,8 +20,8 @@ Collapse the earlier B0–B5 checklist into **four shippable PRs**. Prefer this 
 | --- | --- | --- | --- |
 | **1 — B0** | `cursor/tier-b0-store-*` | Storage RFC + `persistence/` SQLite extract | Merged (#49) |
 | **2 — B1** | `cursor/tier-b1-postgres-*` | Postgres store + dialect adapter; Rust `bind_db` DSN + claim/lease; CI Postgres job | Merged (#52) |
-| **3 — B2** | `cursor/tier-b2-http-workers-*` | Claim / started / finished HTTP API; worker mode without file DB | This PR |
-| **4 — B3/B5** | `cursor/tier-b-compose-*` | Compose file(s), images, GHA compose smoke, GHCR | Pending |
+| **3 — B2** | `cursor/tier-b2-http-workers-*` | Claim / started / finished HTTP API; worker mode without file DB | Merged (#56) |
+| **4 — B3/B5** | `cursor/tier-b-compose-*` | Compose file(s), images, GHA compose smoke, GHCR docs | This PR |
 
 ## PR 2 detail (B1)
 
@@ -55,3 +55,18 @@ Collapse the earlier B0–B5 checklist into **four shippable PRs**. Prefer this 
 - Services process split (B3) and production compose (B5)
 - Removing `file` worker mode (semver major)
 
+## PR 4 detail (B3/B5)
+
+**In scope**
+
+- `ironflow server services start` + `prefect_compat.services.run_services_loop`
+- `Dockerfile.{server,services,worker}` with Postgres extra where needed
+- `deploy/docker/compose.yml` (+ optional `compose.auth.yml`)
+- `scripts/docker_compose_smoke.sh` + GHA workflow
+- Docs: docker-compose, run-background-services, COMPATIBILITY
+
+**Deferred**
+
+- HA advisory lock for multi-services
+- Redis / UI image / GHCR publish automation
+- Full Alembic migrator CLI

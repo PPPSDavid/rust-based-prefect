@@ -763,9 +763,26 @@ def flow(
                     (RunState.PENDING, uuid4(), "propose", 0),
                     (RunState.RUNNING, uuid4(), "start", 1),
                 ]
-                batch_results = _CONTROL_PLANE.set_flow_states_batch(
-                    record.run_id, start_transitions
-                )
+                # Parent cancel can land after create_flow_run but before this
+                # optimistic PENDING→RUNNING batch; treat that as cancellation
+                # instead of surfacing a raw version-conflict ValueError.
+                pre_start = _CONTROL_PLANE.get_flow(record.run_id)
+                if pre_start.state == RunState.CANCELLED:
+                    raise FlowRunCancelled(
+                        f"flow run {record.run_id} was cancelled"
+                    )
+                try:
+                    batch_results = _CONTROL_PLANE.set_flow_states_batch(
+                        record.run_id, start_transitions
+                    )
+                except ValueError as exc:
+                    if "version conflict" in str(exc):
+                        current = _CONTROL_PLANE.get_flow(record.run_id)
+                        if current.state == RunState.CANCELLED:
+                            raise FlowRunCancelled(
+                                f"flow run {record.run_id} was cancelled"
+                            ) from exc
+                    raise
                 if fh:
                     _emit_flow_hooks_for_batch(
                         fh,

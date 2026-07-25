@@ -5,6 +5,8 @@ Task-focused guides for common goals. For a minimal first run, use **[Get starte
 - **[How to set up IronFlow](setup.md)** — clone, Python environment, build the Rust engine, environment variables, `PYTHONPATH`.
 - **[How to run the server and UI](server-and-ui.md)** — API + optional Vite UI via `scripts/ironflow_server.py`.
 - **[How to run the server in Docker](docker-quickstart.md)** — single-container image, volumes, optional basic auth.
+- **[How to run IronFlow with Docker Compose](docker-compose.md)** — Postgres + API + services + HTTP workers.
+- **[How to run background services](run-background-services.md)** — `ironflow server services start` without an HTTP listener.
 - **[How to use Postgres for the control plane](database-postgres.md)** — `IRONFLOW_DATABASE_URL`, Rust claim bind.
 - **[How to run workers in HTTP mode](worker-http-mode.md)** — `IRONFLOW_WORKER_MODE=http`, claim API, no shared DB volume.
 - **[How to secure a self-hosted server](secure-self-hosted.md)** — `IRONFLOW_*_AUTH_STRING` Basic auth and reverse-proxy notes.

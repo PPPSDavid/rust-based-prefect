@@ -20,11 +20,11 @@ IronFlow configuration uses `IRONFLOW_*` environment variables. Defaults assume 
 
 | Variable | Default | Description |
 | --- | --- | --- |
+| `IRONFLOW_ENABLE_SCHEDULER` | `1` | Set to `0`, `false`, or `no` to disable the maintenance thread (schedule ticks, stale lease cleanup). In compose, set `0` on the API and run `ironflow server services start` instead. |
 | `IRONFLOW_ENABLE_LOCAL_WORKER` | `1` | Set to `0`, `false`, or `no` to disable the in-process worker loop in the API process. Use when running `ironflow worker start` separately. |
-| `IRONFLOW_ENABLE_SCHEDULER` | `1` | Set to `0`, `false`, or `no` to disable the maintenance thread (schedule ticks, stale lease cleanup). |
 | `IRONFLOW_LOCAL_WORKER_NAME` | `local-worker-1` | Worker identity for the embedded local worker. |
 | `IRONFLOW_WORK_POOL` | `default-process-pool` | Default work pool for embedded worker claims and deployment defaults. |
-| `IRONFLOW_SCHEDULER_INTERVAL_MS` | `1000` | Scheduler tick interval in milliseconds. |
+| `IRONFLOW_SCHEDULER_INTERVAL_MS` | `1000` | Scheduler tick interval in milliseconds (API embed or `ironflow server services start`). |
 | `IRONFLOW_SCHEDULER_STALE_SECONDS` | `120` | Stale worker lease threshold for maintenance. |
 | `IRONFLOW_TASK_TAG_SLOT_WAIT_SECONDS` | `1.0` | Poll interval while waiting for tag concurrency slots before entering `Running`. |
 
