@@ -17,7 +17,7 @@ from prefect_compat import (
 )
 from prefect_compat.mp_picklable import blind_sleep, return_none
 from prefect_compat.process_workers import task_process_registry
-from prefect_compat.runtime import InMemoryControlPlane, RunState
+from prefect_compat.runtime import FlowRunRecord, InMemoryControlPlane, RunState
 
 pytestmark = pytest.mark.skipif(
     sys.platform == "win32",
@@ -31,7 +31,7 @@ def _plane(tmp_path: Path) -> InMemoryControlPlane:
 
 def _wait_for_registered_worker(
     plane: InMemoryControlPlane, *, timeout: float = 10.0
-) -> object:
+) -> FlowRunRecord:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         run = plane.latest_flow()
