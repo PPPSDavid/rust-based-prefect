@@ -1,5 +1,7 @@
-site_name: Project FlowOxide
-site_description: Rust orchestration kernel with Prefect-style Python authoring (prefect_compat)
+site_name: FlowOxide
+site_description: >-
+  FlowOxide is a Rust-based, Prefect-style orchestration engine:
+  write @flow / @task in Python (prefect_compat); the control plane runs in Rust.
 site_url: https://pppsdavid.github.io/rust-based-prefect/
 repo_url: https://github.com/PPPSDavid/rust-based-prefect
 edit_uri: edit/main/docs/
@@ -23,6 +25,7 @@ exclude_docs: |
 
 theme:
   name: material
+  custom_dir: overrides
   palette:
     - scheme: default
       primary: indigo
@@ -101,5 +104,14 @@ markdown_extensions:
   - tables
   - toc:
       permalink: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/PPPSDavid/rust-based-prefect
+      name: FlowOxide on GitHub
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/flowoxide-prefect-compat/
+      name: flowoxide-prefect-compat on PyPI
 
 strict: true

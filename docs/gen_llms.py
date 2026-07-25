@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate llms.txt at site root for AI/agent discovery (Prefect-style sitemap)."""
+"""Generate discovery files at site root: llms.txt and robots.txt."""
 
 from __future__ import annotations
 
@@ -7,6 +7,12 @@ from mkdocs_gen_files import open as gen_open
 
 SITE_BASE = "https://pppsdavid.github.io/rust-based-prefect"
 REPO_BASE = "https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs"
+
+# robots.txt (Google Search Console + crawlers)
+with gen_open("robots.txt", "w") as robots:
+    robots.write("User-agent: *\n")
+    robots.write("Allow: /\n")
+    robots.write(f"\nSitemap: {SITE_BASE}/sitemap.xml\n")
 
 PAGES: list[tuple[str, str, str]] = [
     ("Home", "", "Layered doc home and onboarding paths."),

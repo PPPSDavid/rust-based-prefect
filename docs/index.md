@@ -1,6 +1,13 @@
-# Project FlowOxide
+---
+title: FlowOxide — Rust-based Prefect-style orchestration
+description: >-
+  Rust-based Prefect-compatible workflow orchestration: Prefect-style @flow / @task
+  authoring in Python, deterministic control plane in Rust. Install flowoxide-prefect-compat.
+---
 
-**FlowOxide** is a **Rust-first** orchestration system with **Prefect-style** Python authoring (`prefect_compat`): you write `@flow` / `@task` flows in Python; the **control plane and durable history** live in the Rust engine. An optional HTTP API and web UI help you inspect runs.
+# FlowOxide
+
+**FlowOxide** is a **Rust-based**, **Prefect-style** orchestration system (`prefect_compat`): you write `@flow` / `@task` flows in Python; the **control plane and durable history** live in the Rust engine. It targets a **Prefect 3.x-compatible subset** with stronger deterministic state handling—not a full Prefect Cloud substitute. An optional HTTP API and web UI help you inspect runs.
 
 ## Choose your path
 

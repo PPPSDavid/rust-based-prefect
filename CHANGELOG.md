@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
+### Added
+
+- **Docs SEO hygiene:** searchable home title/description (“Rust-based Prefect-style”), Open Graph / Twitter meta (`overrides/main.html`), generated `robots.txt` pointing at `sitemap.xml`, footer links to GitHub/PyPI, and Search Console steps in `RELEASING.md`.
+
 ### Changed
 
 - **Project rename: IronFlow → FlowOxide (breaking).** Product, CLI, env vars, Rust crate/FFI symbols, Docker image names, and PyPI package names now use FlowOxide branding.

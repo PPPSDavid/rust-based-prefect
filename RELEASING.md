@@ -69,3 +69,15 @@ After enabling **GitHub Pages** from **GitHub Actions** in the repository settin
 2. Optionally set `repo_url` to the same repository for the “view source” link in the theme.
 
 The **Documentation** workflow builds on every push to `main` that touches docs or `COMPATIBILITY.md`.
+
+### Google discoverability (Search Console)
+
+MkDocs already emits `sitemap.xml`; the build also writes `robots.txt` and Open Graph meta (see `overrides/main.html`). To get the home page into Google:
+
+1. Open [Google Search Console](https://search.google.com/search-console) and add the property for `https://pppsdavid.github.io/` (URL-prefix) or a Domain property if you later use a custom domain.
+2. Verify ownership (HTML tag, DNS, or GitHub association as offered).
+3. Submit **`https://pppsdavid.github.io/rust-based-prefect/sitemap.xml`**.
+4. Use **URL Inspection** → **Request indexing** on `https://pppsdavid.github.io/rust-based-prefect/`.
+5. Keep strong backlinks from the GitHub README and PyPI project **Documentation** URL (already set).
+
+Indexing usually takes days; ranking for queries like “rust based prefect” also depends on title/description relevance and inbound links. Renaming the **GitHub repository** is optional and **not required** for SEO — the current `rust-based-prefect` path already matches that query.
