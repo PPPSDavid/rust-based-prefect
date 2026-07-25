@@ -39,12 +39,22 @@ Maintainers should use `docs/compatibility_review_workflow.md` before changing t
   - **Flow-run final state (IronFlow extension):** default `@flow(final_state="wait_all")` waits for all non-detached task / gate / subflow children, then resolves the flow terminal state in **Rust** (`resolve_flow_terminal_state`: `CANCELLED` > `FAILED` > all `COMPLETED`). Unobserved failed concurrent `submit`s fail the flow (`FlowChildrenFailed`). Escape hatches: `submit(..., detach=True)` and `@flow(final_state="explicit")` (body return/exception remains authoritative). Not Prefect return-value / `State`-object finalization.
   - **Temporal gate tasks (IronFlow extension):** `gate(name=..., max_wait=...)` inside an active `@flow`; call `.submit(until=datetime | after=timedelta, wait_for=[...])` to insert a **zero-op barrier** task (`kind=gate`, real task-run UUID) that blocks downstream `wait_for` until `open_at`. Default **`max_wait`** safeguard is **`timedelta(days=1)`** (Python definitional default; override per gate). While waiting, the flow run may enter **`PAUSED`**; gate promotion ticks prefer **Rust** (`task_tick_gate_tasks` / bundled in `deployment_maintenance`) with Python fallback. UI: DAG node kind **`gate_task`** with `gate_open_at`. Not Prefect API parity — Prefect has no first-class in-flow calendar gate.
   - **Task resume / result persist (subset):** On flow-run **resume** (deployment retry sets `resume_from_flow_run_id`, or in-process `prepare_resume`), IronFlow may skip `COMPLETED` DAG nodes keyed by `(resume_lineage_id, planned_node_id, map_index, input_fingerprint)` when (a) the prior return was `None` (auto marker), or (b) `@task(persist_result=True)` stored a **JSON-safe** payload (bool/int/float/str/list/dict, size-capped). Resume skips require **matching flow/deployment parameters** and **matching JSON-safe submit/`map` inputs**; otherwise the node recomputes. Applies to `submit` and `map` (thread/process included). Non-persisted non-`None` results recompute. Cache hits advance task FSM events but do **not** re-fire `transition_hooks`. Fresh runs never auto-hit. UI shows persisted results on the Task Runs / Artifacts tabs. Not Prefect `cache_policy` parity; no cross-flow cache by default. User guide: **`docs/how-to/task-resume-and-persist.md`**. Design: `docs/plans/task-result-cache.md`.
-- Not yet supported:
+- Not yet supported (open gaps — not parity claims):
   - full API parity for every Prefect state rule edge case.
-  - advanced cloud/tenant features.
-  - all blocks and integrations.
   - Prefect `SubflowTask` / `run_deployment` name parity, automatic deployment creation from `@flow`, or subflow parameter schema validation beyond deployment defaults.
+  - Opt-in **cross-run** result cache (Goal B); Goal A resume-within-lineage is supported above.
+  - Prefect-shaped logging helpers (`get_run_logger`, `log_prints`); log list/API/UI show control-plane-inserted rows only (not stdlib `logging` / `print`).
+  - Cooperative cancel of long-running task bodies (control-plane cancel is recorded; bodies must poll unless instrumented).
+  - User-facing artifacts API (`create_markdown` / tables); internal result artifact rows + GET APIs only.
+  - Variables JSON store; settings/profiles module; runtime-context module parity.
+  - Events → automations / webhooks engine (events + SSE exist; no trigger actions).
   - Async `concurrency` / `rate_limit` helpers, CLI `ironflow gcl` parity, UI concurrency admin page, work-queue / work-pool concurrency.
+  - Advanced RRule calendar filters / `COUNT`.
+- Deliberate park / non-goals (do not treat as near-term backlog):
+  - advanced cloud/tenant features (RBAC, SSO, workspaces).
+  - all blocks, secrets managers, and integration packs.
+  - `task.delay()` background tasks; Dask/Ray runners; non-process work pool types.
+  - human-in-the-loop pause/input (temporal `gate` is a different, deliberate mechanism).
 
 ## Phase 2 static planning compatibility
 
