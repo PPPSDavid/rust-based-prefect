@@ -123,9 +123,42 @@ a {
   background: #2b9155;
 }
 
-.badge-offline {
-  background: #5a6480;
+.badge-paused {
+  background: #b8860b;
 }
+
+.badge-lifecycle {
+  background: #3d4a6b;
+  margin-right: 6px;
+}
+
+.lifecycle-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.log-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 8px 0 12px;
+}
+
+.log-filters input,
+.log-filters select {
+  background: #1a2033;
+  color: #e9eefc;
+  border: 1px solid #2c3147;
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
+.run-parameters {
+  margin: 12px 0;
+}
+
 
 .tabs {
   margin: 12px 0;

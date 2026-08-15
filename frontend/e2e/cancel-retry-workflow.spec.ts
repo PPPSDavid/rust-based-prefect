@@ -56,7 +56,7 @@ test.describe("cancel and retry workflow", () => {
     await cancelButton.click();
 
     await expect(page.locator(".badge-cancelled")).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText("Run cancelled.")).toBeVisible();
+    await expect(page.getByText("Run cancelled (terminate).")).toBeVisible();
 
     const tasksBeforeRetry = await request.get(`${API}/api/flow-runs/${running.flowRunId}/task-runs?limit=20`);
     const taskItems = (await tasksBeforeRetry.json()).items as Array<{ task_name: string; state: string }>;

@@ -1,7 +1,7 @@
 # Memory Bank
 
 Compact context handoff for future sessions. Process/validation contract: root `AGENTS.md`.
-Last updated: 2026-07-25.
+Last updated: 2026-08-15.
 
 ## Project Snapshot
 
@@ -64,8 +64,8 @@ Last updated: 2026-07-25.
 **Task resume (Phase 1 — landed):**
 
 - Design: **`docs/plans/task-result-cache.md`**. User guide: **`docs/how-to/task-resume-and-persist.md`**.
-- Skip on resume when prior return was **`None`** (auto) or **`@task(persist_result=True)`** stored a JSON-safe payload, **and** flow/deployment params + submit/`map` input fingerprints match. `map` uses `map_index`. Cache hits do not re-fire transition hooks. Non-persisted non-`None` recomputes. UI shows persisted results on Task Runs / Artifacts.
-- Follow-ups: native Rust `resume_from` on deployment ops (Python merge bridge today), subflow/gate policies, clearer UI skipped-vs-rerun; UI pause-mode chooser (P3.2e).
+- Skip on resume when prior return was **`None`** (auto) or **`@task(persist_result=True)`** stored a JSON-safe payload, **and** flow/deployment params + submit/`map` input fingerprints match. `map` uses `map_index`. Cache hits do not re-fire transition hooks. Non-persisted non-`None` recomputes. UI shows persisted results plus **skipped** / **recomputed** labels on resume attempts.
+- Follow-ups: native Rust `resume_from` on deployment ops (Python merge bridge today), subflow/gate policies; UI pause-mode chooser **shipped** (P3.2e).
 
 **Useful test scenario (manual / E2E):**
 
@@ -76,10 +76,10 @@ Last updated: 2026-07-25.
 
 Gap canvas: `docs/plans/prefect-gap-canvas.md` (from PR #60 lineage).
 
-1. **P3.2e / P3.5** — UI/CLI pause chooser + lifecycle E2E smoke; `log_prints=` optional.
-2. **P4** concurrency ops (lease-on-cancel, CLI `gcl`, UI admin).
-3. Postgres Rust schedule/gate + HA follow-ups (P2).
-4. Keep CI + `perf_matrix` lite gate healthy (including `--preset gcl`).
-5. P1 resume follow-ups: native Rust `resume_from`, subflow/gate policies, clearer UI skipped-vs-rerun.
-6. Move remaining projection write hot paths from Python into Rust-backed implementation.
-7. Optional: Cloud embeddings path if NL `semantic_search` becomes important; keep decision log current (`docs/agent/DECISION_LOG.md`).
+1. **P4.2 / P4.3** — `ironflow gcl` CLI + UI admin (after P4.0 lease-on-cancel, now landed). See `docs/plans/north-stars-later.md`.
+2. Postgres Rust schedule/gate + HA follow-ups (P2) — later plan.
+3. Keep CI + `perf_matrix` lite gate healthy (including `--preset gcl`) **and** `pytest -m airtight`.
+4. P1 resume follow-ups: native Rust `resume_from`, subflow/gate policies.
+5. Move remaining projection write hot paths from Python into Rust-backed implementation.
+6. Optional: Cloud embeddings path if NL `semantic_search` becomes important; keep decision log current (`docs/agent/DECISION_LOG.md`).
+7. Cheap hosted e2e (GHCR pull-and-smoke) — later plan, not always-on cloud.

@@ -395,6 +395,45 @@ class InMemoryControlPlane:
         with self._lock:
             return gcl.release(self._sqlite_conn, body)
 
+    def release_concurrency_slots_for_holders(
+        self,
+        holder_ids: str | list[str],
+        *,
+        now: str | None = None,
+    ) -> dict[str, Any]:
+        """Release GCL leases owned by task/flow run ids (cancel/terminate)."""
+        from . import concurrency_store as gcl
+
+        body: dict[str, Any] = {"holder_ids": holder_ids}
+        if now is not None:
+            body["now"] = now
+        rust = self._gcl_dispatch("gcl_release_by_holders", body)
+        if rust is not None and "released" in rust:
+            return rust
+        with self._lock:
+            return gcl.release_by_holders(self._sqlite_conn, body)
+
+    def _release_gcl_holders_for_flow(self, flow_run_id: UUID) -> None:
+        holder_ids = [str(flow_run_id)]
+        rows = self._query_rows(
+            "SELECT id FROM task_runs WHERE flow_run_id = ?",
+            [str(flow_run_id)],
+        )
+        holder_ids.extend(str(row["id"]) for row in rows)
+        with self._lock:
+            holder_ids.extend(
+                str(tid)
+                for tid, task in self._tasks.items()
+                if str(task.flow_run_id) == str(flow_run_id)
+            )
+        unique_ids = list(dict.fromkeys(holder_ids))
+        try:
+            self.release_concurrency_slots_for_holders(unique_ids)
+        except Exception:
+            logging.getLogger(__name__).exception(
+                "GCL release-by-holder failed for flow %s", flow_run_id
+            )
+
     def renew_concurrency_slots(
         self,
         lease_ids: str | list[str],
@@ -1899,6 +1938,35 @@ class InMemoryControlPlane:
         )
         if dep_rows:
             result["deployment_id"] = dep_rows[0]["deployment_id"]
+            param_rows = self._query_rows(
+                "SELECT resolved_parameters FROM deployment_runs "
+                "WHERE flow_run_id = ? ORDER BY created_at DESC LIMIT 1",
+                [str(flow_run_id)],
+            )
+            if param_rows:
+                try:
+                    result["parameters"] = json.loads(
+                        param_rows[0]["resolved_parameters"] or "{}"
+                    )
+                except (TypeError, json.JSONDecodeError):
+                    result["parameters"] = {}
+        rec = self._flows.get(flow_run_id)
+        if rec is not None:
+            if rec.resume_from_flow_run_id is not None:
+                result["resume_from_flow_run_id"] = str(rec.resume_from_flow_run_id)
+            if rec.resume_lineage_id is not None:
+                result["resume_lineage_id"] = str(rec.resume_lineage_id)
+        else:
+            extra = self._query_rows(
+                "SELECT resume_from_flow_run_id, resume_lineage_id "
+                "FROM flow_runs WHERE id = ? LIMIT 1",
+                [str(flow_run_id)],
+            )
+            if extra:
+                if extra[0]["resume_from_flow_run_id"]:
+                    result["resume_from_flow_run_id"] = extra[0]["resume_from_flow_run_id"]
+                if extra[0]["resume_lineage_id"]:
+                    result["resume_lineage_id"] = extra[0]["resume_lineage_id"]
         result["breadcrumb"] = self._flow_run_breadcrumb(flow_run_id)
         result["children_summary"] = self._flow_run_children_summary(flow_run_id)
         result["children"] = self._flow_run_children(flow_run_id)
@@ -3418,6 +3486,7 @@ class InMemoryControlPlane:
         if killed:
             refreshed = dict(refreshed)
             refreshed["terminated_task_run_ids"] = killed
+        self._release_gcl_holders_for_flow(flow_run_id)
         return refreshed
 
     def resume_flow_run(self, flow_run_id: UUID) -> dict[str, Any]:
@@ -3673,11 +3742,13 @@ class InMemoryControlPlane:
                 if killed:
                     refreshed = dict(refreshed)
                     refreshed["terminated_task_run_ids"] = killed
+                self._release_gcl_holders_for_flow(flow_run_id)
                 return refreshed
             raise
 
         with self._lock:
             self._propagate_cancel_to_subflows(flow_run_id)
+        self._release_gcl_holders_for_flow(flow_run_id)
         refreshed = self.get_flow_run_detail(flow_run_id)
         if refreshed is None:
             raise ValueError("flow run not found")

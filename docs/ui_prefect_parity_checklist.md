@@ -9,7 +9,7 @@ Side-by-side comparison notes for IronFlow UI vs Prefect OSS 3.x.
 | Area | Prefect | IronFlow today |
 | --- | --- | --- |
 | Primary nav | Flow Runs, Flows, Deployments, Work Pools | Same top-level sections (`AppShell`: `/runs`, `/flows`, `/deployments`, `/work-pools`) |
-| Run detail | Actions (cancel, retry), tabs for tasks/logs | Cancel/retry action bar + tabs (tasks, logs, events, artifacts, DAG) |
+| Run detail | Actions (cancel, retry), tabs for tasks/logs | Cancel/retry/pause drain|terminate/resume + tabs (tasks, logs, events, artifacts, DAG) |
 
 ## Run detail — artifacts / results
 
@@ -22,6 +22,9 @@ Side-by-side comparison notes for IronFlow UI vs Prefect OSS 3.x.
 - [x] List with state filters and pagination (`RunsPage`: state chips + cursor “Load more”)
 - [x] Run detail with live SSE updates (`useSsePulse` + `/api/stream/flow-runs/{id}`)
 - [x] Cancel active runs (`POST /api/flow-runs/{id}/cancel` when `SCHEDULED` / `PENDING` / `RUNNING`)
+- [x] Pause with explicit drain vs terminate chooser (`POST …/pause`); Resume for operator pauses only
+- [x] Lifecycle badges (operator pause vs gate wait, drain pending)
+- [x] Logs tab search + task/level filters
 - [x] Retry failed deployment-backed runs (`POST …/retry`; non-deployment runs surface an error)
 - [x] Run detail tabs: Task Runs, Logs, Events, Artifacts, DAG (logical / expanded modes)
 - [ ] Concurrency-limits admin surface (API exists; no UI page — backlog)

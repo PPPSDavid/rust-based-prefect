@@ -18,6 +18,13 @@ export type FlowRun = {
   breadcrumb?: FlowRunBreadcrumb[];
   children_summary?: FlowRunChildrenSummary;
   children?: FlowRunChild[];
+  lifecycle_action?: string | null;
+  interrupt_mode?: string | null;
+  lifecycle_summary?: string | null;
+  pause_drain_pending?: boolean;
+  parameters?: Record<string, unknown> | null;
+  resume_from_flow_run_id?: string | null;
+  resume_lineage_id?: string | null;
 };
 
 export type FlowRunChild = {

@@ -1,6 +1,6 @@
 # Flow-run lifecycle control: cancel, pause, resume
 
-**Status:** Design accepted — **P3.2a–d + P3.2f implemented** (mode-required pause, drain/resume, process-kill terminate under `ProcessPoolTaskRunner`, hard-pause resume via P1 `prepare_resume` / deployment retry, user guide `docs/how-to/cancel-pause-resume.md`). **P3.2e** UI pause chooser still open.  
+**Status:** Design accepted — **P3.2a–e + P3.2f implemented** (mode-required pause, drain/resume, process-kill terminate under `ProcessPoolTaskRunner`, hard-pause resume via P1 `prepare_resume` / deployment retry, UI pause chooser + lifecycle badges, user guide `docs/how-to/cancel-pause-resume.md`). CLI pause helpers still open.  
 **Canvas ID:** **P3.2** (expanded) — see `docs/plans/prefect-gap-canvas.md`  
 **Last updated:** 2026-07-25  
 **Depends on:** P1.1 resume lineage (interrupted-task retry on hard pause / cancel→retry); P3.0 context helpful  
@@ -218,7 +218,7 @@ Update `docs/concepts/states-and-transitions.md` (today’s published table omit
 | **P3.2b** | Drain pause + resume (no kill): block new starts; wait in-flight; `PAUSED`; resume continues | Tests for soft pause mid-flow |
 | **P3.2c** | Terminate path for cancel + hard pause via process worker registry + SIGTERM/SIGKILL fence | Blind `time.sleep` in child process stops; thread-pool limitation documented or removed for terminate |
 | **P3.2d** | Hard-pause resume re-runs interrupted tasks (P1 integration) | Interrupted tasks re-execute; completed skipped per P1 |
-| **P3.2e** | UI/CLI: pause chooser, cancel copy, badges for mode | Impossible to “just pause” without choosing mode |
+| **P3.2e** | UI/CLI: pause chooser, cancel copy, badges for mode | ✅ UI chooser + badges (CLI still open) |
 | **P3.2f** | Docs how-to + port guide; MEMORY_BANK rewrite of cancel section | ✅ `docs/how-to/cancel-pause-resume.md` + port/mapping updates |
 
 Cooperative helpers (`sleep_cancelable`, etc.) still exported as **supplement** for library code that opts in — never the only cancel story.

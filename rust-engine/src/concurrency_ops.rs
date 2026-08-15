@@ -49,6 +49,8 @@ fn ensure_schema(conn: &Connection) -> Result<(), String> {
             ON concurrency_leases(expires_at);
         CREATE INDEX IF NOT EXISTS idx_concurrency_leases_limit
             ON concurrency_leases(limit_id);
+        CREATE INDEX IF NOT EXISTS idx_concurrency_leases_holder
+            ON concurrency_leases(holder_id);
         ",
     )
     .map_err(|e| e.to_string())
@@ -479,6 +481,62 @@ pub fn release(conn: &Connection, body: &Value) -> Result<Value, String> {
     Ok(json!({"ok": true, "released": released}))
 }
 
+/// Release all leases whose ``holder_id`` is in the request list. Idempotent.
+pub fn release_by_holders(conn: &Connection, body: &Value) -> Result<Value, String> {
+    ensure_schema(conn)?;
+    let holder_ids: Vec<String> = match body.get("holder_ids") {
+        Some(Value::String(s)) => {
+            let trimmed = s.trim();
+            if trimmed.is_empty() {
+                vec![]
+            } else {
+                vec![trimmed.to_string()]
+            }
+        }
+        Some(Value::Array(arr)) => arr
+            .iter()
+            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+            .filter(|s| !s.is_empty())
+            .collect(),
+        _ => return Err("holder_ids must be a string or array".to_string()),
+    };
+    if holder_ids.is_empty() {
+        return Ok(json!({"ok": true, "released": 0}));
+    }
+    let now = parse_now(body.get("now").and_then(|v| v.as_str()))?.to_rfc3339();
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    let mut released = 0u64;
+    for holder_id in &holder_ids {
+        let rows: Vec<(String, String, i64)> = {
+            let mut stmt = tx
+                .prepare(
+                    "SELECT id, limit_id, occupy FROM concurrency_leases WHERE holder_id = ?1",
+                )
+                .map_err(|e| e.to_string())?;
+            let mapped = stmt
+                .query_map(params![holder_id], |r| {
+                    Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+                })
+                .map_err(|e| e.to_string())?;
+            mapped.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?
+        };
+        for (lease_id, limit_id, occupy) in rows {
+            tx.execute("DELETE FROM concurrency_leases WHERE id = ?1", params![lease_id])
+                .map_err(|e| e.to_string())?;
+            tx.execute(
+                "UPDATE concurrency_limits SET active_slots = CASE \
+                    WHEN active_slots > ?1 THEN active_slots - ?1 ELSE 0 END, \
+                    updated_at = ?2 WHERE id = ?3",
+                params![occupy, now, limit_id],
+            )
+            .map_err(|e| e.to_string())?;
+            released += 1;
+        }
+    }
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(json!({"ok": true, "released": released}))
+}
+
 /// Extend lease expiry for concurrency-mode holds.
 pub fn renew(conn: &Connection, body: &Value) -> Result<Value, String> {
     ensure_schema(conn)?;
@@ -772,6 +830,45 @@ mod tests {
         let r2 = release(&conn, &json!({"lease_ids": lids, "now": "2020-01-01T00:00:02Z"}))
             .unwrap();
         assert_eq!(r2["released"], 0);
+    }
+
+    #[test]
+    fn release_by_holders_frees_slots() {
+        let conn = open_db();
+        upsert_limit(&conn, &json!({"name": "db", "limit": 1, "now": "2020-01-01T00:00:00Z"}))
+            .unwrap();
+        let a = acquire(
+            &conn,
+            &json!({
+                "names": ["db"],
+                "now": "2020-01-01T00:00:00Z",
+                "lease_duration": 60,
+                "holder_type": "task_run",
+                "holder_id": "task-1"
+            }),
+        )
+        .unwrap();
+        assert_eq!(a["status"], "acquired");
+        let blocked = acquire(
+            &conn,
+            &json!({"names": ["db"], "now": "2020-01-01T00:00:00Z", "lease_duration": 60}),
+        )
+        .unwrap();
+        assert_eq!(blocked["status"], "would_block");
+        let out = release_by_holders(
+            &conn,
+            &json!({"holder_ids": ["task-1"], "now": "2020-01-01T00:00:01Z"}),
+        )
+        .unwrap();
+        assert_eq!(out["released"], 1);
+        let again = acquire(
+            &conn,
+            &json!({"names": ["db"], "now": "2020-01-01T00:00:02Z", "lease_duration": 60}),
+        )
+        .unwrap();
+        assert_eq!(again["status"], "acquired");
+        let empty = release_by_holders(&conn, &json!({"holder_ids": []})).unwrap();
+        assert_eq!(empty["released"], 0);
     }
 
     #[test]

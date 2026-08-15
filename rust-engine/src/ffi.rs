@@ -990,6 +990,13 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                 .ok_or_else(|| "gcl_release requires bind_db".to_string())?;
             concurrency_ops::release(conn, body)
         }
+        "gcl_release_by_holders" => {
+            let conn = ctx
+                .db_conn
+                .as_ref()
+                .ok_or_else(|| "gcl_release_by_holders requires bind_db".to_string())?;
+            concurrency_ops::release_by_holders(conn, body)
+        }
         "gcl_renew" => {
             let conn = ctx
                 .db_conn

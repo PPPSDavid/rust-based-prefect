@@ -90,7 +90,7 @@ Use **`get_run_logger()`** / **`get_run_context()`** inside flow/task bodies so 
 ## UI / CLI status
 
 - HTTP API + plane helpers: **shipped**
-- UI pause-mode chooser / lifecycle badges: **not shipped** yet (call pause with explicit `mode` via API)
+- UI pause-mode chooser / lifecycle badges: **shipped** (run detail: Pause (drain) / Pause (terminate), Resume for operator pauses only, log search/level/task filters)
 - CLI pause helpers: **not shipped**
 
 ## Related
