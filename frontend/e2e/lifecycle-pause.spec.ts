@@ -79,9 +79,9 @@ test.describe("lifecycle pause chooser", () => {
     await expect(page.locator(".badge-paused")).toBeVisible({ timeout: 15_000 });
 
     await page.getByRole("tab", { name: "Logs" }).click();
-    await expect(page.getByLabel(/Search/i)).toBeVisible();
-    await expect(page.getByLabel(/Level/i)).toBeVisible();
-    await expect(page.getByLabel(/^Task$/i)).toBeVisible();
+    await expect(page.getByRole("searchbox", { name: /Search/i })).toBeVisible();
+    await expect(page.getByRole("combobox", { name: /Level/i })).toBeVisible();
+    await expect(page.getByRole("combobox", { name: /Task/i })).toBeVisible();
 
     await page.getByRole("button", { name: "Resume" }).click();
     await expect(page.getByText(/Resume scheduled a new deployment attempt|Run resumed/)).toBeVisible();
