@@ -40,6 +40,8 @@ def ensure_schema(conn: Any) -> None:
             ON concurrency_leases(expires_at);
         CREATE INDEX IF NOT EXISTS idx_concurrency_leases_limit
             ON concurrency_leases(limit_id);
+        CREATE INDEX IF NOT EXISTS idx_concurrency_leases_holder
+            ON concurrency_leases(holder_id);
         """
     )
 
@@ -321,6 +323,38 @@ def release(conn: Any, body: dict[str, Any]) -> dict[str, Any]:
             [occupy, occupy, now_s, row["limit_id"]],
         )
         released += 1
+    return {"ok": True, "released": released}
+
+
+def release_by_holders(conn: Any, body: dict[str, Any]) -> dict[str, Any]:
+    """Release all leases for the given holder ids. Idempotent."""
+    ensure_schema(conn)
+    raw = body.get("holder_ids")
+    if isinstance(raw, str):
+        holder_ids = [raw] if raw.strip() else []
+    elif isinstance(raw, list):
+        holder_ids = [str(x) for x in raw if str(x).strip()]
+    else:
+        raise ValueError("holder_ids must be a string or array")
+    if not holder_ids:
+        return {"ok": True, "released": 0}
+    now_s = _iso(_parse_now(body.get("now")))
+    released = 0
+    for holder_id in holder_ids:
+        rows = conn.execute(
+            "SELECT id, limit_id, occupy FROM concurrency_leases WHERE holder_id = ?",
+            [holder_id],
+        ).fetchall()
+        for row in rows:
+            conn.execute("DELETE FROM concurrency_leases WHERE id = ?", [row["id"]])
+            occupy = int(row["occupy"])
+            conn.execute(
+                "UPDATE concurrency_limits SET active_slots = CASE "
+                "WHEN active_slots > ? THEN active_slots - ? ELSE 0 END, "
+                "updated_at = ? WHERE id = ?",
+                [occupy, occupy, now_s, row["limit_id"]],
+            )
+            released += 1
     return {"ok": True, "released": released}
 
 

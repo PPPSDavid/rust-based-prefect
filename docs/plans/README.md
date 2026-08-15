@@ -12,6 +12,8 @@ the short handoff; link the active plan from the task brief.
 | [self-hosted-docker-tier-b.md](self-hosted-docker-tier-b.md) | 4-PR sequence complete (B0–B3/B5); follow-ups: HA, B4 Redis, Alembic CLI, UI/GHCR |
 | [concurrency-limits.md](concurrency-limits.md) | Implemented (Phases 1–3 subset) — global + tag + rate_limit |
 | [task-result-cache.md](task-result-cache.md) | Phase 1 implemented — resume lineage + optional persist + UI |
+| [airtight-concurrency.md](airtight-concurrency.md) | Concurrent-state invariants (`pytest -m airtight`); P4.0 lease-on-cancel |
+| [north-stars-later.md](north-stars-later.md) | Parked: scale, GHCR e2e, GCL CLI/UI, planning chrome |
 
 When starting a large compatibility feature, add a plan before coding and name it
 in the PR body.

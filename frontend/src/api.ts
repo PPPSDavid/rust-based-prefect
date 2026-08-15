@@ -39,11 +39,26 @@ export const api = {
   getFlowRun: (id: string) => readJson<FlowRun>(`${base}/api/flow-runs/${id}`),
   cancelFlowRun: (id: string) =>
     readJson<FlowRun>(`${base}/api/flow-runs/${id}/cancel`, { method: "POST" }),
+  pauseFlowRun: (id: string, mode: "drain" | "terminate") =>
+    readJson<FlowRun>(`${base}/api/flow-runs/${id}/pause`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode })
+    }),
+  resumeFlowRun: (id: string) =>
+    readJson<FlowRun>(`${base}/api/flow-runs/${id}/resume`, { method: "POST" }),
   retryFlowRun: (id: string) =>
     readJson<DeploymentRun>(`${base}/api/flow-runs/${id}/retry`, { method: "POST" }),
   listTaskRuns: (id: string) =>
     readJson<CursorPage<TaskRun>>(`${base}/api/flow-runs/${id}/task-runs?limit=500`),
-  listLogs: (id: string) => readJson<CursorPage<LogRecord>>(`${base}/api/flow-runs/${id}/logs?limit=1000`),
+  listLogs: (id: string, params?: { task_run_id?: string; level?: string }) =>
+    readJson<CursorPage<LogRecord>>(
+      pageUrl(`/api/flow-runs/${id}/logs`, {
+        limit: "1000",
+        task_run_id: params?.task_run_id,
+        level: params?.level
+      })
+    ),
   listFlows: (cursor?: string) =>
     readJson<CursorPage<{ name: string; run_count: number; updated_at: string }>>(
       pageUrl("/api/flows", { limit: "200", cursor })

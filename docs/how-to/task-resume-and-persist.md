@@ -80,7 +80,7 @@ Calling `pipeline(x=2)` after a prior `pipeline(x=1)` disables resume skips for 
 
 On a completed run’s detail page:
 
-- **Task Runs** — shows pretty-printed JSON under tasks that persisted a result (`null` for `None`); cache hits may show `· resumed`
+- **Task Runs** — shows pretty-printed JSON under tasks that persisted a result (`null` for `None`); resume attempts label cache hits **skipped** and completed recomputes **recomputed**
 - **Artifacts** — `*-result` rows with the same payload when `persisted`
 
 Visual seed + Playwright check: `POST /benchmark/run` with

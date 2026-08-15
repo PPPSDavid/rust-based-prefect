@@ -14,6 +14,7 @@ from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from typing import Any
 
+from .context import MissingContextError, get_run_context
 from .runtime import InMemoryControlPlane
 
 _LOG = logging.getLogger(__name__)
@@ -173,6 +174,20 @@ def concurrency(
     """
     cp = plane or _plane()
     name_list = _normalize_names(names)
+    bound_holder_type = holder_type
+    bound_holder_id = holder_id
+    if bound_holder_id is None:
+        try:
+            ctx = get_run_context()
+        except MissingContextError:
+            ctx = None
+        if ctx is not None:
+            if ctx.task_run_id is not None:
+                bound_holder_type = bound_holder_type or "task_run"
+                bound_holder_id = str(ctx.task_run_id)
+            elif ctx.flow_run_id is not None:
+                bound_holder_type = bound_holder_type or "flow_run"
+                bound_holder_id = str(ctx.flow_run_id)
     out = _acquire_blocking(
         cp,
         name_list,
@@ -181,8 +196,8 @@ def concurrency(
         timeout_seconds=timeout_seconds,
         strict=strict,
         lease_duration=lease_duration,
-        holder_type=holder_type,
-        holder_id=holder_id,
+        holder_type=bound_holder_type,
+        holder_id=bound_holder_id,
         poll_seconds=poll_seconds,
     )
     lease_ids = [str(x) for x in out.get("lease_ids") or []]
