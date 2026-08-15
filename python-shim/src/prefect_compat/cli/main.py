@@ -21,6 +21,7 @@ from ..runtime import InMemoryControlPlane
 from ..services import run_services_loop
 from ..worker import resolve_worker_mode, run_http_worker_loop, run_worker_loop
 from ..worker_client import WorkerHttpClient
+from .gcl import add_gcl_parser
 
 DEFAULT_API_URL = "http://127.0.0.1:8000"
 DEFAULT_MANIFEST = "ironflow.yaml"
@@ -389,7 +390,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     parser = argparse.ArgumentParser(
         prog="ironflow",
-        description="IronFlow deployment CLI (init, deploy, serve, worker).",
+        description="IronFlow CLI (init, deploy, serve, worker, gcl, server).",
     )
     parser.add_argument(
         "--version",
@@ -597,6 +598,8 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Stale worker threshold (default: IRONFLOW_SCHEDULER_STALE_SECONDS or 120).",
     )
     services_start.set_defaults(func=cmd_server_services_start)
+
+    add_gcl_parser(subparsers)
 
     return parser
 
