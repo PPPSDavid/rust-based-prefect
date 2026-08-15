@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
+import { ConcurrencyPage } from "./pages/ConcurrencyPage";
 import { DeploymentDetailPage } from "./pages/DeploymentDetailPage";
 import { DeploymentsPage } from "./pages/DeploymentsPage";
 import { FlowDetailPage } from "./pages/FlowDetailPage";
@@ -22,6 +23,7 @@ export function App() {
         <Route path="/deployments/:id" element={<DeploymentDetailPage />} />
         <Route path="/work-pools" element={<WorkPoolsPage />} />
         <Route path="/work-pools/:id" element={<WorkPoolDetailPage />} />
+        <Route path="/concurrency" element={<ConcurrencyPage />} />
       </Routes>
     </AppShell>
   );
