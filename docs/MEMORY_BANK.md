@@ -7,7 +7,7 @@ Last updated: 2026-08-15.
 
 - Name: Project IronFlow (`rust-based-prefect`)
 - Goal: Prefect-compatible orchestration with stronger determinism, performance, and static planning.
-- Status: Hybrid MVP in active use — deployments (schedules, CLI/YAML Tier 1); **subflows M1+M2** on `main` (#34/#36) with user guide at `docs/how-to/subflows.md`; transition hooks; **global + tag concurrency limits** (`docs/how-to/concurrency-limits.md`); concurrent `task.submit` via ThreadPoolTaskRunner; **flow-run final state `wait_all`** (Rust `resolve_flow_terminal_state`, `detach` / `final_state="explicit"` escape); agent tooling under `.cursor/` + `docs/agent/`. **Self-hosted (core shipped):** Tier A server Docker + Tier C basic auth + Tier B0–B3/B5 (#49/#52/#56/#57) — Postgres, HTTP workers, `ironflow server services start`, `deploy/docker/compose.yml`, GHA compose smoke. Guides: `docs/how-to/docker-compose.md`, `docs/SELF_HOSTED_SERVER.md`. **Follow-ups (not blocking):** HA services leader election, Alembic-style DB upgrade CLI, Redis/multi-worker API (B4), UI compose image, GHCR publish automation — see `docs/plans/self-hosted-docker-tier-b.md`. Flow-run final state and concurrency plans implemented.
+- Status: Hybrid MVP in active use — deployments (schedules, CLI/YAML Tier 1); **subflows M1+M2** on `main` (#34/#36) with user guide at `docs/how-to/subflows.md`; transition hooks; **global + tag concurrency limits** (`docs/how-to/concurrency-limits.md`, CLI `ironflow gcl`, UI Concurrency page); concurrent `task.submit` via ThreadPoolTaskRunner; **flow-run final state `wait_all`** (Rust `resolve_flow_terminal_state`, `detach` / `final_state="explicit"` escape); agent tooling under `.cursor/` + `docs/agent/`. **Self-hosted (core shipped):** Tier A server Docker + Tier C basic auth + Tier B0–B3/B5 (#49/#52/#56/#57) — Postgres, HTTP workers, `ironflow server services start`, `deploy/docker/compose.yml`, GHA compose smoke. Guides: `docs/how-to/docker-compose.md`, `docs/SELF_HOSTED_SERVER.md`. **Follow-ups (not blocking):** HA services leader election, Alembic-style DB upgrade CLI, Redis/multi-worker API (B4), UI compose image, GHCR publish automation — see `docs/plans/self-hosted-docker-tier-b.md`. Flow-run final state and concurrency plans implemented.
 
 ## Core Architecture
 
@@ -76,7 +76,7 @@ Last updated: 2026-08-15.
 
 Gap canvas: `docs/plans/prefect-gap-canvas.md` (from PR #60 lineage).
 
-1. **P4.2 / P4.3** — `ironflow gcl` CLI + UI admin (after P4.0 lease-on-cancel, now landed). See `docs/plans/north-stars-later.md`.
+1. **P4.1** — async `concurrency` / `rate_limit` (thin over the same Rust acquire). See `docs/plans/north-stars-later.md`.
 2. Postgres Rust schedule/gate + HA follow-ups (P2) — later plan.
 3. Keep CI + `perf_matrix` lite gate healthy (including `--preset gcl`) **and** `pytest -m airtight`.
 4. P1 resume follow-ups: native Rust `resume_from`, subflow/gate policies.

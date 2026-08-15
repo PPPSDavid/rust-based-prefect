@@ -191,9 +191,9 @@ For `map` + thread/process pools: acquire **per worker** immediately before body
 
 ### Phase 4 — API/CLI/UI polish (optional)
 
-- CLI `ironflow gcl …` subset.
-- Frontend concurrency admin page (after API stable).
-- Wire into `perf_matrix` a `gcl` / tag-limited recipe (fulfill `docs/benchmark_baseline.md` scenario 4).
+- [x] CLI `ironflow gcl …` subset (`ls` / `create` / `update` / `delete` / `inspect`).
+- [x] Frontend concurrency admin page (after API stable).
+- [ ] Wire into `perf_matrix` a `gcl` / tag-limited recipe (fulfill `docs/benchmark_baseline.md` scenario 4).
 
 ---
 

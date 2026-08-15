@@ -2,13 +2,13 @@
 
 Side-by-side comparison notes for IronFlow UI vs Prefect OSS 3.x.
 
-**Last audited:** 2026-07-25 against `frontend/src/App.tsx` routes and page implementations.
+**Last audited:** 2026-08-15 against `frontend/src/App.tsx` routes and page implementations.
 
 ## Navigation
 
 | Area | Prefect | IronFlow today |
 | --- | --- | --- |
-| Primary nav | Flow Runs, Flows, Deployments, Work Pools | Same top-level sections (`AppShell`: `/runs`, `/flows`, `/deployments`, `/work-pools`) |
+| Primary nav | Flow Runs, Flows, Deployments, Work Pools | Same plus **Concurrency** (`AppShell`: `/runs`, `/flows`, `/deployments`, `/work-pools`, `/concurrency`) |
 | Run detail | Actions (cancel, retry), tabs for tasks/logs | Cancel/retry/pause drain|terminate/resume + tabs (tasks, logs, events, artifacts, DAG) |
 
 ## Run detail — artifacts / results
@@ -27,7 +27,7 @@ Side-by-side comparison notes for IronFlow UI vs Prefect OSS 3.x.
 - [x] Logs tab search + task/level filters
 - [x] Retry failed deployment-backed runs (`POST …/retry`; non-deployment runs surface an error)
 - [x] Run detail tabs: Task Runs, Logs, Events, Artifacts, DAG (logical / expanded modes)
-- [ ] Concurrency-limits admin surface (API exists; no UI page — backlog)
+- [x] Concurrency-limits admin surface (`ConcurrencyPage` on `/concurrency`; HTTP `/api/concurrency-limits`)
 
 ## Flows
 
@@ -48,13 +48,18 @@ Side-by-side comparison notes for IronFlow UI vs Prefect OSS 3.x.
 - [x] Pool pause/resume
 - [x] Deployment shows assigned work pool id (detail field; defaults to `default-process-pool` label when unset — not a full assign/reassign UI)
 
+## Concurrency
+
+- [x] Nav **Concurrency** page (`/concurrency`) lists named global limits
+- [x] Create (name, limit, optional decay), activate/deactivate, delete
+- [x] Inspect shows GET payload JSON including `active_slots` (no per-holder lease API)
+
 ## Explicit non-goals (MVP)
 
 - Push/managed pool types
 - Work queue priority/concurrency
 - Prefect Cloud auth/tenancy
 - Pixel-perfect visual clone of Prefect UI
-- UI concurrency admin (tracked separately; see `COMPATIBILITY.md`)
 
 ## Visual audit procedure
 

@@ -89,6 +89,27 @@ With a limit of 2, at most two tagged task runs hold slots (and are `RUNNING`) a
 | `PATCH` | `/api/concurrency-limits/{name}` |
 | `DELETE` | `/api/concurrency-limits/{name}` |
 
+`POST` is an **upsert**. Names such as `tag:db` are valid (URL-encoded on the path).
+
+## CLI (`ironflow gcl`)
+
+Talks to a running API (`IRONFLOW_API_URL` or `--api-url`, default `http://127.0.0.1:8000`). Success prints JSON on stdout. `create` upserts. `delete` does not prompt.
+
+```bash
+ironflow gcl create db --limit 5
+ironflow gcl create api --limit 10 --decay 2.0
+ironflow gcl create tag:db --limit 2
+ironflow gcl ls
+ironflow gcl inspect db
+ironflow gcl update db --limit 8
+ironflow gcl update db --inactive
+ironflow gcl delete db
+```
+
+## UI (Concurrency page)
+
+The **Concurrency** nav item (`/concurrency`) lists the same ledger: create (name, limit, optional decay), activate/deactivate, delete, and inspect (GET payload JSON, including `active_slots`). There is no per-holder lease listing API; expired leases are reclaimed on the scheduler maintenance tick. This page is not a Prefect pixel clone and does not manage deployment `concurrency_limit`.
+
 ## Environment
 
 | Variable | Default | Meaning |
