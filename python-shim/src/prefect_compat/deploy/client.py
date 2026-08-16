@@ -65,6 +65,9 @@ class _UrllibSession:
     def patch(self, path: str, json: dict[str, Any] | None = None) -> _UrllibResponse:
         return self._request("PATCH", path, json_body=json)
 
+    def delete(self, path: str) -> _UrllibResponse:
+        return self._request("DELETE", path)
+
 
 class DeployClient:
     def __init__(

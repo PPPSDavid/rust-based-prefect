@@ -182,8 +182,8 @@ Kernel GCL/tag/rate_limit already shipped (Phases 1–3). P4 is the **operator s
 | --- | --- | --- | --- |
 | **P4.0** | GCL **correctness under cancel/resume**: leases always released on task/flow cancel; document interaction with P1 resume | ✅ cancel/terminate-pause release-by-holder; `pytest -m airtight` | shim + engine |
 | **P4.1** | Async `concurrency` / `rate_limit` helpers (thin over same Rust acquire) | Async tests mirror sync semantics; no second ledger | shim |
-| **P4.2** | CLI `ironflow gcl` subset (`ls` / `create` / `update` / `delete` / `inspect`) | CLI + how-to; HTTP or local plane path documented | shim |
-| **P4.3** | UI concurrency admin page (list/create/edit/delete; show active leases if cheap) | Nav entry; uses existing `/api/concurrency-limits` | frontend |
+| **P4.2** | CLI `ironflow gcl` subset (`ls` / `create` / `update` / `delete` / `inspect`) | ✅ CLI + how-to over HTTP `/api/concurrency-limits` | shim |
+| **P4.3** | UI concurrency admin page (list/create/edit/delete; show active leases if cheap) | ✅ Nav **Concurrency**; inspect GET payload (`active_slots`); no per-holder lease API | frontend |
 | **P4.4** | `perf_matrix` **gcl/tag recipe** gate (scenario already hinted in benchmark docs) | Recipe in lite or dedicated preset; compare key stable | benchmarks |
 | **P4.5** | RRule: `COUNT` and/or one advanced calendar filter (**only if a real workload needs it**) | COMPATIBILITY subset updated | engine |
 
@@ -345,8 +345,8 @@ Global/tag limits are already a **compatibility headline** in `COMPATIBILITY.md`
 | Sync `concurrency` / `rate_limit` | Shipped |
 | HTTP `/api/concurrency-limits` CRUD | Shipped |
 | Tag limits on enter `Running` | Shipped |
-| CLI `ironflow gcl` | Missing |
-| UI admin | Missing |
+| CLI `ironflow gcl` | ✅ `ls` / `create` / `update` / `delete` / `inspect` |
+| UI admin | ✅ `/concurrency` nav page |
 | Async CM | Missing |
 | Dedicated perf_matrix gcl recipe | Partial / missing as gate |
 
@@ -416,8 +416,8 @@ P4.5 RRule — optional, separate
 4. **P3.0 + P3.1** — Runtime context + `get_run_logger` (+ optional `log_prints`)  
 5. **P3.2a → P3.2f** — Lifecycle control: force cancel + pause `drain`/`terminate` + resume ([plan](flow-run-lifecycle-control.md))  
 6. **P4.0** — GCL leases correct under cancel/pause/resume  
-7. **P4.2** — CLI `ironflow gcl`  
-8. **P4.3** — UI concurrency admin  
+7. ~~**P4.2** — CLI `ironflow gcl`~~ ✅  
+8. ~~**P4.3** — UI concurrency admin~~ ✅  
 9. **P4.1** — Async concurrency helpers  
 10. **P4.4** — perf_matrix gcl/tag recipe  
 

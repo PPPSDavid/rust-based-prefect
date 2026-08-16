@@ -30,7 +30,7 @@ Use this table when a Prefect import fails or behaves differently. Status values
 | Prefect pause / cancel | partial | Cancel = terminate. Operator pause requires explicit `mode=drain` or `mode=terminate`. Hard OS-kill needs **`ProcessPoolTaskRunner`**; thread runners are cooperative-only. Guide: [cancel / pause / resume](cancel-pause-resume.md) |
 | Artifacts (`create_markdown`, …) | unsupported | Internal result artifacts + GET only; no Prefect `create_*` API |
 | Automations / webhooks | unsupported | Events + SSE exist; no trigger engine |
-| `concurrency` / `rate_limit` (sync) | partial | Sync helpers + GCL CRUD — [concurrency limits](concurrency-limits.md); async helpers not shipped |
+| `concurrency` / `rate_limit` (sync) | partial | Sync helpers + GCL CRUD (HTTP, `ironflow gcl`, UI Concurrency page) — [concurrency limits](concurrency-limits.md); async helpers not shipped |
 | `task.delay` / background tasks | unsupported | Use deployments + workers instead |
 | Cloud connect / workspaces / SSO | deliberate | Self-hosted only; no Cloud client |
 

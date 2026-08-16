@@ -5,7 +5,8 @@ const NAV_ITEMS = [
   { to: "/runs", label: "Flow Runs" },
   { to: "/flows", label: "Flows" },
   { to: "/deployments", label: "Deployments" },
-  { to: "/work-pools", label: "Work Pools" }
+  { to: "/work-pools", label: "Work Pools" },
+  { to: "/concurrency", label: "Concurrency" }
 ] as const;
 
 type AppShellProps = {

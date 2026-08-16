@@ -182,3 +182,14 @@ export type Worker = {
   updated_at: string;
   work_pool_id?: string | null;
 };
+
+export type ConcurrencyLimit = {
+  id: string;
+  name: string;
+  limit: number;
+  active_slots: number;
+  slot_decay_per_second?: number | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};

@@ -1,5 +1,6 @@
 import type {
   ArtifactRecord,
+  ConcurrencyLimit,
   CursorPage,
   Deployment,
   DeploymentRun,
@@ -131,6 +132,35 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, work_pool_id: workPoolId })
     }),
+  listConcurrencyLimits: () =>
+    readJson<{ limits: ConcurrencyLimit[] }>(`${base}/api/concurrency-limits`),
+  getConcurrencyLimit: (name: string) =>
+    readJson<ConcurrencyLimit>(`${base}/api/concurrency-limits/${encodeURIComponent(name)}`),
+  upsertConcurrencyLimit: (payload: {
+    name: string;
+    limit: number;
+    slot_decay_per_second?: number;
+    active?: boolean;
+  }) =>
+    readJson<ConcurrencyLimit>(`${base}/api/concurrency-limits`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }),
+  patchConcurrencyLimit: (
+    name: string,
+    payload: { limit?: number; slot_decay_per_second?: number; active?: boolean }
+  ) =>
+    readJson<ConcurrencyLimit>(`${base}/api/concurrency-limits/${encodeURIComponent(name)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }),
+  deleteConcurrencyLimit: (name: string) =>
+    readJson<{ ok?: boolean; deleted?: boolean }>(
+      `${base}/api/concurrency-limits/${encodeURIComponent(name)}`,
+      { method: "DELETE" }
+    ),
   streamFlowRuns: () => new EventSource(`${base}/api/stream/flow-runs`),
   streamFlowRun: (id: string) => new EventSource(`${base}/api/stream/flow-runs/${id}`)
 };

@@ -16,6 +16,8 @@ test("navigates primary sections", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Flows" })).toBeVisible();
   await page.getByRole("link", { name: "Work Pools" }).click();
   await expect(page.getByRole("heading", { name: "Work Pools" })).toBeVisible();
+  await page.getByRole("link", { name: "Concurrency" }).click();
+  await expect(page.getByRole("heading", { name: "Concurrency" })).toBeVisible();
 });
 
 test("opens run detail tabs", async ({ page }) => {

@@ -28,5 +28,6 @@ describe("App navigation", () => {
     expect(screen.getByRole("link", { name: "Flow Runs" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Deployments" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Work Pools" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Concurrency" })).toBeInTheDocument();
   });
 });
