@@ -37,7 +37,7 @@ State updates carry a **transition token** (UUID). Re-applying the **same** toke
 
 ## Concurrent-state invariants
 
-`perf_matrix` measures throughput. It does **not** prove these invariants. The harness is `pytest -m airtight` (see [`airtight-concurrency.md`](../plans/airtight-concurrency.md)):
+`perf_matrix` measures throughput. It does **not** prove these invariants. The harness is `pytest -m airtight` (see [airtight-concurrency plan](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/plans/airtight-concurrency.md)):
 
 - Duplicate tokens: exactly one `applied` per token, even under a thread storm and across many flow runs.
 - Parallel flow runs + concurrent `submit`: every flow ends in a legal terminal; versions are monotonic.

@@ -283,8 +283,9 @@ Non-obvious caveats for this environment:
   + `CRG_MCP_CONDA_ENV`).
 - **Vite dev server binds to IPv6 `localhost` (`::1`) only.** Open the UI at `http://localhost:4173`,
   **not** `http://127.0.0.1:4173` (the latter refuses the connection). The backend API is at
-  `http://127.0.0.1:8000` and the frontend hardcodes that origin (`frontend/src/api.ts`); backend CORS
-  only allows the `4173` origins, so run both together.
+  `http://127.0.0.1:8000`. API calls use `VITE_API_BASE` when set; the Vite dev server proxies `/api`
+  and `/health` to that origin (`frontend/src/api.ts`, `frontend/vite.config.ts`). Backend CORS only
+  allows the `4173` origins, so run both together.
 - **Running the stack:** start the backend with
   `uv run python -m uvicorn python-shim.src.prefect_compat.server:app --host 127.0.0.1 --port 8000`
   (or `python3 -m uvicorn …` when `.venv` is on `PATH`)

@@ -1,26 +1,35 @@
 # Memory Bank
 
 Compact context handoff for future sessions. Process/validation contract: root `AGENTS.md`.
-Last updated: 2026-08-15.
+Last updated: 2026-08-30.
 
 ## Project Snapshot
 
 - Name: Project IronFlow (`rust-based-prefect`)
 - Goal: Prefect-compatible orchestration with stronger determinism, performance, and static planning.
-- Status: Hybrid MVP in active use — deployments (schedules, CLI/YAML Tier 1); **subflows M1+M2** on `main` (#34/#36) with user guide at `docs/how-to/subflows.md`; transition hooks; **global + tag concurrency limits** (`docs/how-to/concurrency-limits.md`, CLI `ironflow gcl`, UI Concurrency page); concurrent `task.submit` via ThreadPoolTaskRunner; **flow-run final state `wait_all`** (Rust `resolve_flow_terminal_state`, `detach` / `final_state="explicit"` escape); agent tooling under `.cursor/` + `docs/agent/`. **Self-hosted (core shipped):** Tier A server Docker + Tier C basic auth + Tier B0–B3/B5 (#49/#52/#56/#57) — Postgres, HTTP workers, `ironflow server services start`, `deploy/docker/compose.yml`, GHA compose smoke. Guides: `docs/how-to/docker-compose.md`, `docs/SELF_HOSTED_SERVER.md`. **Follow-ups (not blocking):** HA services leader election, Alembic-style DB upgrade CLI, Redis/multi-worker API (B4), UI compose image, GHCR publish automation — see `docs/plans/self-hosted-docker-tier-b.md`. Flow-run final state and concurrency plans implemented.
+- Status: **0.3.0 maintainer-cleanup series** on top of post-`v0.2.0` product that already shipped: deployments (schedules, CLI/YAML Tier 1); **subflows M1+M2** (#34/#36) with `docs/how-to/subflows.md`; transition hooks; **global + tag concurrency limits** (`docs/how-to/concurrency-limits.md`, CLI `ironflow gcl`, UI Concurrency page); concurrent `task.submit` via ThreadPoolTaskRunner; **flow-run final state `wait_all`**; **task resume / persist_result**; cancel / drain|terminate pause; agent tooling under `.cursor/` + `docs/agent/`. **Self-hosted (core shipped):** Tier A server Docker + Tier C basic auth + Tier B0–B3/B5 (#49/#52/#56/#57) — Postgres, HTTP workers, `ironflow server services start`, `deploy/docker/compose.yml`, GHA compose smoke. Guides: `docs/how-to/docker-compose.md`, `docs/SELF_HOSTED_SERVER.md`. **Follow-ups (not blocking):** HA services leader election, Alembic-style DB upgrade CLI, Redis/multi-worker API (B4), UI compose image, GHCR publish automation — see `docs/plans/self-hosted-docker-tier-b.md`.
+
+## 0.3.0 structure (this series)
+
+- Quality gates: rustfmt + clippy `-D warnings`, `ruff format`, ruff `C901` max 20, clippy `too_many_lines` 120, `scripts/code_metrics.py` file-LOC ratchet (new files ≤800; existing must not cross 1000 unless allowlisted; allowlisted files must not grow).
+- Python control plane: `runtime.py` is a mixin facade; logic lives in `prefect_compat/control_plane/`. FastAPI lives in `server.py` + `routes/`; demo flows in `flow_registry.py`.
+- Rust: C ABI `ironflow_*` unchanged; dispatch in `ffi/control_*.rs`; `deployment_ops/` and `concurrency_ops/` are packages. No `rust-engine/src` file >800.
+- Allowlisted production file >1000 LOC: **`decorators.py` only** (parked: `benchmarks/perf_matrix.py`).
+- Hosted docs: Get started ≤4 nav entries; published pages must not MkDocs-link into excluded `docs/plans/**`.
 
 ## Core Architecture
 
-- `rust-engine/`: deterministic state-machine kernel and append-only event model.
-- `python-shim/`: Prefect-style ergonomics (`@flow`, `@task`, `submit`, `map`, `wait_for`, **`deployment_ref` / subflows**) with compatibility runtime + optional FastAPI server. **`ThreadPoolTaskRunner`**: concurrent `submit` + `map`. **`ProcessPoolTaskRunner`**: registered child processes per task (cancel/terminate SIGTERM→SIGKILL).
+- `rust-engine/`: deterministic state-machine kernel (`engine.rs` `validate_transition`) and append-only event model. FFI stays ctypes C ABI (no PyO3).
+- `python-shim/`: Prefect-style ergonomics (`@flow`, `@task`, `submit`, `map`, `wait_for`, **`deployment_ref` / subflows**) with compatibility runtime + optional FastAPI extra `server`. **`ThreadPoolTaskRunner`**: concurrent `submit` + `map`. **`ProcessPoolTaskRunner`**: registered child processes per task (cancel/terminate SIGTERM→SIGKILL).
 - `static-planner/`: static graph IR + forecast for supported flow subset (`@flow` body, `submit`/`map`, repeated tasks, `@task(name=...)`, UI DAG logical/expanded).
-- `benchmarks/`: `perf_matrix.py` (control-plane matrix) and `compare_prefect_vs_ironflow.py` (A/B vs Prefect).
+- `benchmarks/`: `perf_matrix.py` (control-plane matrix) and `compare_prefect_vs_ironflow.py` (A/B vs Prefect). Do not split `perf_matrix.py` in 0.3.0.
+- Native wheel = production; Python fallbacks = degraded in-process authoring.
 
 ## Compatibility Baseline
 
 - Prefect target: `3.x` (subset-first). Source of truth: `COMPATIBILITY.md`.
 - Review loop before matrix changes: `docs/compatibility_review_workflow.md`.
-- Do not claim full Prefect parity without matrix + tests.
+- Do not claim full Prefect parity without matrix + tests. 0.3.0 does **not** expand COMPATIBILITY claims.
 
 ## Persistence Status
 
@@ -30,6 +39,7 @@ Last updated: 2026-08-15.
 - **Postgres** via `IRONFLOW_DATABASE_URL` (`PostgresStore`); Rust `bind_db` for claim/lease on both backends. Schedule ticks / most CRUD on Postgres may still fall back to Python until follow-ups.
 - Query / schedule / claim / GCL hot paths prefer Rust when the native bridge is loaded.
 - Production compose uses Postgres + HTTP workers (no shared worker filesystem).
+- Schema owners: Python store DDL + Rust `ensure_schema` for GCL/`bind_db`. Do not add a fourth copy. Alembic is a follow-up.
 
 ## Agent tooling (code-review-graph)
 
@@ -44,12 +54,14 @@ Last updated: 2026-08-15.
 - Methodology: `docs/perf_methodology.md`
 - Control-plane matrix: `python3 benchmarks/perf_matrix.py run --preset lite …` → `docs/perf_matrix_results.json`
 - Prefect A/B (different tool): `benchmarks/compare_prefect_vs_ironflow.py` → `docs/perf_comparison.json`
+- Historical candidate/compare dumps: `docs/archive/perf/` (not published).
 - Do **not** pass `perf_comparison.json` to `perf_matrix.py compare`.
 
 ## Useful Commands
 
 - Python tests: `python3 -m pytest python-shim/tests static-planner/tests benchmarks/tests`
 - Rust tests: `cargo test --manifest-path rust-engine/Cargo.toml`
+- Lint wrapper: `bash scripts/lint.sh` (ruff/ty/fmt/clippy + `scripts/code_metrics.py`)
 - Perf gate: `python3 benchmarks/perf_matrix.py run --preset lite --repetitions 1 --warmups 0 --jobs 2`
 - CRG setup/verify: `bash scripts/setup_code_review_graph.sh`
 
@@ -83,3 +95,4 @@ Gap canvas: `docs/plans/prefect-gap-canvas.md` (from PR #60 lineage).
 5. Move remaining projection write hot paths from Python into Rust-backed implementation.
 6. Optional: Cloud embeddings path if NL `semantic_search` becomes important; keep decision log current (`docs/agent/DECISION_LOG.md`).
 7. Cheap hosted e2e (GHCR pull-and-smoke) — later plan, not always-on cloud.
+8. Split `decorators.py` / `perf_matrix.py` (parked from 0.3.0 hard-cap).

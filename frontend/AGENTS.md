@@ -7,7 +7,7 @@ Read first: root `AGENTS.md` (Cloud caveats), coordinate API contract changes wi
 ## Caveats
 
 - Dev server: open `http://localhost:4173` (IPv6 `localhost`), not `http://127.0.0.1:4173`.
-- API origin is hardcoded to `http://127.0.0.1:8000` in `src/api.ts`.
+- API calls use `VITE_API_BASE` when set; the Vite dev server proxies `/api` and `/health` to `http://127.0.0.1:8000` (`vite.config.ts`).
 
 ## Validate
 

@@ -17,7 +17,7 @@ Escape hatches:
 - **`submit(..., detach=True)`** — exclude one task/subflow from the wait set (true fire-and-forget / safe-to-fail).
 - **`@flow(final_state="explicit")`** — body return/exception remains authoritative (closer to Prefect’s return-value model).
 
-Design notes: **[flow-run final state plan](../plans/flow-run-final-state.md)**. Compatibility: **[Compatibility matrix](../compatibility.md)**.
+Design notes: [flow-run final state plan](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/plans/flow-run-final-state.md). Compatibility: **[Compatibility matrix](../compatibility.md)**.
 
 ## Subflows (nesting flows)
 
@@ -61,4 +61,4 @@ def pipeline(n: int) -> int:
 
 **Drain** lets in-flight tasks finish then holds `PAUSED`; further `submit` in the same in-process body raises `FlowRunSchedulingHeld`. **Terminate** / cancel cancel RUNNING rows (late `COMPLETED` fenced) and, under **`ProcessPoolTaskRunner`**, SIGTERM→SIGKILL registered child processes. Thread-pool bodies remain cooperative-only. After terminate pause, in-process resume prepares P1 lineage for the **next** `@flow()` invoke (prior attempt is terminalized); deployment-backed resume uses retry-with-`resume_from`.
 
-Step-by-step: **[How to cancel, pause, and resume](../how-to/cancel-pause-resume.md)**. Design: **[lifecycle plan](../plans/flow-run-lifecycle-control.md)**.
+Step-by-step: **[How to cancel, pause, and resume](../how-to/cancel-pause-resume.md)**. Design: [lifecycle plan](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/plans/flow-run-lifecycle-control.md).

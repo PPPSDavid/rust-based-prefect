@@ -123,7 +123,7 @@ Pick a **[release tag](https://github.com/PPPSDavid/rust-based-prefect/releases)
 ```bash
 git clone https://github.com/PPPSDavid/rust-based-prefect.git
 cd rust-based-prefect
-git checkout v0.1.2   # replace with current release tag, or omit to stay on main
+git checkout v0.2.0   # replace with current release tag, or omit to stay on main
 ```
 
 ## 3. Python environment
@@ -196,13 +196,13 @@ cargo test --manifest-path rust-engine/Cargo.toml
 Prefer **`pip install ironflow-prefect-compat`** or **`uv pip install ironflow-prefect-compat`** from PyPI when a wheel matches your platform (see **[§1](#1-pypi-pip-uv-ironflow-prefect-compat)**). If you need a **Git URL** pin instead (pre-release testing or fork), install the shim **from Git**:
 
 ```bash
-python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v0.1.2#subdirectory=python-shim"
+python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v0.2.0#subdirectory=python-shim"
 ```
 
 Replace the tag with your target release. This install **does not** compile Rust unless **`cargo`** is available during the pip build; otherwise build **`rust-engine`** separately and set **`IRONFLOW_RUST_LIB`**, or accept Python fallbacks where implemented. For the **static planner** package:
 
 ```bash
-python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v0.1.2#subdirectory=static-planner"
+python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v0.2.0#subdirectory=static-planner"
 ```
 
 ## 7. Optional: API and UI
@@ -212,6 +212,7 @@ After the above, you can start the bundled HTTP server and UI — see **[How to 
 ## See also
 
 - **[How to set up IronFlow](how-to/setup.md)** — condensed setup and environment variables in one place.
+- **[Quick start (demo flow)](QUICKSTART_DEMO.md)** — bundled `flow_ironflow.py` after a clone + `cargo build`.
 - **[Distribution](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/DISTRIBUTION.md)** — maintainer notes on wheels, CI, TestPyPI vs production PyPI.
 
 ## What is not available yet

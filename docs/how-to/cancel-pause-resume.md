@@ -2,7 +2,7 @@
 
 IronFlow separates **operator lifecycle control** from calendar **gate** waits. This guide covers cancel, pause modes, and resume for the subset shipped today.
 
-Normative limits: **[Compatibility matrix](../compatibility.md)**. Design notes live in-repo at `docs/plans/flow-run-lifecycle-control.md`.
+Normative limits: **[Compatibility matrix](../compatibility.md)**. Design notes: [flow-run lifecycle plan](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/plans/flow-run-lifecycle-control.md) (in-repo).
 
 ## Quick reference
 

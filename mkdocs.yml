@@ -8,6 +8,7 @@ edit_uri: edit/main/docs/
 exclude_docs: |
   plans/**
   agent/**
+  archive/**
   MEMORY_BANK.md
   DISTRIBUTION.md
   benchmark_baseline.md
@@ -19,6 +20,7 @@ exclude_docs: |
   perf_methodology.md
   compatibility_review_workflow.md
   ui_phase1_api_contract.md
+  ui_prefect_parity_checklist.md
   gen_llms.py
 
 theme:
@@ -50,10 +52,8 @@ nav:
   - Get started:
       - "Installation (PyPI · pip / uv)": INSTALL.md
       - "Quick start: PyPI (no clone)": QUICKSTART_PYPI.md
-      - "Quick start (demo flow)": QUICKSTART_DEMO.md
       - "Quickstart: first deployment": quickstart-first-deployment.md
       - "Self-hosted server": SELF_HOSTED_SERVER.md
-      - "Optional: verify the web UI": ui_e2e_visual_check.md
   - Concepts:
       - "Concepts overview": concepts/index.md
       - Flows: concepts/flows.md
@@ -67,6 +67,7 @@ nav:
       - Overview: how-to/index.md
       - "How to set up IronFlow": how-to/setup.md
       - "How to run the server and UI": how-to/server-and-ui.md
+      - "How to verify the web UI": ui_e2e_visual_check.md
       - "How to run the server in Docker": how-to/docker-quickstart.md
       - "How to run IronFlow with Docker Compose": how-to/docker-compose.md
       - "How to run background services": how-to/run-background-services.md

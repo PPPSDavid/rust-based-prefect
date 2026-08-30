@@ -133,4 +133,4 @@ Per-flow overrides always win: `@flow(task_runner=ThreadPoolTaskRunner(max_worke
 - **[Runners](../concepts/runners.md)** — built-in runner types and API surface.
 - **[Tasks](../concepts/tasks.md)** — `submit`, `map`, futures.
 - **[Self-hosted server](../SELF_HOSTED_SERVER.md)** — deployment workers and work pools.
-- **[Performance methodology](../perf_methodology.md)** — how runners interact with the control plane in benchmarks.
+- [Performance methodology](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/perf_methodology.md) — how runners interact with the control plane in benchmarks (in-repo).
