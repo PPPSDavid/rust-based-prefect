@@ -180,7 +180,7 @@ dev = [
 
 [[package]]
 name = "ironflow-prefect-compat"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "python-shim" }
 dependencies = [
     { name = "pydantic" },
@@ -208,7 +208,7 @@ provides-extras = ["postgres", "server"]
 
 [[package]]
 name = "ironflow-static-planner"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "static-planner" }
 dependencies = [
     { name = "pydantic" },

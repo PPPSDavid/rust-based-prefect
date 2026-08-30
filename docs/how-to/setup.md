@@ -13,7 +13,7 @@ Pick a **[release tag](https://github.com/PPPSDavid/rust-based-prefect/releases)
 ```bash
 git clone https://github.com/PPPSDavid/rust-based-prefect.git
 cd rust-based-prefect
-git checkout v0.2.0   # optional: replace with current tag
+git checkout v0.3.0   # optional: replace with current tag
 ```
 
 ## 2. Python environment
@@ -86,7 +86,7 @@ Preferred path when available: **`pip install ironflow-prefect-compat`** (produc
 You can also **`pip install` from Git**:
 
 ```bash
-python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v0.2.0#subdirectory=python-shim"
+python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v0.3.0#subdirectory=python-shim"
 ```
 
 That package **does not** ship `rust-engine`; build the native library separately and set **`IRONFLOW_RUST_LIB`**, or accept Python fallbacks. See also **[Installation](../INSTALL.md)** for the same material with slightly different emphasis.

@@ -7,12 +7,12 @@ Quick path for a **single-container** API server with embedded scheduler and loc
 ## Pull a release image (when published)
 
 ```bash
-docker pull ghcr.io/pppsdavid/ironflow-server:0.2.0
+docker pull ghcr.io/pppsdavid/ironflow-server:0.3.0
 
 docker run -p 8000:8000 \
   -v ironflow-data:/data \
   -e IRONFLOW_HISTORY_PATH=/data/ironflow_history.jsonl \
-  ghcr.io/pppsdavid/ironflow-server:0.2.0
+  ghcr.io/pppsdavid/ironflow-server:0.3.0
 ```
 
 Open `http://127.0.0.1:8000/health` — expect `{"status":"ok"}`.
@@ -36,8 +36,8 @@ Or use a **PyPI wheel** inside the image (no local `cargo`):
 mkdir -p dist/wheels
 docker build -f deploy/docker/Dockerfile.server \
   --build-arg INSTALL_MODE=pypi \
-  --build-arg IRONFLOW_VERSION=0.2.0 \
-  -t ironflow-server:0.2.0 .
+  --build-arg IRONFLOW_VERSION=0.3.0 \
+  -t ironflow-server:0.3.0 .
 ```
 
 ## Run
