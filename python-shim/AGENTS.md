@@ -7,13 +7,14 @@ Read first: root `AGENTS.md`, `COMPATIBILITY.md`, `docs/compatibility_review_wor
 ## In scope
 
 - `@flow` / `@task`, submit/map, deployments, schedules (Python fallbacks)
-- FastAPI routes and persistence glue
+- FastAPI routes (`server.py` + `routes/`) and persistence glue
 - Thin FFI wrappers around rust-engine
 
 ## Hotspots (single-writer)
 
 - `src/prefect_compat/__init__.py` (public exports)
-- `src/prefect_compat/server.py` (central routes)
+- `src/prefect_compat/server.py` (app + embedded worker/scheduler)
+- `src/prefect_compat/runtime.py` (control-plane facade)
 - `pyproject.toml`
 
 ## Validate

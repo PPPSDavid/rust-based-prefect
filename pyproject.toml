@@ -53,7 +53,6 @@ max-complexity = 20
 "python-shim/src/prefect_compat/concurrency_store.py" = ["C901"]
 "python-shim/src/prefect_compat/decorators.py" = ["C901"]
 "python-shim/src/prefect_compat/persistence/store_sqlite.py" = ["C901"]
-"python-shim/src/prefect_compat/runtime.py" = ["C901"]
 "static-planner/src/static_planner/planner.py" = ["C901"]
 
 [tool.ty.environment]
@@ -89,4 +88,17 @@ include = [
 exclude = [
     "python-shim/setup.py",
     "python-shim/build_native.py",
+    # Mixins share `self` across classes; attribute types live on InMemoryControlPlane.
+    "python-shim/src/prefect_compat/control_plane/dag.py",
+    "python-shim/src/prefect_compat/control_plane/deployment_runs.py",
+    "python-shim/src/prefect_compat/control_plane/deployments.py",
+    "python-shim/src/prefect_compat/control_plane/gates.py",
+    "python-shim/src/prefect_compat/control_plane/gcl.py",
+    "python-shim/src/prefect_compat/control_plane/lifecycle.py",
+    "python-shim/src/prefect_compat/control_plane/queries.py",
+    "python-shim/src/prefect_compat/control_plane/resume.py",
+    "python-shim/src/prefect_compat/control_plane/run_events.py",
+    "python-shim/src/prefect_compat/control_plane/runs.py",
+    "python-shim/src/prefect_compat/control_plane/rust_dispatch.py",
+    "python-shim/src/prefect_compat/control_plane/store.py",
 ]

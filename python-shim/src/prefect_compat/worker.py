@@ -11,6 +11,7 @@ from uuid import UUID
 
 from .cancellation import FlowRunCancelled
 from .decorators import _ACTIVE_DEPLOYMENT_RUN
+from .flow_registry import FLOW_REGISTRY
 from .runtime import RunState
 
 
@@ -44,8 +45,6 @@ def resolve_flow_callable(
     flow_registry: dict[str, Callable[..., Any]] | None = None,
 ) -> Callable[..., Any]:
     if flow_registry is None:
-        from .server import FLOW_REGISTRY
-
         flow_registry = FLOW_REGISTRY
     if flow_name in flow_registry:
         return flow_registry[flow_name]
