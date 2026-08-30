@@ -34,6 +34,30 @@ This project is **not** a drop-in replacement for Prefect Cloud or the full Pref
 | Event stream / observability | Local persistence (JSONL + SQLite) and optional API/SSE; see README **History persistence**. Automations on those events are not supported. |
 | Static DAG / compile-time insights | `static-planner/` analyzes `@flow` bodies (`submit`, `map`, `wait_for`, repeated tasks, `@task(name=...)`) and stores a per-run manifest + forecast. See **[DAG and forecast](concepts/dag-and-forecast.md)**. Dynamic regions fall back to runtime-inferred DAGs. |
 | Run DAG UI | Local UI **DAG** tab: **Aggregated fan-out** (planned graph, fan-out collapsed) vs **Task runs**; dependencies always left→right, parallel top→bottom; zoom/pan, search, path highlight. API: `mode=logical|expanded`. |
+| Graph mode / execution contract | **IronFlow extension:** `@flow(graph_mode="auto"|"static"|"dynamic")`; resume skips only when **effective=static** and manifest/parameters match. Prefect has no equivalent — all flows treated as potentially dynamic at retry. Guide: **[graph mode and retry](how-to/graph-mode-and-retry.md)**. |
+
+## State & retry identity
+
+Comparison for flow/task lifecycle and retry semantics (Prefect 3.x reference: [states](https://docs.prefect.io/v3/concepts/states), [retries](https://docs.prefect.io/v3/how-to-guides/workflows/retries)).
+
+| Scenario | Prefect 3.x | IronFlow today | Ambiguity risk |
+| --- | --- | --- | --- |
+| Happy path | `Scheduled→Pending→Running→Completed` | Same 7-state subset | Low |
+| Task auto-retry | Same `task_run_id`, `run_count++` | **Unsupported** (spec: `docs/plans/task-auto-retry.md`) | N/A until implemented |
+| Flow / deployment retry | Same or new `flow_run_id` depending on path | **Always new** `flow_run_id` + `resume_from_flow_run_id` | **Low** — explicit lineage |
+| Skip completed on retry | Cache / persist policies | Static contract + logical slot key | Low when **effective=static**; none when dynamic |
+| Code/manifest change on retry | Re-execute; cache may skip | Manifest fingerprint mismatch → disable skips | Addressed via execution contract |
+| Total attempt count | Split across `flow_run.run_count` vs `task_run.run_count` | **`flow_attempt_number`**, **`task_run_attempt`** (API) | Low — separate fields |
+| Dynamic control flow | Runtime | **`auto`→dynamic** or forced **`dynamic`** | Low |
+
+**IronFlow identity invariants (normative):**
+
+- **Execution identity** — `flow_run_id` / `task_run_id`: one row per execution attempt; never reused across flow retries.
+- **Logical identity** — `planned_node_id` + `map_index` + `input_fingerprint`: skip/recompute correlation within a lineage.
+- **Lineage identity** — `resume_lineage_id` + `resume_from_flow_run_id`: chains deployment retries.
+- **Non-goals** — Prefect `dynamic_key` task correlation; terminal→non-terminal FSM edges; Prefect `CRASHED` / `AwaitingRetry` state names.
+
+Deep dive: **[State transition matrix](concepts/state-transition-matrix.md)**, **[Execution contract](concepts/execution-contract.md)**.
 
 ## Practical “bring your own tasks” path
 

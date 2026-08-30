@@ -9,7 +9,9 @@ Use these pages to learn the IronFlow model end-to-end:
 - **[Runners](runners.md)** — task runners for concurrent `submit` / `map`. Practical choice guide: **[How to choose a task runner](../how-to/choose-task-runners.md)**.
 - **[DAG and forecast](dag-and-forecast.md)** — static planner, run DAG UI, subflow node kinds, wide/long graphs.
 - **[States and transitions](states-and-transitions.md)** — `RunState` values and allowed edges (enforced in Rust).
+- **[State transition matrix](state-transition-matrix.md)** — flow/task `transition_kind` catalog and lifecycle diagrams.
+- **[Execution contract](execution-contract.md)** — graph mode (`auto`/`static`/`dynamic`) and resume policy.
 - **[Prefect → IronFlow](../PREFECT_IRONFLOW_MAPPING.md)** — table mapping Prefect mental models to this project.
 - **[Architecture](../architecture.md)** — how Python calls the engine and where persistence hooks live.
 
-Hands-on nesting: **[How to compose flows with subflows](../how-to/subflows.md)**. Resume / persist: **[How to resume tasks and persist results](../how-to/task-resume-and-persist.md)**. Cancel / pause: **[How to cancel, pause, and resume](../how-to/cancel-pause-resume.md)**. For supported features and limits, see **[Compatibility matrix](../compatibility.md)**. For Prefect’s own tutorials, see the upstream [Prefect 3 concepts](https://docs.prefect.io/v3/concepts) (IronFlow implements a **subset**; compatibility is not universal).
+Hands-on nesting: **[How to compose flows with subflows](../how-to/subflows.md)**. Resume / persist: **[How to resume tasks and persist results](../how-to/task-resume-and-persist.md)**. Graph mode: **[How to choose graph mode and retry](../how-to/graph-mode-and-retry.md)**. Cancel / pause: **[How to cancel, pause, and resume](../how-to/cancel-pause-resume.md)**. For supported features and limits, see **[Compatibility matrix](../compatibility.md)**. For Prefect’s own tutorials, see the upstream [Prefect 3 concepts](https://docs.prefect.io/v3/concepts) (IronFlow implements a **subset**; compatibility is not universal).
