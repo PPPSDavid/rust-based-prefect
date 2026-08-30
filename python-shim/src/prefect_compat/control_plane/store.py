@@ -313,8 +313,8 @@ class StoreMixin:
         now = self._now()
         self._sqlite_conn.execute(
             "INSERT OR IGNORE INTO task_runs(id,flow_run_id,task_name,planned_node_id,state,version,created_at,updated_at,"
-            "kind,child_flow_run_id,child_deployment_run_id,gate_open_at,tags,contribute_to_flow_state) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "kind,child_flow_run_id,child_deployment_run_id,gate_open_at,tags,contribute_to_flow_state,task_run_attempt) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             [
                 str(task.task_run_id),
                 str(task.flow_run_id),
@@ -332,6 +332,7 @@ class StoreMixin:
                 task.gate_open_at,
                 json.dumps(list(task.tags)) if task.tags else None,
                 1 if task.contribute_to_flow_state else 0,
+                task.task_run_attempt,
             ],
         )
 
@@ -451,6 +452,9 @@ class StoreMixin:
             "child_deployment_run_id": row["child_deployment_run_id"]
             if "child_deployment_run_id" in keys
             else None,
+            "task_run_attempt": int(row["task_run_attempt"])
+            if "task_run_attempt" in keys and row["task_run_attempt"] is not None
+            else 1,
         }
 
     def _log_row_to_dict(self, row: sqlite3.Row) -> dict[str, Any]:

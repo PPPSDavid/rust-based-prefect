@@ -66,5 +66,5 @@ prefect_compat = [
 "prefect_compat.cli.templates" = ["*.yaml"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = ["src", "../static-planner/src"]
 testpaths = ["tests"]

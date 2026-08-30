@@ -60,10 +60,31 @@ def compile_flow_source(
             label=f"{task_name}-{instance}",
         )
 
-    def _append_task_call(call: ast.Call) -> None:
+    def _ensure_task_node_from_call(
+        call: ast.Call, call_to_node: dict[int, str]
+    ) -> str | None:
+        """Materialize nested submit/map calls and return this call's node id."""
+        existing = call_to_node.get(id(call))
+        if existing is not None:
+            return existing
+        nested_dep_ids: list[str] = []
+        for arg in call.args:
+            if isinstance(arg, ast.Call) and isinstance(arg.func, ast.Attribute):
+                if arg.func.attr in {"submit", "map"}:
+                    nested_id = _ensure_task_node_from_call(arg, call_to_node)
+                    if nested_id is not None and nested_id not in nested_dep_ids:
+                        nested_dep_ids.append(nested_id)
         maybe = _extract_task_call(call, bound_nodes, gate_symbols)
-        if maybe is not None:
-            nodes.append(_make_node(maybe["symbol"], maybe["op_type"], maybe["deps"]))
+        if maybe is None:
+            return None
+        deps = list(dict.fromkeys([*maybe["deps"], *nested_dep_ids]))
+        node = _make_node(maybe["symbol"], maybe["op_type"], deps)
+        nodes.append(node)
+        call_to_node[id(call)] = node.node_id
+        return node.node_id
+
+    def _append_task_call(call: ast.Call) -> None:
+        _ensure_task_node_from_call(call, {})
 
     def visit_stmt(stmt: ast.stmt) -> None:
         nonlocal fallback_required
@@ -85,9 +106,9 @@ def compile_flow_source(
                 var_name = stmt.targets[0].id
                 maybe = _extract_task_call(call, bound_nodes, gate_symbols)
                 if maybe is not None:
-                    node = _make_node(maybe["symbol"], maybe["op_type"], maybe["deps"])
-                    nodes.append(node)
-                    bound_nodes[var_name] = node.node_id
+                    node_id = _ensure_task_node_from_call(call, {})
+                    if node_id is not None:
+                        bound_nodes[var_name] = node_id
                     return
 
         if isinstance(stmt, ast.For):
@@ -113,6 +134,10 @@ def compile_flow_source(
                 return
 
         if isinstance(stmt, ast.Return) and stmt.value is not None:
+            map_call = _find_map_call(stmt.value)
+            if map_call is not None:
+                _append_task_call(map_call)
+                return
             call = _locate_task_call(stmt.value)
             if call is not None:
                 _append_task_call(call)
@@ -214,6 +239,17 @@ def _extract_task_call(
                     add_dep(elt.id)
 
     return {"symbol": symbol, "op_type": op_type, "deps": dep_ids}
+
+
+def _find_map_call(node: ast.AST) -> ast.Call | None:
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+        if node.func.attr == "map":
+            return node
+    for child in ast.iter_child_nodes(node):
+        found = _find_map_call(child)
+        if found is not None:
+            return found
+    return None
 
 
 def _locate_task_call(node: ast.AST) -> ast.Call | None:

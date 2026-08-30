@@ -24,6 +24,10 @@ from .hooks import (
     compile_transition_hooks,
     dispatch_transition_hooks,
 )
+from .graph_mode import (
+    normalize_declared_graph_mode,
+    resolve_graph_mode,
+)
 from .process_workers import ProcessWorkerTerminated, run_in_registered_process
 from .result_codec import fingerprint_parameters, fingerprint_task_inputs
 from .runtime import (
@@ -914,9 +918,11 @@ def flow(
     task_runner: MapTaskRunner | ProcessPoolTaskRunner | None = None,
     transition_hooks: Sequence[TransitionHookSpec] | None = None,
     final_state: str = "wait_all",
+    graph_mode: str = "auto",
 ) -> Callable[..., Any]:
     def decorate(f: Callable[..., T]) -> Callable[..., T]:
         flow_name = name or getattr(f, "__name__", "<flow>")
+        declared_graph_mode = normalize_declared_graph_mode(graph_mode)
         resolved_runner = (
             task_runner if task_runner is not None else default_task_runner_from_env()
         )
@@ -1005,6 +1011,11 @@ def flow(
                             dep_run_id, record.run_id
                         )
                     manifest_info = _compile_forecast_for_flow(f, flow_name)
+                    resolution = resolve_graph_mode(
+                        declared_graph_mode,
+                        fallback_required=bool(manifest_info["fallback_required"]),
+                        manifest=manifest_info["manifest"],
+                    )
                     _CONTROL_PLANE.save_flow_manifest(
                         run_id=record.run_id,
                         manifest=manifest_info["manifest"],
@@ -1013,6 +1024,7 @@ def flow(
                         fallback_required=manifest_info["fallback_required"],
                         source=manifest_info["source"],
                     )
+                    _CONTROL_PLANE.configure_flow_graph_mode(record.run_id, resolution)
                     start_transitions: list[tuple[RunState, UUID, str, int | None]] = [
                         (RunState.PENDING, uuid4(), "propose", 0),
                         (RunState.RUNNING, uuid4(), "start", 1),
@@ -1348,14 +1360,32 @@ def _fingerprint_resolved_inputs(
 def _compile_forecast_for_flow(
     flow_fn: Callable[..., Any], flow_name: str
 ) -> dict[str, Any]:
+    try:
+        source = textwrap.dedent(inspect.getsource(flow_fn))
+    except (OSError, TypeError):
+        source = ""
+    source_hash = hash(source)
     cache_key = id(flow_fn)
     cached = _FORECAST_BY_FLOW_FN.get(cache_key)
-    if cached is not None and cached.get("flow_name") == flow_name:
+    if (
+        cached is not None
+        and cached.get("flow_name") == flow_name
+        and cached.get("source_hash") == source_hash
+    ):
         return cached["info"]
 
-    info = _compile_forecast_for_flow_uncached(flow_fn, flow_name)
-    _FORECAST_BY_FLOW_FN[cache_key] = {"flow_name": flow_name, "info": info}
+    info = _compile_forecast_for_flow_uncached(flow_fn, flow_name, source=source)
+    _FORECAST_BY_FLOW_FN[cache_key] = {
+        "flow_name": flow_name,
+        "source_hash": source_hash,
+        "info": info,
+    }
     return info
+
+
+def clear_forecast_cache() -> None:
+    """Clear static-planner forecast cache (tests / long-lived processes)."""
+    _FORECAST_BY_FLOW_FN.clear()
 
 
 def _task_symbols_for_flow(flow_fn: Callable[..., Any]) -> dict[str, str]:
@@ -1382,7 +1412,7 @@ def _task_symbols_for_flow(flow_fn: Callable[..., Any]) -> dict[str, str]:
 
 
 def _compile_forecast_for_flow_uncached(
-    flow_fn: Callable[..., Any], flow_name: str
+    flow_fn: Callable[..., Any], flow_name: str, *, source: str | None = None
 ) -> dict[str, Any]:
     try:
         from static_planner import compile_and_forecast
@@ -1404,7 +1434,8 @@ def _compile_forecast_for_flow_uncached(
             }
 
     try:
-        source = textwrap.dedent(inspect.getsource(flow_fn))
+        if source is None:
+            source = textwrap.dedent(inspect.getsource(flow_fn))
         task_names = _task_symbols_for_flow(flow_fn)
         result = compile_and_forecast(
             source, flow_name=flow_name, task_names=task_names

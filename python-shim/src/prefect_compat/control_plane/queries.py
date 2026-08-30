@@ -80,19 +80,36 @@ class QueriesMixin:
                 result["resume_from_flow_run_id"] = str(rec.resume_from_flow_run_id)
             if rec.resume_lineage_id is not None:
                 result["resume_lineage_id"] = str(rec.resume_lineage_id)
+            result["declared_graph_mode"] = rec.declared_graph_mode
+            result["effective_graph_mode"] = rec.effective_graph_mode
+            if rec.manifest_fingerprint:
+                result["manifest_fingerprint"] = rec.manifest_fingerprint
+            if rec.contract_mismatch:
+                result["contract_mismatch"] = True
+            result["flow_attempt_number"] = rec.flow_attempt_number
         else:
             extra = self._query_rows(
-                "SELECT resume_from_flow_run_id, resume_lineage_id "
+                "SELECT resume_from_flow_run_id, resume_lineage_id, declared_graph_mode, "
+                "effective_graph_mode, manifest_fingerprint, contract_mismatch, flow_attempt_number "
                 "FROM flow_runs WHERE id = ? LIMIT 1",
                 [str(flow_run_id)],
             )
             if extra:
-                if extra[0]["resume_from_flow_run_id"]:
-                    result["resume_from_flow_run_id"] = extra[0][
-                        "resume_from_flow_run_id"
-                    ]
-                if extra[0]["resume_lineage_id"]:
-                    result["resume_lineage_id"] = extra[0]["resume_lineage_id"]
+                row = extra[0]
+                if row["resume_from_flow_run_id"]:
+                    result["resume_from_flow_run_id"] = row["resume_from_flow_run_id"]
+                if row["resume_lineage_id"]:
+                    result["resume_lineage_id"] = row["resume_lineage_id"]
+                if row["declared_graph_mode"]:
+                    result["declared_graph_mode"] = row["declared_graph_mode"]
+                if row["effective_graph_mode"]:
+                    result["effective_graph_mode"] = row["effective_graph_mode"]
+                if row["manifest_fingerprint"]:
+                    result["manifest_fingerprint"] = row["manifest_fingerprint"]
+                if int(row["contract_mismatch"] or 0):
+                    result["contract_mismatch"] = True
+                if row["flow_attempt_number"] is not None:
+                    result["flow_attempt_number"] = int(row["flow_attempt_number"])
         result["breadcrumb"] = self._flow_run_breadcrumb(flow_run_id)
         result["children_summary"] = self._flow_run_children_summary(flow_run_id)
         result["children"] = self._flow_run_children(flow_run_id)
@@ -123,7 +140,7 @@ class QueriesMixin:
             )
         query = (
             "SELECT seq,id,flow_run_id,task_name,planned_node_id,state,version,created_at,updated_at,"
-            "kind,child_flow_run_id,child_deployment_run_id "
+            "kind,child_flow_run_id,child_deployment_run_id,task_run_attempt "
             "FROM task_runs WHERE flow_run_id = ?"
         )
         params: list[Any] = [str(flow_run_id)]

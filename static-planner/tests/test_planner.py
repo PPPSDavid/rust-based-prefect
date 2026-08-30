@@ -181,3 +181,35 @@ if flag:
 """
     output = compile_and_forecast(source, flow_name="if_demo")
     assert output["diagnostics"]["fallback_required"] is True
+
+
+def test_compile_nested_submit_in_argument():
+    source = """
+def pipeline() -> dict:
+    return downstream.submit(upstream.submit()).result()
+"""
+    graph, diagnostics = compile_flow_source(source, flow_name="pipeline")
+    manifest = graph.as_manifest()
+
+    assert diagnostics.fallback_required is False
+    assert len(manifest["nodes"]) == 2
+    upstream_node = next(n for n in manifest["nodes"] if n["task_name"] == "upstream")
+    downstream_node = next(
+        n for n in manifest["nodes"] if n["task_name"] == "downstream"
+    )
+    assert upstream_node["deps"] == []
+    assert upstream_node["node_id"] in downstream_node["deps"]
+
+
+def test_compile_map_in_list_comprehension_return():
+    source = """
+def pipeline() -> list[int]:
+    return [f.result() for f in work.map([1, 2, 3])]
+"""
+    graph, diagnostics = compile_flow_source(source, flow_name="pipeline")
+    manifest = graph.as_manifest()
+
+    assert diagnostics.fallback_required is False
+    assert len(manifest["nodes"]) == 1
+    assert manifest["nodes"][0]["task_name"] == "work"
+    assert manifest["nodes"][0]["op_type"] == "map"

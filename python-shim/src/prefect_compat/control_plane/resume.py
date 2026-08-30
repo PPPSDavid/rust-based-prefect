@@ -3,7 +3,12 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
+from ..graph_mode import (
+    GraphModeResolution,
+    contract_allows_resume_skips,
+)
 from ..result_codec import ResultEncodeError, decode_task_result, encode_task_result
+from .types import FlowRunRecord
 
 
 class ResumeMixin:
@@ -76,6 +81,36 @@ class ResumeMixin:
             self._sqlite_conn.execute(
                 "ALTER TABLE flow_runs ADD COLUMN parameters_fingerprint TEXT"
             )
+        if "declared_graph_mode" not in flow_cols:
+            self._sqlite_conn.execute(
+                "ALTER TABLE flow_runs ADD COLUMN declared_graph_mode TEXT DEFAULT 'auto'"
+            )
+        if "effective_graph_mode" not in flow_cols:
+            self._sqlite_conn.execute(
+                "ALTER TABLE flow_runs ADD COLUMN effective_graph_mode TEXT DEFAULT 'dynamic'"
+            )
+        if "manifest_fingerprint" not in flow_cols:
+            self._sqlite_conn.execute(
+                "ALTER TABLE flow_runs ADD COLUMN manifest_fingerprint TEXT"
+            )
+        if "contract_mismatch" not in flow_cols:
+            self._sqlite_conn.execute(
+                "ALTER TABLE flow_runs ADD COLUMN contract_mismatch INTEGER DEFAULT 0"
+            )
+        if "flow_attempt_number" not in flow_cols:
+            self._sqlite_conn.execute(
+                "ALTER TABLE flow_runs ADD COLUMN flow_attempt_number INTEGER DEFAULT 1"
+            )
+        task_cols = {
+            c["name"]
+            for c in self._sqlite_conn.execute(
+                "PRAGMA table_info(task_runs)"
+            ).fetchall()
+        }
+        if "task_run_attempt" not in task_cols:
+            self._sqlite_conn.execute(
+                "ALTER TABLE task_runs ADD COLUMN task_run_attempt INTEGER DEFAULT 1"
+            )
         dep_run_cols = {
             c["name"]
             for c in self._sqlite_conn.execute(
@@ -145,6 +180,7 @@ class ResumeMixin:
         if (
             rec is None
             or rec.resume_from_flow_run_id is None
+            or rec.effective_graph_mode != "static"
             or not rec.resume_skips_enabled
         ):
             return False, None
@@ -290,3 +326,92 @@ class ResumeMixin:
         merged = dict(run)
         merged["resume_from_flow_run_id"] = rows[0]["resume_from_flow_run_id"]
         return merged
+
+    def _compute_flow_attempt_number(self, resume_lineage_id: UUID | None) -> int:
+        if resume_lineage_id is None:
+            return 1
+        rows = self._query_rows(
+            "SELECT COUNT(*) AS c FROM flow_runs "
+            "WHERE id = ? OR resume_lineage_id = ?",
+            [str(resume_lineage_id), str(resume_lineage_id)],
+        )
+        if not rows:
+            return 1
+        return int(rows[0]["c"]) + 1
+
+    def _lineage_root_manifest_fingerprint(self, lineage_id: UUID) -> str | None:
+        rows = self._query_rows(
+            "SELECT manifest_fingerprint FROM flow_runs "
+            "WHERE id = ? OR (resume_lineage_id = ? AND manifest_fingerprint IS NOT NULL) "
+            "ORDER BY CASE WHEN id = ? THEN 0 ELSE 1 END, flow_attempt_number ASC "
+            "LIMIT 1",
+            [str(lineage_id), str(lineage_id), str(lineage_id)],
+        )
+        if rows and rows[0]["manifest_fingerprint"]:
+            return str(rows[0]["manifest_fingerprint"])
+        rec = self._flows.get(lineage_id)
+        if rec is not None and rec.manifest_fingerprint:
+            return rec.manifest_fingerprint
+        return None
+
+    def configure_flow_graph_mode(
+        self, flow_run_id: UUID, resolution: GraphModeResolution
+    ) -> FlowRunRecord:
+        """Apply graph-mode resolution, execution contract, and resume-skip policy."""
+        with self._lock:
+            rec = self._flows.get(flow_run_id)
+            if rec is None:
+                raise ValueError("flow run not found")
+            rec.declared_graph_mode = resolution.declared
+            rec.effective_graph_mode = resolution.effective
+            rec.manifest_fingerprint = resolution.manifest_fingerprint
+
+            parameters_match = True
+            contract_mismatch = False
+            if rec.resume_from_flow_run_id is not None:
+                prior = self._flows.get(rec.resume_from_flow_run_id)
+                prior_fp: str | None = None
+                if prior is None:
+                    prior_rows = self._query_rows(
+                        "SELECT parameters_fingerprint FROM flow_runs WHERE id = ? LIMIT 1",
+                        [str(rec.resume_from_flow_run_id)],
+                    )
+                    if prior_rows and prior_rows[0]["parameters_fingerprint"]:
+                        prior_fp = str(prior_rows[0]["parameters_fingerprint"])
+                else:
+                    prior_fp = prior.parameters_fingerprint
+                parameters_match = (
+                    prior_fp is not None
+                    and rec.parameters_fingerprint is not None
+                    and prior_fp == rec.parameters_fingerprint
+                )
+                if resolution.effective == "static" and resolution.manifest_fingerprint:
+                    lineage_id = rec.resume_lineage_id or rec.run_id
+                    root_fp = self._lineage_root_manifest_fingerprint(lineage_id)
+                    if root_fp and root_fp != resolution.manifest_fingerprint:
+                        contract_mismatch = True
+
+            rec.contract_mismatch = contract_mismatch
+            rec.resume_skips_enabled = contract_allows_resume_skips(
+                effective=resolution.effective,  # type: ignore[arg-type]
+                parameters_match=parameters_match,
+                contract_mismatch=contract_mismatch,
+            )
+            if rec.resume_skips_enabled:
+                self._resume_lookups_enabled = True
+
+            self._ensure_resume_schema()
+            self._sqlite_conn.execute(
+                "UPDATE flow_runs SET declared_graph_mode = ?, effective_graph_mode = ?, "
+                "manifest_fingerprint = ?, contract_mismatch = ?, flow_attempt_number = ? "
+                "WHERE id = ?",
+                [
+                    rec.declared_graph_mode,
+                    rec.effective_graph_mode,
+                    rec.manifest_fingerprint,
+                    1 if rec.contract_mismatch else 0,
+                    rec.flow_attempt_number,
+                    str(flow_run_id),
+                ],
+            )
+            return rec
