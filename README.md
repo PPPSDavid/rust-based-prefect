@@ -49,7 +49,7 @@ Expect **`True`** when a matching wheel loaded. **Developing the repo**, integra
 | PyPI / conda packaging notes (contributors) | [DISTRIBUTION.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/DISTRIBUTION.md) |
 | Releases & version bumps | [RELEASING.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/RELEASING.md) |
 | Change history | [CHANGELOG.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/CHANGELOG.md) |
-| Agent / contributor workflow | [AGENTS.md](AGENTS.md) |
+| Agent / contributor workflow | [AGENTS.md](AGENTS.md) · [CONTRIBUTING.md](CONTRIBUTING.md) |
 
 ## Goals
 

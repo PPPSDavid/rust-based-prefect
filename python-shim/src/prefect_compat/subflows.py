@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Generic, TypeVar, cast
-from collections.abc import Sequence
 from uuid import UUID
 
 from .decorators import (

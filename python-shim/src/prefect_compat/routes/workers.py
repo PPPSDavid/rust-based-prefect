@@ -80,8 +80,10 @@ def worker_claim(req: WorkerClaimRequest, response: Response) -> dict | None:
     """
     control_plane = _plane()
     wait_ms = req.wait_ms
-    if wait_ms is not None and wait_ms > 0 and getattr(
-        control_plane, "_rust_db_bound", False
+    if (
+        wait_ms is not None
+        and wait_ms > 0
+        and getattr(control_plane, "_rust_db_bound", False)
     ):
         claimed = control_plane.claim_next_deployment_run_wait(
             worker_name=req.worker_name,
@@ -112,9 +114,7 @@ def worker_run_started(deployment_run_id: UUID) -> dict:
 
 
 @router.post("/runs/{deployment_run_id}/finished")
-def worker_run_finished(
-    deployment_run_id: UUID, req: WorkerRunFinishedRequest
-) -> dict:
+def worker_run_finished(deployment_run_id: UUID, req: WorkerRunFinishedRequest) -> dict:
     control_plane = _plane()
     control_plane.mark_deployment_run_finished(
         deployment_run_id=deployment_run_id,

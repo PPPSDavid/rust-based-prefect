@@ -7,7 +7,6 @@ from pathlib import Path
 from uuid import UUID
 
 import pytest
-
 from prefect_compat import InMemoryControlPlane, flow, set_control_plane, task
 from prefect_compat.runtime import RunState
 from prefect_compat.subflows import deployment_ref

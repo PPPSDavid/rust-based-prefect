@@ -152,7 +152,12 @@ impl Engine {
     }
 
     /// Replay / migration helper: set authoritative state without FSM checks or token accounting.
-    pub fn apply_flow_checkpoint(&mut self, run_id: Uuid, state: RunState, version: u64) -> Result<(), EngineError> {
+    pub fn apply_flow_checkpoint(
+        &mut self,
+        run_id: Uuid,
+        state: RunState,
+        version: u64,
+    ) -> Result<(), EngineError> {
         let run = self
             .flow_runs
             .get_mut(&run_id)
@@ -178,7 +183,10 @@ impl Engine {
         Ok(())
     }
 
-    pub fn set_flow_state(&mut self, req: SetStateRequest) -> Result<SetStateResponse, EngineError> {
+    pub fn set_flow_state(
+        &mut self,
+        req: SetStateRequest,
+    ) -> Result<SetStateResponse, EngineError> {
         if self.applied_tokens.contains(&req.transition_token) {
             let run = self
                 .flow_runs
@@ -230,7 +238,10 @@ impl Engine {
         })
     }
 
-    pub fn set_task_state(&mut self, req: SetTaskStateRequest) -> Result<SetStateResponse, EngineError> {
+    pub fn set_task_state(
+        &mut self,
+        req: SetTaskStateRequest,
+    ) -> Result<SetStateResponse, EngineError> {
         if self.applied_tokens.contains(&req.transition_token) {
             let task = self
                 .task_runs

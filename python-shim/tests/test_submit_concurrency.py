@@ -6,8 +6,14 @@ import threading
 import time
 
 import pytest
-
-from prefect_compat import InMemoryControlPlane, RunState, flow, set_control_plane, task, wait
+from prefect_compat import (
+    InMemoryControlPlane,
+    RunState,
+    flow,
+    set_control_plane,
+    task,
+    wait,
+)
 from prefect_compat.task_runners import SequentialTaskRunner, ThreadPoolTaskRunner
 
 
@@ -40,7 +46,9 @@ def test_independent_submits_overlap_with_thread_pool(tmp_path):
     f()
     # Prefer a concurrency counter over a brittle wall-clock ceiling (CI measured
     # ~0.434s once vs a <0.4 bound while still overlapping).
-    assert max_concurrent >= 2, f"expected overlapping submits, max_concurrent={max_concurrent}"
+    assert max_concurrent >= 2, (
+        f"expected overlapping submits, max_concurrent={max_concurrent}"
+    )
 
 
 def test_wait_for_gates_submit_body_start(tmp_path):
@@ -136,4 +144,6 @@ def test_concurrent_submit_control_plane_uses_rust_fsm_when_available(tmp_path):
     tasks = [t for t in plane._tasks.values() if t.task_name == "inc"]
     assert len(tasks) == 16
     assert all(t.state == RunState.COMPLETED for t in tasks)
-    assert all(t.version >= 3 for t in tasks)  # scheduled → pending → running → completed
+    assert all(
+        t.version >= 3 for t in tasks
+    )  # scheduled → pending → running → completed

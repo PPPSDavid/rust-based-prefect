@@ -31,6 +31,8 @@ _RustFsmBridge: Any = None
 try:
     from .rust_bridge import (
         RustFsmBridge as _RustFsmBridge_cls,
+    )
+    from .rust_bridge import (
         RustQueryBridge as _RustQueryBridge_cls,
     )
 
@@ -611,7 +613,12 @@ class InMemoryControlPlane:
                 [now, cutoff],
             )
             reaped = int(cur.rowcount or 0)
-        return {"reclaimed": reclaimed, "triggered": n_tick, "reaped": reaped, "gates_promoted": gates}
+        return {
+            "reclaimed": reclaimed,
+            "triggered": n_tick,
+            "reaped": reaped,
+            "gates_promoted": gates,
+        }
 
     def _tick_deployment_schedules_python(self) -> int:
         now = self._now()
@@ -921,7 +928,9 @@ class InMemoryControlPlane:
             return
         flow_cols = {
             c["name"]
-            for c in self._sqlite_conn.execute("PRAGMA table_info(flow_runs)").fetchall()
+            for c in self._sqlite_conn.execute(
+                "PRAGMA table_info(flow_runs)"
+            ).fetchall()
         }
         if "resume_from_flow_run_id" not in flow_cols:
             self._sqlite_conn.execute(
@@ -1627,16 +1636,12 @@ class InMemoryControlPlane:
             transition_token: UUID | None = None
             from_state: str | None = None
 
-            fenced_late_event = (
-                task.state == RunState.CANCELLED
-                and event_type
-                in {
-                    "task_completed",
-                    "task_failed",
-                    "task_running",
-                    "task_pending",
-                }
-            )
+            fenced_late_event = task.state == RunState.CANCELLED and event_type in {
+                "task_completed",
+                "task_failed",
+                "task_running",
+                "task_pending",
+            }
             if fenced_late_event:
                 flow_run_id_for_settle = task.flow_run_id
                 from_state = None
@@ -1964,7 +1969,9 @@ class InMemoryControlPlane:
             )
             if extra:
                 if extra[0]["resume_from_flow_run_id"]:
-                    result["resume_from_flow_run_id"] = extra[0]["resume_from_flow_run_id"]
+                    result["resume_from_flow_run_id"] = extra[0][
+                        "resume_from_flow_run_id"
+                    ]
                 if extra[0]["resume_lineage_id"]:
                     result["resume_lineage_id"] = extra[0]["resume_lineage_id"]
         result["breadcrumb"] = self._flow_run_breadcrumb(flow_run_id)
@@ -2790,9 +2797,8 @@ class InMemoryControlPlane:
             open_items = [
                 item
                 for item in items
-                if str(item.get("state", "")) not in {
-                    s.value for s in self._CHILD_TERMINAL
-                }
+                if str(item.get("state", ""))
+                not in {s.value for s in self._CHILD_TERMINAL}
             ]
             if not open_items:
                 return
@@ -2846,9 +2852,7 @@ class InMemoryControlPlane:
             for row in rows
         ]
 
-    def _resolve_flow_terminal_state_python(
-        self, flow_run_id: UUID
-    ) -> dict[str, Any]:
+    def _resolve_flow_terminal_state_python(self, flow_run_id: UUID) -> dict[str, Any]:
         items = self._list_contributing_children_python(flow_run_id)
         counts = {
             "total": len(items),
@@ -2919,9 +2923,7 @@ class InMemoryControlPlane:
         flow = self.get_flow(flow_run_id)
         if flow.state == RunState.RUNNING:
             try:
-                self.set_flow_state(
-                    flow_run_id, RunState.PAUSED, uuid4(), "gate_wait"
-                )
+                self.set_flow_state(flow_run_id, RunState.PAUSED, uuid4(), "gate_wait")
             except ValueError:
                 pass
         self._persist_record(
@@ -2936,9 +2938,7 @@ class InMemoryControlPlane:
         flow = self.get_flow(flow_run_id)
         if flow.state == RunState.PAUSED:
             try:
-                self.set_flow_state(
-                    flow_run_id, RunState.RUNNING, uuid4(), "gate_open"
-                )
+                self.set_flow_state(flow_run_id, RunState.RUNNING, uuid4(), "gate_open")
             except ValueError:
                 pass
 
@@ -3387,13 +3387,9 @@ class InMemoryControlPlane:
     def has_operator_interrupt(self, flow_run_id: UUID) -> bool:
         """True while cancel or pause lifecycle is in progress (any flow state)."""
         life = self._lifecycle_by_flow.get(str(flow_run_id))
-        return bool(
-            life and life.get("lifecycle_action") in {"pause", "cancel"}
-        )
+        return bool(life and life.get("lifecycle_action") in {"pause", "cancel"})
 
-    def pause_flow_run(
-        self, flow_run_id: UUID, mode: str | Any
-    ) -> dict[str, Any]:
+    def pause_flow_run(self, flow_run_id: UUID, mode: str | Any) -> dict[str, Any]:
         """Operator pause. ``mode`` must be ``drain`` or ``terminate`` (required)."""
         from .lifecycle import InterruptMode, parse_interrupt_mode
 
@@ -3430,7 +3426,10 @@ class InMemoryControlPlane:
                 if state != "PAUSED":
                     try:
                         self.set_flow_state(
-                            flow_run_id, RunState.PAUSED, uuid4(), "operator_pause_drain"
+                            flow_run_id,
+                            RunState.PAUSED,
+                            uuid4(),
+                            "operator_pause_drain",
                         )
                     except ValueError:
                         pass
@@ -3615,7 +3614,10 @@ class InMemoryControlPlane:
         with self._lock:
             n = 0
             for task in self._tasks.values():
-                if str(task.flow_run_id) == str(flow_run_id) and task.state not in terminal:
+                if (
+                    str(task.flow_run_id) == str(flow_run_id)
+                    and task.state not in terminal
+                ):
                     n += 1
             return n
 
@@ -3669,7 +3671,10 @@ class InMemoryControlPlane:
         if flow.state == RunState.RUNNING:
             try:
                 self.set_flow_state(
-                    flow_run_id, RunState.PAUSED, uuid4(), "operator_pause_drain_settled"
+                    flow_run_id,
+                    RunState.PAUSED,
+                    uuid4(),
+                    "operator_pause_drain_settled",
                 )
             except ValueError:
                 pass

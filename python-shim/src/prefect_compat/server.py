@@ -4,6 +4,7 @@ import os
 import threading
 import time
 from collections.abc import AsyncIterator
+from datetime import timedelta
 from pathlib import Path
 from uuid import UUID
 
@@ -12,16 +13,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from starlette.responses import StreamingResponse
 
-from datetime import timedelta
-
 from .auth_middleware import BasicAuthMiddleware
 from .decorators import flow, set_control_plane, task, wait
 from .gates import gate
 from .lifecycle import parse_cancel_mode
-from .runtime import InMemoryControlPlane
 from .routes.workers import router as workers_router
-from .worker import run_local_deployment_once, run_worker_loop
+from .runtime import InMemoryControlPlane
 from .task_runners import ThreadPoolTaskRunner
+from .worker import run_local_deployment_once, run_worker_loop
 
 
 class BenchmarkRequest(BaseModel):
@@ -558,7 +557,9 @@ def patch_concurrency_limit(name: str, req: ConcurrencyLimitPatchRequest) -> dic
             if req.slot_decay_per_second is not None
             else current.get("slot_decay_per_second")
         ),
-        active=req.active if req.active is not None else bool(current.get("active", True)),
+        active=req.active
+        if req.active is not None
+        else bool(current.get("active", True)),
     )
 
 

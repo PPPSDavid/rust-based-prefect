@@ -7,7 +7,6 @@ import threading
 import time
 
 import pytest
-
 from prefect_compat import InMemoryControlPlane, flow, set_control_plane, task, wait
 from prefect_compat.mp_picklable import blind_sleep
 from prefect_compat.mp_picklable import inc as _mp_inc

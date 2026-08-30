@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from prefect_compat import (
     InMemoryControlPlane,
     RunState,
@@ -167,9 +166,7 @@ def test_wait_all_waits_for_deployment_subflow(tmp_path: Path) -> None:
 
     def worker() -> None:
         while not stop.is_set():
-            run_local_deployment_once(
-                plane, "w1", "default-process-pool", registry
-            )
+            run_local_deployment_once(plane, "w1", "default-process-pool", registry)
 
     t = threading.Thread(target=worker, daemon=True)
     t.start()

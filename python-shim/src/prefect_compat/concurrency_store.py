@@ -150,7 +150,9 @@ def reclaim_expired(conn: Any, now: str | None = None) -> int:
     by_limit: dict[str, int] = {}
     for row in expired:
         conn.execute("DELETE FROM concurrency_leases WHERE id = ?", [row["id"]])
-        by_limit[row["limit_id"]] = by_limit.get(row["limit_id"], 0) + int(row["occupy"])
+        by_limit[row["limit_id"]] = by_limit.get(row["limit_id"], 0) + int(
+            row["occupy"]
+        )
     for limit_id, freed in by_limit.items():
         conn.execute(
             "UPDATE concurrency_limits SET active_slots = CASE "

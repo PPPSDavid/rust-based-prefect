@@ -41,6 +41,7 @@ pub fn persist_flow_create_with_conn(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn persist_task_create(
     db_path: &str,
     task: &crate::engine::TaskRun,
@@ -83,6 +84,7 @@ fn ensure_contribute_column(conn: &Connection) -> Result<(), String> {
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn persist_task_create_with_conn(
     conn: &Connection,
     task: &crate::engine::TaskRun,
@@ -298,7 +300,11 @@ pub fn persist_task_transition_with_conn(
         ],
     )
     .map_err(|e| e.to_string())?;
-    let lvl = if event_type == "task_failed" { "ERROR" } else { "INFO" };
+    let lvl = if event_type == "task_failed" {
+        "ERROR"
+    } else {
+        "INFO"
+    };
     conn.execute(
         "INSERT INTO logs(id,flow_run_id,task_run_id,level,message,timestamp) VALUES(?,?,?,?,?,?)",
         params![

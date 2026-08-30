@@ -37,14 +37,24 @@ extend-exclude = [
 ]
 
 [tool.ruff.lint]
-select = ["E4", "E7", "E9", "F", "UP"]
+select = ["E4", "E7", "E9", "F", "UP", "I", "C90"]
 ignore = []
+
+[tool.ruff.lint.mccabe]
+max-complexity = 20
 
 [tool.ruff.lint.per-file-ignores]
 # Setuptools path bootstrap before local imports.
 "python-shim/setup.py" = ["E402"]
 # Intentional sys.path bootstrap before prefect_compat import.
 "benchmarks/perf_matrix.py" = ["E402"]
+# McCabe backlog (god files / parked harness). Shrink this list as modules split.
+"benchmarks/subflow_perf.py" = ["C901"]
+"python-shim/src/prefect_compat/concurrency_store.py" = ["C901"]
+"python-shim/src/prefect_compat/decorators.py" = ["C901"]
+"python-shim/src/prefect_compat/persistence/store_sqlite.py" = ["C901"]
+"python-shim/src/prefect_compat/runtime.py" = ["C901"]
+"static-planner/src/static_planner/planner.py" = ["C901"]
 
 [tool.ty.environment]
 extra-paths = ["python-shim/src", "static-planner/src"]

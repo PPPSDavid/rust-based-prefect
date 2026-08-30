@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 from typing import Any
 
-
 _INSERT_OR_IGNORE = re.compile(
     r"^\s*INSERT\s+OR\s+IGNORE\s+INTO\s+",
     re.IGNORECASE,

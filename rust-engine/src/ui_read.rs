@@ -49,35 +49,32 @@ fn query_flow_runs(conn: &Connection, params_json: &str) -> Result<String, Strin
         has_where = true;
     }
     if cursor.is_some() {
-        sql.push_str(if has_where { " AND seq < ?2" } else { " WHERE seq < ?2" });
+        sql.push_str(if has_where {
+            " AND seq < ?2"
+        } else {
+            " WHERE seq < ?2"
+        });
     }
     sql.push_str(" ORDER BY seq DESC LIMIT ?3");
 
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
     let items = stmt
-        .query_map(
-            params![
-                state.as_deref(),
-                cursor,
-                limit
-            ],
-            |row| {
-                Ok(json!({
-                    "id": row.get::<_, String>(1)?,
-                    "name": row.get::<_, String>(2)?,
-                    "state": row.get::<_, String>(3)?,
-                    "version": row.get::<_, i64>(4)?,
-                    "created_at": row.get::<_, String>(5)?,
-                    "updated_at": row.get::<_, String>(6)?,
-                    "parent_flow_run_id": row.get::<_, Option<String>>(7)?,
-                    "parent_task_run_id": row.get::<_, Option<String>>(8)?,
-                    "root_flow_run_id": row.get::<_, Option<String>>(9)?,
-                    "execution_mode": row.get::<_, Option<String>>(10)?,
-                    "depth": row.get::<_, i64>(11)?,
-                    "seq": row.get::<_, i64>(0)?
-                }))
-            },
-        )
+        .query_map(params![state.as_deref(), cursor, limit], |row| {
+            Ok(json!({
+                "id": row.get::<_, String>(1)?,
+                "name": row.get::<_, String>(2)?,
+                "state": row.get::<_, String>(3)?,
+                "version": row.get::<_, i64>(4)?,
+                "created_at": row.get::<_, String>(5)?,
+                "updated_at": row.get::<_, String>(6)?,
+                "parent_flow_run_id": row.get::<_, Option<String>>(7)?,
+                "parent_task_run_id": row.get::<_, Option<String>>(8)?,
+                "root_flow_run_id": row.get::<_, Option<String>>(9)?,
+                "execution_mode": row.get::<_, Option<String>>(10)?,
+                "depth": row.get::<_, i64>(11)?,
+                "seq": row.get::<_, i64>(0)?
+            }))
+        })
         .map_err(|e| e.to_string())?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?;
@@ -91,7 +88,9 @@ fn query_flow_run_detail(conn: &Connection, params_json: &str) -> Result<String,
     let mut stmt = conn
         .prepare("SELECT id,name,state,version,created_at,updated_at,parent_flow_run_id,parent_task_run_id,root_flow_run_id,execution_mode,depth FROM flow_runs WHERE id = ?1 LIMIT 1")
         .map_err(|e| e.to_string())?;
-    let mut rows = stmt.query(params![flow_run_id]).map_err(|e| e.to_string())?;
+    let mut rows = stmt
+        .query(params![flow_run_id])
+        .map_err(|e| e.to_string())?;
     if let Some(row) = rows.next().map_err(|e| e.to_string())? {
         serde_json::to_string(&json!({
             "id": row.get::<_, String>(0).map_err(|e| e.to_string())?,
@@ -164,17 +163,20 @@ fn query_logs(conn: &Connection, params_json: &str) -> Result<String, String> {
 
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
     let items = stmt
-        .query_map(params![flow_run_id, task_run_id, level, cursor, limit], |row| {
-            Ok(json!({
-                "id": row.get::<_, String>(1)?,
-                "flow_run_id": row.get::<_, String>(2)?,
-                "task_run_id": row.get::<_, Option<String>>(3)?,
-                "level": row.get::<_, String>(4)?,
-                "message": row.get::<_, String>(5)?,
-                "timestamp": row.get::<_, String>(6)?,
-                "seq": row.get::<_, i64>(0)?
-            }))
-        })
+        .query_map(
+            params![flow_run_id, task_run_id, level, cursor, limit],
+            |row| {
+                Ok(json!({
+                    "id": row.get::<_, String>(1)?,
+                    "flow_run_id": row.get::<_, String>(2)?,
+                    "task_run_id": row.get::<_, Option<String>>(3)?,
+                    "level": row.get::<_, String>(4)?,
+                    "message": row.get::<_, String>(5)?,
+                    "timestamp": row.get::<_, String>(6)?,
+                    "seq": row.get::<_, i64>(0)?
+                }))
+            },
+        )
         .map_err(|e| e.to_string())?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?;
@@ -292,14 +294,16 @@ fn query_artifacts(conn: &Connection, params_json: &str, key: &str) -> Result<St
 }
 
 fn query_artifact(conn: &Connection, params_json: &str) -> Result<String, String> {
-    let artifact_id =
-        parse_opt_string(params_json, "artifact_id").ok_or_else(|| "artifact_id required".to_string())?;
+    let artifact_id = parse_opt_string(params_json, "artifact_id")
+        .ok_or_else(|| "artifact_id required".to_string())?;
     let mut stmt = conn
         .prepare(
             "SELECT id,flow_run_id,task_run_id,artifact_type,key,summary,created_at FROM artifacts WHERE id = ?1 LIMIT 1",
         )
         .map_err(|e| e.to_string())?;
-    let mut rows = stmt.query(params![artifact_id]).map_err(|e| e.to_string())?;
+    let mut rows = stmt
+        .query(params![artifact_id])
+        .map_err(|e| e.to_string())?;
     if let Some(row) = rows.next().map_err(|e| e.to_string())? {
         serde_json::to_string(&json!({
             "id": row.get::<_, String>(0).map_err(|e| e.to_string())?,

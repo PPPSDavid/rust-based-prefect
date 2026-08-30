@@ -74,7 +74,7 @@ fn select_limit_by_name(conn: &Connection, name: &str) -> Result<Option<Value>, 
         "SELECT id, name, limit_slots, active_slots, slot_decay_per_second, active, created_at, updated_at \
          FROM concurrency_limits WHERE name = ?1",
         params![name],
-        |row| limit_row_to_json(row),
+        limit_row_to_json,
     )
     .optional()
     .map_err(|e| e.to_string())
@@ -98,18 +98,13 @@ pub fn upsert_limit(conn: &Connection, body: &Value) -> Result<Value, String> {
     if limit < 0 {
         return Err("limit must be >= 0".to_string());
     }
-    let decay = body
-        .get("slot_decay_per_second")
-        .and_then(|v| v.as_f64());
+    let decay = body.get("slot_decay_per_second").and_then(|v| v.as_f64());
     if let Some(d) = decay {
         if d <= 0.0 {
             return Err("slot_decay_per_second must be > 0".to_string());
         }
     }
-    let active = body
-        .get("active")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(true);
+    let active = body.get("active").and_then(|v| v.as_bool()).unwrap_or(true);
     let now = parse_now(body.get("now").and_then(|v| v.as_str()))?.to_rfc3339();
 
     if let Some(existing) = select_limit_by_name(conn, name)? {
@@ -143,8 +138,11 @@ pub fn delete_limit(conn: &Connection, name: &str) -> Result<Value, String> {
         return Ok(json!({"ok": true, "deleted": false}));
     };
     let id = lim.get("id").and_then(|v| v.as_str()).unwrap();
-    conn.execute("DELETE FROM concurrency_leases WHERE limit_id = ?1", params![id])
-        .map_err(|e| e.to_string())?;
+    conn.execute(
+        "DELETE FROM concurrency_leases WHERE limit_id = ?1",
+        params![id],
+    )
+    .map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM concurrency_limits WHERE id = ?1", params![id])
         .map_err(|e| e.to_string())?;
     Ok(json!({"ok": true, "deleted": true}))
@@ -167,7 +165,7 @@ pub fn list_limits(conn: &Connection) -> Result<Value, String> {
         )
         .map_err(|e| e.to_string())?;
     let rows = stmt
-        .query_map([], |row| limit_row_to_json(row))
+        .query_map([], limit_row_to_json)
         .map_err(|e| e.to_string())?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?;
@@ -215,9 +213,7 @@ pub fn reclaim_expired(conn: &Connection, now_iso: Option<&str>) -> Result<u64, 
 
 fn reclaim_expired_tx(tx: &Transaction<'_>, now: &str) -> Result<u64, String> {
     let mut stmt = tx
-        .prepare(
-            "SELECT id, limit_id, occupy FROM concurrency_leases WHERE expires_at <= ?1",
-        )
+        .prepare("SELECT id, limit_id, occupy FROM concurrency_leases WHERE expires_at <= ?1")
         .map_err(|e| e.to_string())?;
     let expired: Vec<(String, String, i64)> = stmt
         .query_map(params![now], |row| {
@@ -230,8 +226,11 @@ fn reclaim_expired_tx(tx: &Transaction<'_>, now: &str) -> Result<u64, String> {
 
     let mut by_limit: HashMap<String, i64> = HashMap::new();
     for (lease_id, limit_id, occupy) in &expired {
-        tx.execute("DELETE FROM concurrency_leases WHERE id = ?1", params![lease_id])
-            .map_err(|e| e.to_string())?;
+        tx.execute(
+            "DELETE FROM concurrency_leases WHERE id = ?1",
+            params![lease_id],
+        )
+        .map_err(|e| e.to_string())?;
         *by_limit.entry(limit_id.clone()).or_insert(0) += occupy;
     }
     for (limit_id, freed) in by_limit {
@@ -256,6 +255,7 @@ fn reclaim_expired_tx(tx: &Transaction<'_>, now: &str) -> Result<u64, String> {
 /// - `strict`: bool — error if any named limit is missing/inactive
 /// - `holder_type` / `holder_id`: optional
 /// - `now`: optional RFC3339 (tests)
+#[allow(clippy::too_many_lines)] // split with concurrency_ops in the crate-layering pass
 pub fn acquire(conn: &Connection, body: &Value) -> Result<Value, String> {
     ensure_schema(conn)?;
     let mut names: Vec<String> = match body.get("names") {
@@ -466,8 +466,11 @@ pub fn release(conn: &Connection, body: &Value) -> Result<Value, String> {
         let Some((limit_id, occupy)) = row else {
             continue;
         };
-        tx.execute("DELETE FROM concurrency_leases WHERE id = ?1", params![lease_id])
-            .map_err(|e| e.to_string())?;
+        tx.execute(
+            "DELETE FROM concurrency_leases WHERE id = ?1",
+            params![lease_id],
+        )
+        .map_err(|e| e.to_string())?;
         tx.execute(
             "UPDATE concurrency_limits SET active_slots = CASE \
                 WHEN active_slots > ?1 THEN active_slots - ?1 ELSE 0 END, \
@@ -509,20 +512,23 @@ pub fn release_by_holders(conn: &Connection, body: &Value) -> Result<Value, Stri
     for holder_id in &holder_ids {
         let rows: Vec<(String, String, i64)> = {
             let mut stmt = tx
-                .prepare(
-                    "SELECT id, limit_id, occupy FROM concurrency_leases WHERE holder_id = ?1",
-                )
+                .prepare("SELECT id, limit_id, occupy FROM concurrency_leases WHERE holder_id = ?1")
                 .map_err(|e| e.to_string())?;
             let mapped = stmt
                 .query_map(params![holder_id], |r| {
                     Ok((r.get(0)?, r.get(1)?, r.get(2)?))
                 })
                 .map_err(|e| e.to_string())?;
-            mapped.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?
+            mapped
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|e| e.to_string())?
         };
         for (lease_id, limit_id, occupy) in rows {
-            tx.execute("DELETE FROM concurrency_leases WHERE id = ?1", params![lease_id])
-                .map_err(|e| e.to_string())?;
+            tx.execute(
+                "DELETE FROM concurrency_leases WHERE id = ?1",
+                params![lease_id],
+            )
+            .map_err(|e| e.to_string())?;
             tx.execute(
                 "UPDATE concurrency_limits SET active_slots = CASE \
                     WHEN active_slots > ?1 THEN active_slots - ?1 ELSE 0 END, \
@@ -605,8 +611,11 @@ mod tests {
     #[test]
     fn acquire_respects_limit_and_releases() {
         let conn = open_db();
-        upsert_limit(&conn, &json!({"name": "db", "limit": 2, "now": "2020-01-01T00:00:00Z"}))
-            .unwrap();
+        upsert_limit(
+            &conn,
+            &json!({"name": "db", "limit": 2, "now": "2020-01-01T00:00:00Z"}),
+        )
+        .unwrap();
 
         let a1 = acquire(
             &conn,
@@ -637,7 +646,11 @@ mod tests {
         assert_eq!(blocked["status"], "would_block");
 
         let lids = a1["lease_ids"].clone();
-        release(&conn, &json!({"lease_ids": lids, "now": "2020-01-01T00:00:01Z"})).unwrap();
+        release(
+            &conn,
+            &json!({"lease_ids": lids, "now": "2020-01-01T00:00:01Z"}),
+        )
+        .unwrap();
         let a3 = acquire(
             &conn,
             &json!({
@@ -652,10 +665,16 @@ mod tests {
     #[test]
     fn multi_name_acquire_is_all_or_nothing() {
         let conn = open_db();
-        upsert_limit(&conn, &json!({"name": "a", "limit": 1, "now": "2020-01-01T00:00:00Z"}))
-            .unwrap();
-        upsert_limit(&conn, &json!({"name": "b", "limit": 1, "now": "2020-01-01T00:00:00Z"}))
-            .unwrap();
+        upsert_limit(
+            &conn,
+            &json!({"name": "a", "limit": 1, "now": "2020-01-01T00:00:00Z"}),
+        )
+        .unwrap();
+        upsert_limit(
+            &conn,
+            &json!({"name": "b", "limit": 1, "now": "2020-01-01T00:00:00Z"}),
+        )
+        .unwrap();
         // Fill b
         acquire(
             &conn,
@@ -718,8 +737,11 @@ mod tests {
     #[test]
     fn reclaim_expired_frees_slots() {
         let conn = open_db();
-        upsert_limit(&conn, &json!({"name": "db", "limit": 1, "now": "2020-01-01T00:00:00Z"}))
-            .unwrap();
+        upsert_limit(
+            &conn,
+            &json!({"name": "db", "limit": 1, "now": "2020-01-01T00:00:00Z"}),
+        )
+        .unwrap();
         acquire(
             &conn,
             &json!({
@@ -816,27 +838,39 @@ mod tests {
     #[test]
     fn release_is_idempotent() {
         let conn = open_db();
-        upsert_limit(&conn, &json!({"name": "db", "limit": 1, "now": "2020-01-01T00:00:00Z"}))
-            .unwrap();
+        upsert_limit(
+            &conn,
+            &json!({"name": "db", "limit": 1, "now": "2020-01-01T00:00:00Z"}),
+        )
+        .unwrap();
         let a = acquire(
             &conn,
             &json!({"names": ["db"], "now": "2020-01-01T00:00:00Z", "lease_duration": 60}),
         )
         .unwrap();
         let lids = a["lease_ids"].clone();
-        let r1 = release(&conn, &json!({"lease_ids": lids.clone(), "now": "2020-01-01T00:00:01Z"}))
-            .unwrap();
+        let r1 = release(
+            &conn,
+            &json!({"lease_ids": lids.clone(), "now": "2020-01-01T00:00:01Z"}),
+        )
+        .unwrap();
         assert_eq!(r1["released"], 1);
-        let r2 = release(&conn, &json!({"lease_ids": lids, "now": "2020-01-01T00:00:02Z"}))
-            .unwrap();
+        let r2 = release(
+            &conn,
+            &json!({"lease_ids": lids, "now": "2020-01-01T00:00:02Z"}),
+        )
+        .unwrap();
         assert_eq!(r2["released"], 0);
     }
 
     #[test]
     fn release_by_holders_frees_slots() {
         let conn = open_db();
-        upsert_limit(&conn, &json!({"name": "db", "limit": 1, "now": "2020-01-01T00:00:00Z"}))
-            .unwrap();
+        upsert_limit(
+            &conn,
+            &json!({"name": "db", "limit": 1, "now": "2020-01-01T00:00:00Z"}),
+        )
+        .unwrap();
         let a = acquire(
             &conn,
             &json!({

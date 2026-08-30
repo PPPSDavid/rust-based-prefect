@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
-from collections.abc import Callable
 from uuid import UUID, uuid4
 
 from prefect_compat import (

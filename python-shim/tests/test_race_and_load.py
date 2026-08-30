@@ -2,7 +2,6 @@ from concurrent.futures import ThreadPoolExecutor
 from uuid import UUID, uuid4
 
 import pytest
-
 from prefect_compat import InMemoryControlPlane, RunState
 
 pytestmark = pytest.mark.airtight
@@ -60,4 +59,3 @@ def test_duplicate_tokens_across_many_flow_runs(tmp_path):
             statuses = list(ex.map(lambda _: transition(), range(16)))
         assert statuses.count("applied") == 1
         assert statuses.count("duplicate") == 15
-

@@ -1,0 +1,20 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.6
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: cargo fmt (rust-engine)
+        language: system
+        entry: cargo fmt --manifest-path rust-engine/Cargo.toml -- --check
+        files: \.rs$
+        pass_filenames: false
+      - id: code-metrics
+        name: file LOC ratchet
+        language: system
+        entry: python3 scripts/code_metrics.py
+        pass_filenames: false

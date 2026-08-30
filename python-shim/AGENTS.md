@@ -20,6 +20,9 @@ Read first: root `AGENTS.md`, `COMPATIBILITY.md`, `docs/compatibility_review_wor
 
 ```bash
 python3 -m pytest python-shim/tests
+python3 scripts/code_metrics.py
 ```
+
+New `python-shim/src` files must be ≤800 lines (see root `CONTRIBUTING.md` / `scripts/code_metrics.py`). Do not grow allowlisted god files.
 
 Compatibility claim changes must update `COMPATIBILITY.md` in the same change.

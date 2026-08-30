@@ -108,7 +108,11 @@ fn count_exec_runs(conn: &Connection, deployment_id: &str) -> Result<i64, String
 }
 
 /// Upsert worker heartbeat (ONLINE).
-pub fn worker_heartbeat(conn: &Connection, worker_name: &str, work_pool_id: Option<&str>) -> Result<(), String> {
+pub fn worker_heartbeat(
+    conn: &Connection,
+    worker_name: &str,
+    work_pool_id: Option<&str>,
+) -> Result<(), String> {
     let now = now_iso();
     conn.execute(
         "INSERT INTO workers(name,last_heartbeat,status,updated_at,work_pool_id) VALUES(?1,?2,'ONLINE',?3,?4) \
@@ -199,7 +203,7 @@ pub fn claim_next_deployment_run(
              created_at,updated_at,started_at,finished_at \
              FROM deployment_runs WHERE id = ?1 AND status = 'CLAIMED'",
             params![cid],
-            |row| deployment_run_row_to_json(row),
+            deployment_run_row_to_json,
         )
         .map_err(|e| e.to_string())?;
     tx.commit().map_err(|e| e.to_string())?;
@@ -267,7 +271,7 @@ pub fn trigger_deployment_run_tx(
                      created_at,updated_at,started_at,finished_at \
                      FROM deployment_runs WHERE id = ?1",
                     params![rid],
-                    |row| deployment_run_row_to_json(row),
+                    deployment_run_row_to_json,
                 )
                 .map_err(|e| e.to_string())?;
             return Ok(row);
@@ -325,7 +329,7 @@ pub fn trigger_deployment_run_tx(
          created_at,updated_at,started_at,finished_at \
          FROM deployment_runs WHERE id = ?1",
         params![run_id],
-        |row| deployment_run_row_to_json(row),
+        deployment_run_row_to_json,
     )
     .map_err(|e| e.to_string())
 }
@@ -344,6 +348,7 @@ pub fn trigger_deployment_run(
 }
 
 /// Insert a deployment row or return existing by unique `name` (Python shim parity).
+#[allow(clippy::too_many_lines)] // split with deployment_ops in the crate-layering pass
 pub fn create_deployment(conn: &Connection, body: &Value) -> Result<Value, String> {
     let name = body
         .get("name")
@@ -360,7 +365,7 @@ pub fn create_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
              schedule_next_run_at,schedule_enabled,work_pool_id,created_at,updated_at \
              FROM deployments WHERE name = ?1 LIMIT 1",
             params![name],
-            |row| deployment_row_to_json(row),
+            deployment_row_to_json,
         )
         .optional()
         .map_err(|e| e.to_string())?;
@@ -444,7 +449,7 @@ pub fn create_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
             .unwrap_or(false)
             && schedule_next_run_at.is_none()
         {
-            let expr = schedule_cron.as_ref().map(|s| s.as_str()).unwrap_or("");
+            let expr = schedule_cron.as_deref().unwrap_or("");
             let next = next_cron_occurrence(expr, Utc::now())?;
             schedule_next_run_at = Some(next.to_rfc3339());
         }
@@ -454,7 +459,7 @@ pub fn create_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
             .unwrap_or(false)
             && schedule_next_run_at.is_none()
         {
-            let expr = schedule_rrule.as_ref().map(|s| s.as_str()).unwrap_or("");
+            let expr = schedule_rrule.as_deref().unwrap_or("");
             let next = next_rrule_occurrence(expr, Utc::now())?;
             schedule_next_run_at = Some(next.to_rfc3339());
         }
@@ -496,7 +501,7 @@ pub fn create_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
          schedule_next_run_at,schedule_enabled,work_pool_id,created_at,updated_at \
          FROM deployments WHERE id = ?1",
         params![deployment_id],
-        |row| deployment_row_to_json(row),
+        deployment_row_to_json,
     )
     .map_err(|e| e.to_string())
 }
@@ -605,6 +610,7 @@ fn next_rrule_occurrence(expr: &str, after: DateTime<Utc>) -> Result<DateTime<Ut
 }
 
 /// Partial update of a deployment row (`null` JSON fields mean leave unchanged).
+#[allow(clippy::too_many_lines)] // split with deployment_ops in the crate-layering pass
 pub fn update_deployment(conn: &Connection, body: &Value) -> Result<Value, String> {
     let deployment_id = body
         .get("deployment_id")
@@ -618,7 +624,7 @@ pub fn update_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
              schedule_next_run_at,schedule_enabled,work_pool_id,created_at,updated_at \
              FROM deployments WHERE id = ?1 LIMIT 1",
             params![deployment_id],
-            |row| deployment_row_to_json(row),
+            deployment_row_to_json,
         )
         .optional()
         .map_err(|e| e.to_string())?;
@@ -777,7 +783,7 @@ pub fn update_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
             .unwrap_or(false)
             && schedule_next_run_at.is_none()
         {
-            let expr = schedule_cron.as_ref().map(|s| s.as_str()).unwrap_or("");
+            let expr = schedule_cron.as_deref().unwrap_or("");
             let next = next_cron_occurrence(expr, Utc::now())?;
             schedule_next_run_at = Some(next.to_rfc3339());
         }
@@ -787,7 +793,7 @@ pub fn update_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
             .unwrap_or(false)
             && schedule_next_run_at.is_none()
         {
-            let expr = schedule_rrule.as_ref().map(|s| s.as_str()).unwrap_or("");
+            let expr = schedule_rrule.as_deref().unwrap_or("");
             let next = next_rrule_occurrence(expr, Utc::now())?;
             schedule_next_run_at = Some(next.to_rfc3339());
         }
@@ -827,7 +833,7 @@ pub fn update_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
          schedule_next_run_at,schedule_enabled,work_pool_id,created_at,updated_at \
          FROM deployments WHERE id = ?1",
         params![deployment_id],
-        |row| deployment_row_to_json(row),
+        deployment_row_to_json,
     )
     .map_err(|e| e.to_string())
 }
@@ -1062,14 +1068,17 @@ pub fn cancel_deployment_runs_for_parent_flow(
 }
 
 /// Read a single deployment run row (hot path for subflow wait polling).
-pub fn get_deployment_run(conn: &Connection, deployment_run_id: &str) -> Result<Option<Value>, String> {
+pub fn get_deployment_run(
+    conn: &Connection,
+    deployment_run_id: &str,
+) -> Result<Option<Value>, String> {
     conn.query_row(
         "SELECT id,deployment_id,status,requested_parameters,resolved_parameters,idempotency_key,\
          worker_name,lease_until,flow_run_id,error,parent_flow_run_id,parent_task_run_id,parent_deployment_run_id,\
          created_at,updated_at,started_at,finished_at \
          FROM deployment_runs WHERE id = ?1 LIMIT 1",
         params![deployment_run_id],
-        |row| deployment_run_row_to_json(row),
+        deployment_run_row_to_json,
     )
     .optional()
     .map_err(|e| e.to_string())
@@ -1209,8 +1218,14 @@ mod tests {
             parent_task_run_id: Some("task-parent".to_string()),
             parent_deployment_run_id: Some("dep-run-parent".to_string()),
         };
-        let run = trigger_deployment_run(&conn, "dep-1", Some(&json!({"n": 1})), None, Some(&parent_link))
-            .expect("trigger");
+        let run = trigger_deployment_run(
+            &conn,
+            "dep-1",
+            Some(&json!({"n": 1})),
+            None,
+            Some(&parent_link),
+        )
+        .expect("trigger");
         assert_eq!(run["parent_flow_run_id"], "flow-parent");
         assert_eq!(run["parent_task_run_id"], "task-parent");
         assert_eq!(run["parent_deployment_run_id"], "dep-run-parent");

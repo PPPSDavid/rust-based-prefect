@@ -21,7 +21,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 # Logical names used in AGENTS.md → actual FastMCP tool names (CRG 2.3.x).

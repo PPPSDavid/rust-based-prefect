@@ -22,7 +22,9 @@ fn cstr_to_string(ptr: *const c_char) -> Result<String, String> {
         return Err("received null pointer".to_string());
     }
     let cstr = unsafe { CStr::from_ptr(ptr) };
-    cstr.to_str().map(|s| s.to_string()).map_err(|e| e.to_string())
+    cstr.to_str()
+        .map(|s| s.to_string())
+        .map_err(|e| e.to_string())
 }
 
 #[no_mangle]
@@ -48,6 +50,7 @@ pub extern "C" fn ironflow_query(
 }
 
 #[no_mangle]
+#[allow(clippy::not_unsafe_ptr_arg_deref)] // C ABI: ctypes cannot call `unsafe fn`
 pub extern "C" fn ironflow_free_string(ptr: *mut c_char) {
     if ptr.is_null() {
         return;
@@ -87,7 +90,8 @@ struct DeploymentSchedulerHandle {
     join: Option<thread::JoinHandle<()>>,
 }
 
-static DEPLOYMENT_SCHEDULERS: OnceLock<Mutex<HashMap<u64, DeploymentSchedulerHandle>>> = OnceLock::new();
+static DEPLOYMENT_SCHEDULERS: OnceLock<Mutex<HashMap<u64, DeploymentSchedulerHandle>>> =
+    OnceLock::new();
 
 fn deployment_schedulers() -> &'static Mutex<HashMap<u64, DeploymentSchedulerHandle>> {
     DEPLOYMENT_SCHEDULERS.get_or_init(|| Mutex::new(HashMap::new()))
@@ -164,15 +168,19 @@ fn pg_fallback(op: &str) -> Value {
     json!({"ok": false, "error": {"code": "fallback", "message": format!("unknown control op: {op}")}})
 }
 
+#[allow(clippy::too_many_lines)] // split into ffi/control_*.rs in the crate-layering pass
 fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<Value, String> {
     match op {
         "bind_db" => {
             if let Some(url) = body.get("database_url").and_then(|v| v.as_str()) {
                 let url = url.to_string();
                 if !(url.starts_with("postgres://") || url.starts_with("postgresql://")) {
-                    return Err("database_url must be a postgres:// or postgresql:// DSN".to_string());
+                    return Err(
+                        "database_url must be a postgres:// or postgresql:// DSN".to_string()
+                    );
                 }
-                let client = postgres::Client::connect(&url, postgres::NoTls).map_err(|e| e.to_string())?;
+                let client =
+                    postgres::Client::connect(&url, postgres::NoTls).map_err(|e| e.to_string())?;
                 ctx.db_path = Some(url);
                 ctx.db_conn = None;
                 ctx.pg_client = Some(client);
@@ -336,7 +344,8 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
             Ok(json!({"ok": true}))
         }
         "set_flow_state" => {
-            let req: SetStateRequest = serde_json::from_value(body.clone()).map_err(|e| e.to_string())?;
+            let req: SetStateRequest =
+                serde_json::from_value(body.clone()).map_err(|e| e.to_string())?;
             match ctx.engine.set_flow_state(req) {
                 Ok(resp) => Ok(set_state_response_json(&resp)),
                 Err(e) => Ok(json!({"ok": false, "error": engine_error_value(e)})),
@@ -347,19 +356,32 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                 return Ok(pg_fallback("set_flow_state_persist"));
             }
             let db_path = resolve_db_path(ctx, body)?;
-            let req: SetStateRequest =
-                serde_json::from_value(body.get("request").cloned().unwrap_or_else(|| body.clone()))
-                    .map_err(|e| e.to_string())?;
+            let req: SetStateRequest = serde_json::from_value(
+                body.get("request").cloned().unwrap_or_else(|| body.clone()),
+            )
+            .map_err(|e| e.to_string())?;
             let run_id = req.run_id;
             match ctx.engine.set_flow_state(req) {
                 Ok(resp) => {
                     let persist_res = if let Some(conn) = ctx.db_conn.as_ref() {
-                        ui_write::persist_flow_transition_with_conn(conn, &ctx.engine, run_id, resp.status)
+                        ui_write::persist_flow_transition_with_conn(
+                            conn,
+                            &ctx.engine,
+                            run_id,
+                            resp.status,
+                        )
                     } else {
-                        ui_write::persist_flow_transition(&db_path, &ctx.engine, run_id, resp.status)
+                        ui_write::persist_flow_transition(
+                            &db_path,
+                            &ctx.engine,
+                            run_id,
+                            resp.status,
+                        )
                     };
                     if let Err(e) = persist_res {
-                        return Ok(json!({"ok": false, "error": {"code": "persistence", "message": e}}));
+                        return Ok(
+                            json!({"ok": false, "error": {"code": "persistence", "message": e}}),
+                        );
                     }
                     Ok(set_state_response_json(&resp))
                 }
@@ -388,9 +410,12 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                     let run_id = req.run_id;
                     match ctx.engine.set_flow_state(req) {
                         Ok(resp) => {
-                            if let Err(e) =
-                                ui_write::persist_flow_transition_with_conn(&tx, &ctx.engine, run_id, resp.status)
-                            {
+                            if let Err(e) = ui_write::persist_flow_transition_with_conn(
+                                &tx,
+                                &ctx.engine,
+                                run_id,
+                                resp.status,
+                            ) {
                                 return Ok(json!({
                                     "ok": false,
                                     "error": {"code": "persistence", "message": e},
@@ -422,9 +447,12 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                     let run_id = req.run_id;
                     match ctx.engine.set_flow_state(req) {
                         Ok(resp) => {
-                            if let Err(e) =
-                                ui_write::persist_flow_transition_with_conn(&tx, &ctx.engine, run_id, resp.status)
-                            {
+                            if let Err(e) = ui_write::persist_flow_transition_with_conn(
+                                &tx,
+                                &ctx.engine,
+                                run_id,
+                                resp.status,
+                            ) {
                                 return Ok(json!({
                                     "ok": false,
                                     "error": {"code": "persistence", "message": e},
@@ -491,7 +519,9 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                         )
                     };
                     if let Err(e) = persist_res {
-                        return Ok(json!({"ok": false, "error": {"code": "persistence", "message": e}}));
+                        return Ok(
+                            json!({"ok": false, "error": {"code": "persistence", "message": e}}),
+                        );
                     }
                     Ok(set_state_response_json(&resp))
                 }
@@ -638,7 +668,11 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                 .get("worker_name")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| "missing string field worker_name".to_string())?;
-            let lease_seconds = body.get("lease_seconds").and_then(|v| v.as_i64()).unwrap_or(30).max(1);
+            let lease_seconds = body
+                .get("lease_seconds")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(30)
+                .max(1);
             let work_pool_id = body.get("work_pool_id").and_then(|v| v.as_str());
             if let Some(client) = ctx.pg_client.as_mut() {
                 match deployment_ops_pg::claim_next_deployment_run(
@@ -649,17 +683,25 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                 ) {
                     Ok(Some(run)) => Ok(json!({"ok": true, "run": run})),
                     Ok(None) => Ok(json!({"ok": true, "run": Value::Null})),
-                    Err(e) => Ok(json!({"ok": false, "error": {"code": "deployment", "message": e}})),
+                    Err(e) => {
+                        Ok(json!({"ok": false, "error": {"code": "deployment", "message": e}}))
+                    }
                 }
             } else {
-                let conn = ctx
-                    .db_conn
-                    .as_ref()
-                    .ok_or_else(|| "deployment_claim_next requires bind_db (shared SQLite connection)".to_string())?;
-                match deployment_ops::claim_next_deployment_run(conn, worker_name, lease_seconds, work_pool_id) {
+                let conn = ctx.db_conn.as_ref().ok_or_else(|| {
+                    "deployment_claim_next requires bind_db (shared SQLite connection)".to_string()
+                })?;
+                match deployment_ops::claim_next_deployment_run(
+                    conn,
+                    worker_name,
+                    lease_seconds,
+                    work_pool_id,
+                ) {
                     Ok(Some(run)) => Ok(json!({"ok": true, "run": run})),
                     Ok(None) => Ok(json!({"ok": true, "run": Value::Null})),
-                    Err(e) => Ok(json!({"ok": false, "error": {"code": "deployment", "message": e}})),
+                    Err(e) => {
+                        Ok(json!({"ok": false, "error": {"code": "deployment", "message": e}}))
+                    }
                 }
             }
         }
@@ -670,7 +712,11 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                 .get("worker_name")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| "missing string field worker_name".to_string())?;
-            let lease_seconds = body.get("lease_seconds").and_then(|v| v.as_i64()).unwrap_or(30).max(1);
+            let lease_seconds = body
+                .get("lease_seconds")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(30)
+                .max(1);
             let work_pool_id = body.get("work_pool_id").and_then(|v| v.as_str());
             if let Some(client) = ctx.pg_client.as_mut() {
                 match deployment_ops_pg::claim_next_deployment_run(
@@ -681,17 +727,26 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                 ) {
                     Ok(Some(run)) => Ok(json!({"ok": true, "run": run})),
                     Ok(None) => Ok(json!({"ok": true, "run": Value::Null})),
-                    Err(e) => Ok(json!({"ok": false, "error": {"code": "deployment", "message": e}})),
+                    Err(e) => {
+                        Ok(json!({"ok": false, "error": {"code": "deployment", "message": e}}))
+                    }
                 }
             } else {
                 let conn = ctx
                     .db_conn
                     .as_ref()
                     .ok_or_else(|| "deployment_claim_next_wait requires bind_db".to_string())?;
-                match deployment_ops::claim_next_deployment_run(conn, worker_name, lease_seconds, work_pool_id) {
+                match deployment_ops::claim_next_deployment_run(
+                    conn,
+                    worker_name,
+                    lease_seconds,
+                    work_pool_id,
+                ) {
                     Ok(Some(run)) => Ok(json!({"ok": true, "run": run})),
                     Ok(None) => Ok(json!({"ok": true, "run": Value::Null})),
-                    Err(e) => Ok(json!({"ok": false, "error": {"code": "deployment", "message": e}})),
+                    Err(e) => {
+                        Ok(json!({"ok": false, "error": {"code": "deployment", "message": e}}))
+                    }
                 }
             }
         }
@@ -810,7 +865,8 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| "missing string field worker_name".to_string())?;
             let work_pool_id = body.get("work_pool_id").and_then(|v| v.as_str());
-            deployment_ops::worker_heartbeat(conn, worker_name, work_pool_id).map_err(|e| e.to_string())?;
+            deployment_ops::worker_heartbeat(conn, worker_name, work_pool_id)
+                .map_err(|e| e.to_string())?;
             Ok(json!({"ok": true}))
         }
         "deployment_tick_schedules" => {
@@ -832,7 +888,11 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                 .db_conn
                 .as_ref()
                 .ok_or_else(|| "deployment_reap_stale_workers requires bind_db".to_string())?;
-            let stale = body.get("stale_after_seconds").and_then(|v| v.as_i64()).unwrap_or(120).max(1);
+            let stale = body
+                .get("stale_after_seconds")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(120)
+                .max(1);
             let n = deployment_ops::reap_stale_workers(conn, stale).map_err(|e| e.to_string())?;
             Ok(json!({"ok": true, "reaped": n}))
         }
@@ -918,10 +978,17 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                 .db_conn
                 .as_ref()
                 .ok_or_else(|| "deployment_maintenance requires bind_db".to_string())?;
-            let stale = body.get("stale_after_seconds").and_then(|v| v.as_i64()).unwrap_or(120).max(1);
-            let mut summary = deployment_ops::deployment_maintenance(conn, stale).map_err(|e| e.to_string())?;
-            let gates = gate_ops::tick_gate_tasks(conn, &mut ctx.engine).map_err(|e| e.to_string())?;
-            let gcl_reclaimed = concurrency_ops::reclaim_expired(conn, None).map_err(|e| e.to_string())?;
+            let stale = body
+                .get("stale_after_seconds")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(120)
+                .max(1);
+            let mut summary =
+                deployment_ops::deployment_maintenance(conn, stale).map_err(|e| e.to_string())?;
+            let gates =
+                gate_ops::tick_gate_tasks(conn, &mut ctx.engine).map_err(|e| e.to_string())?;
+            let gcl_reclaimed =
+                concurrency_ops::reclaim_expired(conn, None).map_err(|e| e.to_string())?;
             if let Some(obj) = summary.as_object_mut() {
                 obj.insert("gates_promoted".to_string(), json!(gates));
                 obj.insert("gcl_reclaimed".to_string(), json!(gcl_reclaimed));
@@ -936,7 +1003,8 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
                 .db_conn
                 .as_ref()
                 .ok_or_else(|| "task_tick_gate_tasks requires bind_db".to_string())?;
-            let promoted = gate_ops::tick_gate_tasks(conn, &mut ctx.engine).map_err(|e| e.to_string())?;
+            let promoted =
+                gate_ops::tick_gate_tasks(conn, &mut ctx.engine).map_err(|e| e.to_string())?;
             Ok(json!({"ok": true, "promoted": promoted}))
         }
         "gcl_upsert" => {
@@ -1055,7 +1123,9 @@ fn state_from_field(body: &Value, key: &str) -> Result<crate::engine::RunState, 
 }
 
 fn opt_str_from_field(body: &Value, key: &str) -> Option<String> {
-    body.get(key).and_then(|v| v.as_str()).map(|s| s.to_string())
+    body.get(key)
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
 }
 
 /// Opaque control-plane engine handle (per Python ``InMemoryControlPlane``). Handle ``0`` is invalid.
@@ -1081,7 +1151,10 @@ pub extern "C" fn ironflow_engine_free(handle: u64) {
         return;
     }
     ironflow_deployment_scheduler_stop_internal(handle);
-    engines().lock().expect("engine map poisoned").remove(&handle);
+    engines()
+        .lock()
+        .expect("engine map poisoned")
+        .remove(&handle);
 }
 
 /// Spawn a background thread that periodically runs `deployment_maintenance` under the engine mutex.
@@ -1156,14 +1229,19 @@ pub extern "C" fn ironflow_control(
             .map_err(|_| "engine context poisoned".to_string())?;
         match dispatch_control(&mut ctx, &op, &body) {
             Ok(v) => Ok(v.to_string()),
-            Err(e) => Ok(json!({"ok": false, "error": {"code": "dispatch", "message": e}}).to_string()),
+            Err(e) => {
+                Ok(json!({"ok": false, "error": {"code": "dispatch", "message": e}}).to_string())
+            }
         }
     })();
 
     match result {
         Ok(s) => CString::new(s).unwrap_or_default().into_raw(),
         Err(e) => {
-            let payload = format!(r#"{{"ok":false,"error":{{"code":"ffi","message":"{}"}}}}"#, e.replace('"', "\\\""));
+            let payload = format!(
+                r#"{{"ok":false,"error":{{"code":"ffi","message":"{}"}}}}"#,
+                e.replace('"', "\\\"")
+            );
             CString::new(payload).unwrap_or_default().into_raw()
         }
     }

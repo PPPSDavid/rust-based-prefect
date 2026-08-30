@@ -32,7 +32,10 @@ def main() -> None:
         raise SystemExit(f"prefect not importable: {exc}") from exc
 
     try:
-        from prefect.task_runners import SequentialTaskRunner, ThreadPoolTaskRunner  # type: ignore
+        from prefect.task_runners import (  # type: ignore
+            SequentialTaskRunner,
+            ThreadPoolTaskRunner,
+        )
     except Exception:
         try:
             from prefect import SequentialTaskRunner, ThreadPoolTaskRunner

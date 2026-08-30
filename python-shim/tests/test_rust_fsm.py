@@ -5,9 +5,8 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
-
-from prefect_compat.rust_bridge import native_library_available
 from prefect_compat.runtime import InMemoryControlPlane, RunState
+from prefect_compat.rust_bridge import native_library_available
 
 
 @pytest.mark.skipif(

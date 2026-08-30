@@ -8,7 +8,6 @@ from pathlib import Path
 from uuid import UUID
 
 import pytest
-
 from prefect_compat import InMemoryControlPlane, deployment_ref, flow, set_control_plane
 from prefect_compat.cancellation import FlowRunCancelled, sleep_cancelable
 from prefect_compat.runtime import RunState

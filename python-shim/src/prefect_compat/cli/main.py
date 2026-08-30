@@ -614,8 +614,7 @@ def cmd_server_services_start(args: argparse.Namespace) -> int:
     if getattr(plane, "_store", None) is not None:
         print(f"store_backend: {plane._store.backend_kind}")
     print(
-        "Note: run a single services replica per stack "
-        "(HA advisory lock deferred).",
+        "Note: run a single services replica per stack (HA advisory lock deferred).",
         file=sys.stderr,
     )
     try:

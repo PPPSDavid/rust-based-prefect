@@ -12,10 +12,12 @@ fn now_iso() -> String {
 }
 
 fn deployment_run_row_to_json(row: &postgres::Row) -> Value {
-    let requested: Value = serde_json::from_str(row.get::<_, String>("requested_parameters").as_str())
-        .unwrap_or(json!({}));
-    let resolved: Value = serde_json::from_str(row.get::<_, String>("resolved_parameters").as_str())
-        .unwrap_or(json!({}));
+    let requested: Value =
+        serde_json::from_str(row.get::<_, String>("requested_parameters").as_str())
+            .unwrap_or(json!({}));
+    let resolved: Value =
+        serde_json::from_str(row.get::<_, String>("resolved_parameters").as_str())
+            .unwrap_or(json!({}));
     json!({
         "id": row.get::<_, String>("id"),
         "deployment_id": row.get::<_, String>("deployment_id"),

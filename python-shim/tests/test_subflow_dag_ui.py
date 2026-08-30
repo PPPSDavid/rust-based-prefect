@@ -6,7 +6,6 @@ import threading
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-
 from prefect_compat import InMemoryControlPlane, deployment_ref, flow, set_control_plane
 from prefect_compat.server import app, control_plane
 from prefect_compat.worker import run_worker_loop
