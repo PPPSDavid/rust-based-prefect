@@ -334,3 +334,38 @@ pub fn persist_task_transition_with_conn(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::engine::{Engine, RunState};
+
+    #[test]
+    fn persist_flow_create_inserts_row() {
+        let conn = Connection::open_in_memory().expect("db");
+        conn.execute_batch(
+            "CREATE TABLE flow_runs (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                state TEXT,
+                version INTEGER,
+                created_at TEXT,
+                updated_at TEXT,
+                parent_flow_run_id TEXT,
+                parent_task_run_id TEXT,
+                root_flow_run_id TEXT,
+                execution_mode TEXT,
+                depth INTEGER
+            );",
+        )
+        .expect("schema");
+        let mut engine = Engine::new();
+        let run = engine.create_flow_run("demo");
+        persist_flow_create_with_conn(&conn, &run).expect("persist");
+        let n: i64 = conn
+            .query_row("SELECT COUNT(*) FROM flow_runs", [], |r| r.get(0))
+            .expect("count");
+        assert_eq!(n, 1);
+        assert_eq!(run.state, RunState::Scheduled);
+    }
+}

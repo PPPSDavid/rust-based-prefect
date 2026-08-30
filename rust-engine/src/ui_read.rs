@@ -341,3 +341,18 @@ fn page_with_cursor(mut items: Vec<Value>, limit: i64) -> Result<String, String>
     }))
     .map_err(|e| e.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unknown_query_kind() {
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!("ironflow-ui-read-{}.sqlite", uuid::Uuid::new_v4()));
+        let path_str = path.to_string_lossy().to_string();
+        let err = query(&path_str, "not_a_kind", "{}").expect_err("unknown kind");
+        assert!(err.contains("unknown query kind"), "{err}");
+        let _ = std::fs::remove_file(&path);
+    }
+}

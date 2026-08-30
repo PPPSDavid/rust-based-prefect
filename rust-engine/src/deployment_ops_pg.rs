@@ -5,7 +5,7 @@ use chrono::{Duration, Utc};
 use postgres::Client;
 use serde_json::{json, Value};
 
-const DEFAULT_WORK_POOL_ID: &str = "default-process-pool";
+pub(crate) const DEFAULT_WORK_POOL_ID: &str = "default-process-pool";
 
 fn now_iso() -> String {
     Utc::now().to_rfc3339()
@@ -234,4 +234,15 @@ pub fn deployment_maintenance_lease(
         "triggered": 0u64,
         "reaped": reaped,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn default_pool_matches_sqlite_ops() {
+        assert_eq!(
+            super::DEFAULT_WORK_POOL_ID,
+            crate::deployment_ops::DEFAULT_WORK_POOL_ID
+        );
+    }
 }

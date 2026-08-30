@@ -105,3 +105,26 @@ pub fn tick_gate_tasks_json(conn: &Connection, engine: &mut Engine) -> Result<Va
     let promoted = tick_gate_tasks(conn, engine)?;
     Ok(json!({"promoted": promoted}))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::Connection;
+
+    #[test]
+    fn tick_gate_tasks_empty_table() {
+        let conn = Connection::open_in_memory().expect("db");
+        conn.execute_batch(
+            "CREATE TABLE task_runs (
+                id TEXT PRIMARY KEY,
+                kind TEXT,
+                state TEXT,
+                gate_open_at TEXT
+            );",
+        )
+        .expect("schema");
+        let mut engine = Engine::new();
+        let n = tick_gate_tasks(&conn, &mut engine).expect("tick");
+        assert_eq!(n, 0);
+    }
+}
