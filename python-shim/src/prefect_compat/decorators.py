@@ -18,15 +18,15 @@ if TYPE_CHECKING:
 from .cancellation import FlowRunCancelled
 from .context import bind_flow_metadata, bind_task_run, bound_flow_parameters
 from .errors import FlowChildrenFailed
+from .graph_mode import (
+    normalize_declared_graph_mode,
+    resolve_graph_mode,
+)
 from .hooks import (
     TransitionContext,
     TransitionHookSpec,
     compile_transition_hooks,
     dispatch_transition_hooks,
-)
-from .graph_mode import (
-    normalize_declared_graph_mode,
-    resolve_graph_mode,
 )
 from .process_workers import ProcessWorkerTerminated, run_in_registered_process
 from .result_codec import fingerprint_parameters, fingerprint_task_inputs
