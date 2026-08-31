@@ -6,7 +6,6 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
-
 from prefect_compat import InMemoryControlPlane, flow, set_control_plane, task
 from prefect_compat.graph_mode import resolve_graph_mode
 from prefect_compat.runtime import RunState

@@ -434,13 +434,7 @@ mod tests {
         ];
 
         let all = [
-            Scheduled,
-            Pending,
-            Running,
-            Paused,
-            Completed,
-            Failed,
-            Cancelled,
+            Scheduled, Pending, Running, Paused, Completed, Failed, Cancelled,
         ];
 
         for &from in &all {
