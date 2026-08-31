@@ -19,9 +19,9 @@ _UNSET = object()
 
 
 def _control_plane():
-    from .decorators import _CONTROL_PLANE
+    from .decorators import _require_control_plane
 
-    return _CONTROL_PLANE
+    return _require_control_plane()
 
 
 @dataclass

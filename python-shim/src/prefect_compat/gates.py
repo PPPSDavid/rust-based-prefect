@@ -30,9 +30,9 @@ class GateWaitTooLongError(ValueError):
 
 
 def _control_plane():
-    from .decorators import _CONTROL_PLANE
+    from .decorators import _require_control_plane
 
-    return _CONTROL_PLANE
+    return _require_control_plane()
 
 
 def _effective_max_wait(max_wait: timedelta | None) -> timedelta:

@@ -13,9 +13,9 @@ class FlowRunCancelled(RuntimeError):
 
 
 def _control_plane():
-    from .decorators import _CONTROL_PLANE
+    from .decorators import _require_control_plane
 
-    return _CONTROL_PLANE
+    return _require_control_plane()
 
 
 def active_flow_run_id() -> UUID | None:
