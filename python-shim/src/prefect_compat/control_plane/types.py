@@ -35,6 +35,11 @@ class FlowRunRecord:
     resume_lineage_id: UUID | None = None
     parameters_fingerprint: str | None = None
     resume_skips_enabled: bool = False
+    declared_graph_mode: str = "auto"
+    effective_graph_mode: str = "dynamic"
+    manifest_fingerprint: str | None = None
+    contract_mismatch: bool = False
+    flow_attempt_number: int = 1
 
 
 @dataclass
@@ -58,6 +63,7 @@ class TaskRunRecord:
     gate_open_at: str | None = None
     tags: tuple[str, ...] = ()
     contribute_to_flow_state: bool = True
+    task_run_attempt: int = 1
 
 
 @dataclass

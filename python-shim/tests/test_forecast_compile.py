@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import textwrap
 
-from prefect_compat.decorators import _compile_forecast_for_flow, flow, task
+from prefect_compat.decorators import flow, task
+from prefect_compat.forecast_compile import _compile_forecast_for_flow
 
 
 @task

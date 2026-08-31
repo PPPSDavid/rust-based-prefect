@@ -415,4 +415,48 @@ mod tests {
         });
         assert!(matches!(err, Err(EngineError::InvalidTransition { .. })));
     }
+
+    #[test]
+    fn validate_transition_matrix_exhaustive() {
+        use RunState::*;
+
+        let allowed: &[(RunState, RunState)] = &[
+            (Scheduled, Pending),
+            (Scheduled, Cancelled),
+            (Pending, Running),
+            (Pending, Cancelled),
+            (Running, Completed),
+            (Running, Failed),
+            (Running, Cancelled),
+            (Running, Paused),
+            (Paused, Running),
+            (Paused, Cancelled),
+        ];
+
+        let all = [
+            Scheduled, Pending, Running, Paused, Completed, Failed, Cancelled,
+        ];
+
+        for &from in &all {
+            for &to in &all {
+                if from == to {
+                    assert!(
+                        validate_transition(from, to).is_err(),
+                        "self-transition {from:?}->{to:?} should be rejected"
+                    );
+                    continue;
+                }
+                let expect_ok = allowed.contains(&(from, to));
+                let result = validate_transition(from, to);
+                if expect_ok {
+                    assert!(result.is_ok(), "expected allowed {from:?}->{to:?}");
+                } else {
+                    assert!(
+                        matches!(result, Err(EngineError::InvalidTransition { .. })),
+                        "expected rejected {from:?}->{to:?}"
+                    );
+                }
+            }
+        }
+    }
 }

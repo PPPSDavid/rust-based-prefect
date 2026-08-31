@@ -10,7 +10,8 @@ from .concurrency import (
     rate_limit,
 )
 from .context import MissingContextError, RunContext, get_run_context
-from .decorators import flow, set_control_plane, task, wait
+from .control_plane_registry import set_control_plane
+from .decorators import flow, task, wait
 from .errors import FlowChildrenFailed
 from .gates import GateFuture, gate
 from .hooks import TransitionContext, TransitionHookSpec, on_transition

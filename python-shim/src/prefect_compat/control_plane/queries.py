@@ -41,6 +41,87 @@ class QueriesMixin:
         next_cursor = str(rows[-1]["seq"]) if len(rows) == limit else None
         return PageResult(items=items, next_cursor=next_cursor)
 
+    def _attach_graph_mode_fields_to_detail(
+        self, result: dict[str, Any], flow_run_id: UUID
+    ) -> None:
+        rec = self._flows.get(flow_run_id)
+        if rec is not None:
+            if rec.resume_from_flow_run_id is not None:
+                result["resume_from_flow_run_id"] = str(rec.resume_from_flow_run_id)
+            if rec.resume_lineage_id is not None:
+                result["resume_lineage_id"] = str(rec.resume_lineage_id)
+            result["declared_graph_mode"] = rec.declared_graph_mode
+            result["effective_graph_mode"] = rec.effective_graph_mode
+            if rec.manifest_fingerprint:
+                result["manifest_fingerprint"] = rec.manifest_fingerprint
+            if rec.contract_mismatch:
+                result["contract_mismatch"] = True
+            result["flow_attempt_number"] = rec.flow_attempt_number
+            return
+        extra = self._query_rows(
+            "SELECT resume_from_flow_run_id, resume_lineage_id, declared_graph_mode, "
+            "effective_graph_mode, manifest_fingerprint, contract_mismatch, flow_attempt_number "
+            "FROM flow_runs WHERE id = ? LIMIT 1",
+            [str(flow_run_id)],
+        )
+        if not extra:
+            return
+        row = extra[0]
+        if row["resume_from_flow_run_id"]:
+            result["resume_from_flow_run_id"] = row["resume_from_flow_run_id"]
+        if row["resume_lineage_id"]:
+            result["resume_lineage_id"] = row["resume_lineage_id"]
+        if row["declared_graph_mode"]:
+            result["declared_graph_mode"] = row["declared_graph_mode"]
+        if row["effective_graph_mode"]:
+            result["effective_graph_mode"] = row["effective_graph_mode"]
+        if row["manifest_fingerprint"]:
+            result["manifest_fingerprint"] = row["manifest_fingerprint"]
+        if int(row["contract_mismatch"] or 0):
+            result["contract_mismatch"] = True
+        if row["flow_attempt_number"] is not None:
+            result["flow_attempt_number"] = int(row["flow_attempt_number"])
+
+    def _attach_deployment_fields_to_detail(
+        self, result: dict[str, Any], flow_run_id: UUID
+    ) -> None:
+        dep_rows = self._query_rows(
+            "SELECT deployment_id FROM deployment_runs WHERE flow_run_id = ? ORDER BY created_at DESC LIMIT 1",
+            [str(flow_run_id)],
+        )
+        if not dep_rows:
+            return
+        result["deployment_id"] = dep_rows[0]["deployment_id"]
+        param_rows = self._query_rows(
+            "SELECT resolved_parameters FROM deployment_runs "
+            "WHERE flow_run_id = ? ORDER BY created_at DESC LIMIT 1",
+            [str(flow_run_id)],
+        )
+        if not param_rows:
+            return
+        try:
+            result["parameters"] = json.loads(
+                param_rows[0]["resolved_parameters"] or "{}"
+            )
+        except (TypeError, json.JSONDecodeError):
+            result["parameters"] = {}
+
+    def _attach_lifecycle_fields_to_detail(
+        self, result: dict[str, Any], flow_run_id: UUID
+    ) -> None:
+        life = self._lifecycle_by_flow.get(str(flow_run_id))
+        if life:
+            result["lifecycle_action"] = life.get("lifecycle_action")
+            result["interrupt_mode"] = life.get("interrupt_mode")
+            if life.get("pause_drain_pending"):
+                result["pause_drain_pending"] = True
+            summary = life.get("lifecycle_summary")
+            if summary:
+                result["lifecycle_summary"] = summary
+        else:
+            result.setdefault("lifecycle_action", None)
+            result.setdefault("interrupt_mode", None)
+
     def get_flow_run_detail(self, flow_run_id: UUID) -> dict[str, Any] | None:
         rust_result = self._query_rust(
             "flow_run_detail", {"flow_run_id": str(flow_run_id)}
@@ -56,58 +137,12 @@ class QueriesMixin:
             if not rows:
                 return None
             result = self._flow_row_to_dict(rows[0])
-        dep_rows = self._query_rows(
-            "SELECT deployment_id FROM deployment_runs WHERE flow_run_id = ? ORDER BY created_at DESC LIMIT 1",
-            [str(flow_run_id)],
-        )
-        if dep_rows:
-            result["deployment_id"] = dep_rows[0]["deployment_id"]
-            param_rows = self._query_rows(
-                "SELECT resolved_parameters FROM deployment_runs "
-                "WHERE flow_run_id = ? ORDER BY created_at DESC LIMIT 1",
-                [str(flow_run_id)],
-            )
-            if param_rows:
-                try:
-                    result["parameters"] = json.loads(
-                        param_rows[0]["resolved_parameters"] or "{}"
-                    )
-                except (TypeError, json.JSONDecodeError):
-                    result["parameters"] = {}
-        rec = self._flows.get(flow_run_id)
-        if rec is not None:
-            if rec.resume_from_flow_run_id is not None:
-                result["resume_from_flow_run_id"] = str(rec.resume_from_flow_run_id)
-            if rec.resume_lineage_id is not None:
-                result["resume_lineage_id"] = str(rec.resume_lineage_id)
-        else:
-            extra = self._query_rows(
-                "SELECT resume_from_flow_run_id, resume_lineage_id "
-                "FROM flow_runs WHERE id = ? LIMIT 1",
-                [str(flow_run_id)],
-            )
-            if extra:
-                if extra[0]["resume_from_flow_run_id"]:
-                    result["resume_from_flow_run_id"] = extra[0][
-                        "resume_from_flow_run_id"
-                    ]
-                if extra[0]["resume_lineage_id"]:
-                    result["resume_lineage_id"] = extra[0]["resume_lineage_id"]
+        self._attach_deployment_fields_to_detail(result, flow_run_id)
+        self._attach_graph_mode_fields_to_detail(result, flow_run_id)
         result["breadcrumb"] = self._flow_run_breadcrumb(flow_run_id)
         result["children_summary"] = self._flow_run_children_summary(flow_run_id)
         result["children"] = self._flow_run_children(flow_run_id)
-        life = self._lifecycle_by_flow.get(str(flow_run_id))
-        if life:
-            result["lifecycle_action"] = life.get("lifecycle_action")
-            result["interrupt_mode"] = life.get("interrupt_mode")
-            if life.get("pause_drain_pending"):
-                result["pause_drain_pending"] = True
-            summary = life.get("lifecycle_summary")
-            if summary:
-                result["lifecycle_summary"] = summary
-        else:
-            result.setdefault("lifecycle_action", None)
-            result.setdefault("interrupt_mode", None)
+        self._attach_lifecycle_fields_to_detail(result, flow_run_id)
         return result
 
     def list_task_runs(
@@ -123,7 +158,7 @@ class QueriesMixin:
             )
         query = (
             "SELECT seq,id,flow_run_id,task_name,planned_node_id,state,version,created_at,updated_at,"
-            "kind,child_flow_run_id,child_deployment_run_id "
+            "kind,child_flow_run_id,child_deployment_run_id,task_run_attempt "
             "FROM task_runs WHERE flow_run_id = ?"
         )
         params: list[Any] = [str(flow_run_id)]

@@ -34,9 +34,9 @@ class ConcurrencyLimitError(RuntimeError):
 
 
 def _plane() -> InMemoryControlPlane:
-    from .decorators import _CONTROL_PLANE
+    from .control_plane_registry import _require_control_plane
 
-    return _CONTROL_PLANE
+    return _require_control_plane()
 
 
 def _normalize_names(names: str | Sequence[str]) -> list[str]:

@@ -19,6 +19,10 @@ Escape hatches:
 
 Design notes: [flow-run final state plan](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/plans/flow-run-final-state.md). Compatibility: **[Compatibility matrix](../compatibility.md)**.
 
+## Graph mode
+
+Use **`@flow(graph_mode="auto"|"static"|"dynamic")`** (default **`auto`**) to control resume behavior on retry. Static-effective flows may skip completed DAG nodes when the execution contract matches; dynamic-effective flows always re-execute. See **[Execution contract](../concepts/execution-contract.md)** and **[How to choose graph mode and retry](../how-to/graph-mode-and-retry.md)**.
+
 ## Subflows (nesting flows)
 
 IronFlow supports **two** nesting mechanisms:

@@ -2,7 +2,7 @@
 
 On **flow-run retry**, **operator terminate-pause resume**, or an in-process **`prepare_resume`**, IronFlow can skip DAG nodes that already **COMPLETED** in a prior attempt. This is **resume-within-lineage**, not Prefect’s full `cache_policy` matrix. For pause/cancel operators, see **[How to cancel, pause, and resume](cancel-pause-resume.md)**.
 
-Normative limits: **[Compatibility matrix](../compatibility.md)**. Design notes: [task-result-cache plan](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/plans/task-result-cache.md) (in-repo).
+Normative limits: **[Compatibility matrix](../compatibility.md)**. Design notes: `docs/plans/task-result-cache.md` (in-repo). **Graph mode:** resume skips apply only when **`effective_graph_mode=static`** — see **[How to choose graph mode and retry](graph-mode-and-retry.md)** and **[Execution contract](../concepts/execution-contract.md)**.
 
 ## When tasks skip
 
@@ -12,6 +12,8 @@ Normative limits: **[Compatibility matrix](../compatibility.md)**. Design notes:
 | Non-`None` + `@task(persist_result=True)` and JSON-safe | **Yes** (value restored) when params + inputs match |
 | Non-`None` without `persist_result` | **No** — recomputed |
 | Flow/deployment parameters changed vs prior attempt | **No** — all resume skips disabled for that run |
+| **Effective graph mode = dynamic** (`auto` or forced) | **No** — full re-execute |
+| Manifest fingerprint mismatch (code change) | **No** — contract mismatch disables skips |
 | Submit/`map` inputs changed (or not JSON-fingerprintable) | **No** — that node recomputes |
 | Fresh run / new schedule tick (no resume lineage) | **Never** |
 

@@ -24,7 +24,8 @@ class _ControlPlaneLogHandler(logging.Handler):
 
         # Circular: handlers must resolve the live plane/ContextVars at emit time.
         from .context import _ACTIVE_TASK_RUN_ID
-        from .decorators import _ACTIVE_FLOW_RUN, _CONTROL_PLANE
+        from .control_plane_registry import _require_control_plane
+        from .decorators import _ACTIVE_FLOW_RUN
 
         flow_run_id = _ACTIVE_FLOW_RUN.get()
         if flow_run_id is None:
@@ -37,7 +38,7 @@ class _ControlPlaneLogHandler(logging.Handler):
 
         task_run_id = _ACTIVE_TASK_RUN_ID.get()
         try:
-            _CONTROL_PLANE.append_log(
+            _require_control_plane().append_log(
                 flow_run_id=flow_run_id,
                 message=message,
                 level=record.levelname,

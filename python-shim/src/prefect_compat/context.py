@@ -54,7 +54,8 @@ class RunContext:
 def get_run_context() -> RunContext:
     """Return the active ``RunContext``, or raise ``MissingContextError``."""
     # Circular: decorators own flow-run ContextVars and import bind_* from here.
-    from .decorators import _ACTIVE_DEPLOYMENT_RUN, _ACTIVE_FLOW_RUN, _CONTROL_PLANE
+    from .control_plane_registry import _require_control_plane
+    from .decorators import _ACTIVE_DEPLOYMENT_RUN, _ACTIVE_FLOW_RUN
 
     flow_run_id = _ACTIVE_FLOW_RUN.get()
     if flow_run_id is None:
@@ -62,10 +63,11 @@ def get_run_context() -> RunContext:
             "get_run_context() requires an active @flow invocation"
         )
 
+    plane = _require_control_plane()
     flow_name = _ACTIVE_FLOW_NAME.get()
     if not flow_name:
         try:
-            flow_name = _CONTROL_PLANE.get_flow(flow_run_id).name
+            flow_name = plane.get_flow(flow_run_id).name
         except Exception:
             flow_name = "<unknown>"
 
@@ -74,7 +76,7 @@ def get_run_context() -> RunContext:
     deployment_name: str | None = None
     if deployment_run_id is not None:
         try:
-            dep_run = _CONTROL_PLANE.get_deployment_run(deployment_run_id)
+            dep_run = plane.get_deployment_run(deployment_run_id)
         except Exception:
             dep_run = None
         if dep_run:
@@ -82,7 +84,7 @@ def get_run_context() -> RunContext:
             if raw_dep_id:
                 deployment_id = UUID(str(raw_dep_id))
                 try:
-                    dep = _CONTROL_PLANE.get_deployment(deployment_id)
+                    dep = plane.get_deployment(deployment_id)
                 except Exception:
                     dep = None
                 if dep:

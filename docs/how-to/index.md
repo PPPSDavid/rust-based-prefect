@@ -17,6 +17,7 @@ Task-focused guides for common goals. For a minimal first run, use **[Get starte
 - **[How to choose a task runner](choose-task-runners.md)** — thread vs process vs sequential for `submit` / `map`; API/remote vs local CPU workloads.
 - **[How to use concurrency limits](concurrency-limits.md)** — global slots, `concurrency` / `rate_limit`, tag-based task caps, `ironflow gcl`, UI Concurrency page.
 - **[How to resume tasks and persist results](task-resume-and-persist.md)** — DAG resume on retry, `@task(persist_result=True)`, JSON allowlist, UI.
+- **[How to choose graph mode and retry](graph-mode-and-retry.md)** — `auto`/`static`/`dynamic`, execution contract, Prefect comparison.
 - **[How to cancel, pause, and resume](cancel-pause-resume.md)** — drain vs terminate pause, process-kill cancel, resume + P1 skip/recompute.
 - **[How to port a flow from Prefect](port-from-prefect.md)** — imports, control plane, staying inside the supported subset.
 

@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from typing import Any
 from uuid import UUID, uuid4
 
+from ..graph_mode import StaticGraphContractViolation
 from .types import (
     SUBFLOW_MAX_DEPTH,
     FlowRunRecord,
@@ -39,14 +40,11 @@ class RunsMixin:
             if depth > SUBFLOW_MAX_DEPTH:
                 raise ValueError(f"subflow depth exceeds maximum ({SUBFLOW_MAX_DEPTH})")
         resume_lineage_id: UUID | None = None
-        resume_skips_enabled = False
         if resume_from_flow_run_id is not None:
             with self._lock:
                 self._ensure_resume_schema()
             prior = self._flows.get(resume_from_flow_run_id)
-            prior_fp: str | None = None
             if prior is None:
-                # Durable path: prior may only exist in SQLite after process restart.
                 prior_row = self._query_rows(
                     "SELECT id, parameters_fingerprint FROM flow_runs WHERE id = ? LIMIT 1",
                     [str(resume_from_flow_run_id)],
@@ -54,19 +52,9 @@ class RunsMixin:
                 if not prior_row:
                     raise ValueError("resume_from flow run not found")
                 resume_lineage_id = self._lineage_id_for_flow(resume_from_flow_run_id)
-                raw_fp = prior_row[0]["parameters_fingerprint"]
-                prior_fp = str(raw_fp) if raw_fp else None
             else:
                 resume_lineage_id = prior.resume_lineage_id or prior.run_id
-                prior_fp = prior.parameters_fingerprint
-            # Case 6: only skip when flow/deployment params match the prior attempt.
-            resume_skips_enabled = (
-                prior_fp is not None
-                and parameters_fingerprint is not None
-                and prior_fp == parameters_fingerprint
-            )
-            if resume_skips_enabled:
-                self._resume_lookups_enabled = True
+        flow_attempt_number = self._compute_flow_attempt_number(resume_lineage_id)
         record = FlowRunRecord(
             run_id=run_id,
             name=name,
@@ -80,7 +68,8 @@ class RunsMixin:
             resume_from_flow_run_id=resume_from_flow_run_id,
             resume_lineage_id=resume_lineage_id,
             parameters_fingerprint=parameters_fingerprint,
-            resume_skips_enabled=resume_skips_enabled,
+            resume_skips_enabled=False,
+            flow_attempt_number=flow_attempt_number,
         )
         with self._lock:
             persisted_by_rust = False
@@ -336,10 +325,14 @@ class RunsMixin:
                 if task.flow_run_id == flow_run_id and task.planned_node_id
             }
             taken = reserved | task_run_used
+            flow = self._flows.get(flow_run_id)
+            static_mode = flow is not None and flow.effective_graph_mode == "static"
 
             by_task = self._manifest_by_task.get(flow_run_id)
+            manifest_ids: list[str] = []
             if by_task is not None:
-                for node_id in by_task.get(task_name, []):
+                manifest_ids = list(by_task.get(task_name, []))
+                for node_id in manifest_ids:
                     if node_id not in taken:
                         reserved.add(node_id)
                         return node_id
@@ -347,14 +340,27 @@ class RunsMixin:
                 manifest_id = self._next_planned_from_sql_unlocked(
                     flow_run_id, task_name
                 )
+                if manifest_id is not None:
+                    manifest_ids = [manifest_id]
                 if manifest_id is not None and manifest_id not in taken:
                     reserved.add(manifest_id)
                     return manifest_id
+
+            if static_mode and manifest_ids:
+                # ``map()`` fan-out shares one logical planned node across indices.
+                last_id = manifest_ids[-1]
+                reserved.add(last_id)
+                return last_id
 
             index = 0
             while True:
                 candidate = f"dyn_{task_name}_{index}"
                 if candidate not in taken:
+                    if static_mode:
+                        raise StaticGraphContractViolation(
+                            f"Static flow run {flow_run_id} exhausted planned nodes "
+                            f"for task {task_name!r}; would allocate {candidate!r}"
+                        )
                     reserved.add(candidate)
                     return candidate
                 index += 1
