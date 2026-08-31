@@ -6,7 +6,6 @@ import logging
 from uuid import uuid4
 
 import pytest
-
 from prefect_compat import (
     InMemoryControlPlane,
     RunState,

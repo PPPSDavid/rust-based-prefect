@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import argparse
-import ctypes
 import concurrent.futures
+import ctypes
 import json
 import platform
 import random
@@ -13,7 +13,7 @@ import tempfile
 import threading
 import time
 from dataclasses import asdict, dataclass
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -962,7 +962,9 @@ def _run_decorator_submit_micro_iteration(
 
         inc = as_task_wrapper(_inc)
 
-        @flow(task_runner=ThreadPoolTaskRunner(max_workers=min(32, max(4, submit_width))))
+        @flow(
+            task_runner=ThreadPoolTaskRunner(max_workers=min(32, max(4, submit_width)))
+        )
         def sample() -> int:
             futs = [inc.submit(i) for i in range(submit_width)]
             wait(futs)
@@ -1154,7 +1156,9 @@ def _run_gcl_iteration(
             latency_key = "gcl.tag_map_ms"
 
         after_proc = _process_snapshot()
-        sqlite_after = float(db_path.stat().st_size) if db_path.exists() else sqlite_before
+        sqlite_after = (
+            float(db_path.stat().st_size) if db_path.exists() else sqlite_before
+        )
         wal_after = float(wal_path.stat().st_size) if wal_path.exists() else wal_before
         _close_plane_footprint(plane)
 
@@ -1200,6 +1204,7 @@ def _run_gcl_iteration(
         process=process,
         sqlite=sqlite,
     )
+
 
 def _run_resolve_terminal_iteration(
     recipe: WorkloadRecipe,

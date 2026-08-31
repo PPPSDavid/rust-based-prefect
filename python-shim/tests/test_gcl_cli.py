@@ -6,7 +6,6 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-
 from prefect_compat.cli.gcl import GclClient
 from prefect_compat.cli.main import main
 from prefect_compat.decorators import set_control_plane
@@ -62,7 +61,9 @@ def test_gcl_create_ls_inspect_update_delete(tmp_path: Path, monkeypatch) -> Non
     _patch_gcl_client(monkeypatch, TestClient(app))
     argv_url = ["--api-url", "http://testserver"]
 
-    code, out, err = _run(["gcl", "create", "db", "--limit", "5", "--decay", "1.5", *argv_url])
+    code, out, err = _run(
+        ["gcl", "create", "db", "--limit", "5", "--decay", "1.5", *argv_url]
+    )
     assert code == 0, err
     created = json.loads(out)
     assert created["name"] == "db"
@@ -82,7 +83,9 @@ def test_gcl_create_ls_inspect_update_delete(tmp_path: Path, monkeypatch) -> Non
     assert inspected["limit"] == 5
     assert "active_slots" in inspected
 
-    code, out, err = _run(["gcl", "update", "db", "--limit", "8", "--inactive", *argv_url])
+    code, out, err = _run(
+        ["gcl", "update", "db", "--limit", "8", "--inactive", *argv_url]
+    )
     assert code == 0, err
     updated = json.loads(out)
     assert updated["limit"] == 8
@@ -122,7 +125,9 @@ def test_gcl_tag_name_roundtrip(tmp_path: Path, monkeypatch) -> None:
 def test_gcl_inspect_missing_exits_1(tmp_path: Path, monkeypatch) -> None:
     _swap_plane(tmp_path)
     _patch_gcl_client(monkeypatch, TestClient(app))
-    code, _out, err = _run(["gcl", "inspect", "missing", "--api-url", "http://testserver"])
+    code, _out, err = _run(
+        ["gcl", "inspect", "missing", "--api-url", "http://testserver"]
+    )
     assert code == 1
     assert "not found" in err
 

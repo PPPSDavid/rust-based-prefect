@@ -117,8 +117,8 @@ When ownership areas shift, new hotspots appear, or validation commands change, 
 Run before declaring completion:
 
 1. Prefer `uv sync --frozen --group dev` once (root workspace + committed `uv.lock`). Transitional fallback: `pip install -r requirements-ci.txt`.
-2. `uv run ruff check .` and `uv run ty check` (configuration in root `pyproject.toml`); or `python -m ruff` / `python -m ty` after the sync/venv is active.
-3. `uv run pytest python-shim/tests static-planner/tests benchmarks/tests` (from repo root; `pytest.ini` adds `python-shim/src`, `static-planner/src`, and `.` to `PYTHONPATH`). `python -m pytest …` is fine once `.venv` is on `PATH`.
+2. `bash scripts/lint.sh` (or: `uv run ruff check .`, `uv run ruff format --check .`, `uv run ty check`, `python scripts/code_metrics.py`, `cargo fmt --manifest-path rust-engine/Cargo.toml -- --check`, `cargo clippy --manifest-path rust-engine/Cargo.toml --all-targets -- -D warnings`). Ruff/ty config is in root `pyproject.toml`. **File caps:** new production files ≤800 lines; existing files must not cross 1000 unless allowlisted in `scripts/metrics/baseline.json` (allowlisted files must not grow). Function complexity: ruff `C901` (max 20) and clippy `too_many_lines` (threshold 120). See `CONTRIBUTING.md`.
+3. `uv run pytest python-shim/tests static-planner/tests benchmarks/tests` (from repo root; `pytest.ini` adds `python-shim/src`, `static-planner/src`, and `.` to `PYTHONPATH`). `python -m pytest …` is fine once `.venv` is on `PATH`. Also `uv run pytest -m airtight` for concurrent-state invariants.
 4. `cargo test --manifest-path rust-engine/Cargo.toml`
 5. After any significant change/refactor/new feature, run a deterministic perf check to guard against regressions:
    - Fast local gate: `uv run python benchmarks/perf_matrix.py run --preset lite --repetitions 1 --warmups 0 --jobs 2`
@@ -283,8 +283,9 @@ Non-obvious caveats for this environment:
   + `CRG_MCP_CONDA_ENV`).
 - **Vite dev server binds to IPv6 `localhost` (`::1`) only.** Open the UI at `http://localhost:4173`,
   **not** `http://127.0.0.1:4173` (the latter refuses the connection). The backend API is at
-  `http://127.0.0.1:8000` and the frontend hardcodes that origin (`frontend/src/api.ts`); backend CORS
-  only allows the `4173` origins, so run both together.
+  `http://127.0.0.1:8000`. API calls use `VITE_API_BASE` when set; the Vite dev server proxies `/api`
+  and `/health` to that origin (`frontend/src/api.ts`, `frontend/vite.config.ts`). Backend CORS only
+  allows the `4173` origins, so run both together.
 - **Running the stack:** start the backend with
   `uv run python -m uvicorn python-shim.src.prefect_compat.server:app --host 127.0.0.1 --port 8000`
   (or `python3 -m uvicorn …` when `.venv` is on `PATH`)
@@ -292,7 +293,7 @@ Non-obvious caveats for this environment:
   Seed demo runs for the UI with `python3 scripts/ui_e2e_seed.py` (needs the backend up). The local
   worker + scheduler run as daemon threads inside the API process (toggle via `IRONFLOW_ENABLE_LOCAL_WORKER`
   / `IRONFLOW_ENABLE_SCHEDULER`).
-- **Python lint:** CI runs `uv run ruff check .` and `uv run ty check` (see root `pyproject.toml`). Prefer `uv sync --frozen --group dev` before running locally.
+- **Python lint:** CI runs `uv run ruff check .` and `uv run ty check` (see root `pyproject.toml`). Prefer `uv sync --frozen --group dev` before running locally. File-LOC ratchet: `python scripts/code_metrics.py`. Contributor guide: root `CONTRIBUTING.md`.
 - **Persistence is local files** under `data/` (JSONL history + a stdlib-SQLite read model); there is no
   external database/broker to start. `data/` is git-ignored, but `benchmarks/perf_matrix.py run` overwrites
   tracked `docs/perf_matrix_results.json` / `docs/perf_matrix_summary.md` — revert those unless a benchmark

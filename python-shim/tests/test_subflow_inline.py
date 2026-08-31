@@ -7,7 +7,6 @@ import time
 from pathlib import Path
 
 import pytest
-
 from prefect_compat import (
     InMemoryControlPlane,
     deployment_ref,

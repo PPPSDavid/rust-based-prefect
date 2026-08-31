@@ -6,7 +6,6 @@ from pathlib import Path
 from uuid import UUID
 
 import pytest
-
 from prefect_compat import (
     flow,
     get_run_context,
@@ -102,7 +101,9 @@ def test_get_run_logger_writes_flow_and_task_logs(tmp_path: Path) -> None:
     assert flow_info["task_run_id"] is None
 
 
-def test_get_run_logger_outside_run_does_not_raise(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_get_run_logger_outside_run_does_not_raise(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     plane = _plane(tmp_path)
     set_control_plane(plane)
     log = get_run_logger()

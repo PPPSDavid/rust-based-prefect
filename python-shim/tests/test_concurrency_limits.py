@@ -8,7 +8,6 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-
 from prefect_compat import (
     ConcurrencyLimitError,
     ConcurrencySlotTimeoutError,
@@ -79,7 +78,9 @@ def test_strict_missing_limit_raises(tmp_path: Path) -> None:
     plane = _plane(tmp_path)
     set_control_plane(plane)
     with pytest.raises(ConcurrencyLimitError):
-        with concurrency("missing-limit", strict=True, plane=plane, timeout_seconds=0.5):
+        with concurrency(
+            "missing-limit", strict=True, plane=plane, timeout_seconds=0.5
+        ):
             pass
 
 

@@ -2,7 +2,7 @@
 
 IronFlow supports Prefect-style **global concurrency limits** (named slots) and **tag-based task limits**. Both share one Rust-backed SQLite slot ledger. Deployment concurrency (`concurrency_limit` on a deployment) is separate — it only caps concurrent **deployment runs**.
 
-Normative scope: **[Compatibility matrix](../compatibility.md)** · Design notes: **[`docs/plans/concurrency-limits.md`](../plans/concurrency-limits.md)** · Concepts: **[Tasks](../concepts/tasks.md)**.
+Normative scope: **[Compatibility matrix](../compatibility.md)** · Design notes: [concurrency-limits plan](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/plans/concurrency-limits.md) · Concepts: **[Tasks](../concepts/tasks.md)**.
 
 Upstream reference: [Prefect global concurrency limits](https://docs.prefect.io/v3/concepts/global-concurrency-limits), [tag-based concurrency limits](https://docs.prefect.io/v3/concepts/tag-based-concurrency-limits).
 

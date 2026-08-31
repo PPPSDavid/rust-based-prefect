@@ -31,7 +31,11 @@ def main() -> int:
         print("No gate_task nodes in expanded DAG", file=sys.stderr)
         print(json.dumps(payload, indent=2)[:2000], file=sys.stderr)
         return 1
-    print(json.dumps({"run_id": str(parent_run.run_id), "gate_nodes": gate_nodes}, indent=2))
+    print(
+        json.dumps(
+            {"run_id": str(parent_run.run_id), "gate_nodes": gate_nodes}, indent=2
+        )
+    )
     return 0
 
 

@@ -12,8 +12,8 @@ import multiprocessing as mp
 import os
 import signal
 import time
-from dataclasses import dataclass, field
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from queue import Empty
 from threading import RLock
 from typing import Any
@@ -50,9 +50,7 @@ class TaskProcessRegistry:
     _by_task: dict[str, _WorkerEntry] = field(default_factory=dict)
     _generation: int = 0
 
-    def register(
-        self, flow_run_id: UUID, task_run_id: UUID, process: Any
-    ) -> int:
+    def register(self, flow_run_id: UUID, task_run_id: UUID, process: Any) -> int:
         with self._lock:
             self._generation += 1
             gen = self._generation

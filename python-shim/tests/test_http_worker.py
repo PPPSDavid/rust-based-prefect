@@ -7,7 +7,6 @@ from pathlib import Path
 from uuid import UUID
 
 from fastapi.testclient import TestClient
-
 from prefect_compat.decorators import set_control_plane
 from prefect_compat.runtime import InMemoryControlPlane
 from prefect_compat.server import FLOW_REGISTRY, app, control_plane

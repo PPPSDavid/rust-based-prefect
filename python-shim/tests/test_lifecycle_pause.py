@@ -9,7 +9,6 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-
 from prefect_compat import InterruptMode, flow, set_control_plane, task
 from prefect_compat.cancellation import FlowRunCancelled
 from prefect_compat.decorators import set_control_plane as set_plane
@@ -79,9 +78,7 @@ def test_pause_endpoint_requires_mode(tmp_path: Path) -> None:
     assert missing.status_code == 422
     bad = client.post(f"/api/flow-runs/{run.run_id}/pause", json={"mode": "soft"})
     assert bad.status_code == 422
-    ok = client.post(
-        f"/api/flow-runs/{run.run_id}/pause", json={"mode": "drain"}
-    )
+    ok = client.post(f"/api/flow-runs/{run.run_id}/pause", json={"mode": "drain"})
     assert ok.status_code == 200
     body = ok.json()
     assert body["interrupt_mode"] == "drain"

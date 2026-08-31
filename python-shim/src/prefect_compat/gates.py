@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Generic, TypeVar, cast
-from collections.abc import Sequence
 from uuid import UUID
 
 from .cancellation import FlowRunCancelled, assert_flow_not_cancelled, sleep_cancelable
@@ -154,7 +154,9 @@ class GateWrapper:
             )
 
         open_at = _resolve_open_at(until=until, after=after)
-        effective = _effective_max_wait(max_wait if max_wait is not None else self.max_wait)
+        effective = _effective_max_wait(
+            max_wait if max_wait is not None else self.max_wait
+        )
         _validate_gate_wait(open_at, effective)
 
         plane = _control_plane()

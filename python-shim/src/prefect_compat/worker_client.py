@@ -149,7 +149,9 @@ class WorkerHttpClient:
         response.raise_for_status()
         return response.json()
 
-    def get_deployment_run(self, deployment_run_id: UUID | str) -> dict[str, Any] | None:
+    def get_deployment_run(
+        self, deployment_run_id: UUID | str
+    ) -> dict[str, Any] | None:
         response = self._session.get(f"/api/workers/runs/{deployment_run_id}")
         if response.status_code == 404:
             return None

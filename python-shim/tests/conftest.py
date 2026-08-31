@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Generator
 
 import pytest
-
 from prefect_compat.decorators import set_control_plane
 from prefect_compat.process_workers import task_process_registry
 from prefect_compat.server import control_plane

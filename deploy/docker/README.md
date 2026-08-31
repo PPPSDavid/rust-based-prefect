@@ -23,7 +23,7 @@ Images install the **same PyPI wheel** (same `VERSION` tag). Server/services ima
 
 | Tag | Meaning |
 | --- | --- |
-| `ghcr.io/<org>/ironflow-server:0.2.0` | Immutable release (matches `VERSION` / PyPI) |
+| `ghcr.io/<org>/ironflow-server:0.3.0` | Immutable release (matches `VERSION` / PyPI) |
 | `ghcr.io/<org>/ironflow-server:0.2` | Patch-line float |
 | `ghcr.io/<org>/ironflow-server:latest` | Latest release (avoid in production) |
 

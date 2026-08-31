@@ -4,7 +4,6 @@ import base64
 
 import pytest
 from fastapi.testclient import TestClient
-
 from prefect_compat.auth import (
     api_client_auth_string,
     basic_authorization_header,

@@ -7,7 +7,6 @@ import uuid
 from pathlib import Path
 
 import pytest
-
 from prefect_compat.persistence import (
     DEFAULT_WORK_POOL_ID,
     PostgresStore,

@@ -3,7 +3,6 @@ from __future__ import annotations
 import math
 
 import pytest
-
 from prefect_compat.result_codec import (
     ResultEncodeError,
     decode_task_result,

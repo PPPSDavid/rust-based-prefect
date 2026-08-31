@@ -4,12 +4,11 @@ import contextvars
 import inspect
 import sys
 import textwrap
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from functools import wraps
-from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast, overload
-from collections.abc import Callable, Iterable, Sequence
 from uuid import UUID, uuid4
 
 if TYPE_CHECKING:
@@ -25,8 +24,8 @@ from .hooks import (
     compile_transition_hooks,
     dispatch_transition_hooks,
 )
-from .result_codec import fingerprint_parameters, fingerprint_task_inputs
 from .process_workers import ProcessWorkerTerminated, run_in_registered_process
+from .result_codec import fingerprint_parameters, fingerprint_task_inputs
 from .runtime import (
     FlowRunRecord,
     FlowRunSchedulingHeld,
@@ -113,7 +112,9 @@ class TaskFuture(Generic[T]):
         self.result()
 
 
-def wait(futures: Sequence[TaskFuture[Any] | SubflowFuture[Any] | GateFuture[Any]]) -> list[Any]:
+def wait(
+    futures: Sequence[TaskFuture[Any] | SubflowFuture[Any] | GateFuture[Any]],
+) -> list[Any]:
     return [future.result() for future in futures]
 
 
@@ -240,7 +241,8 @@ class TaskWrapper:
     def submit(
         self,
         *args: Any,
-        wait_for: Sequence[TaskFuture[Any] | SubflowFuture[Any] | GateFuture[Any]] | None = None,
+        wait_for: Sequence[TaskFuture[Any] | SubflowFuture[Any] | GateFuture[Any]]
+        | None = None,
         detach: bool = False,
         **kwargs: Any,
     ) -> TaskFuture[T]:
@@ -291,7 +293,9 @@ class TaskWrapper:
             )
             return TaskFuture(
                 task_run_id=str(task_run.task_run_id) if task_run is not None else None,
-                planned_node_id=task_run.planned_node_id if task_run is not None else None,
+                planned_node_id=task_run.planned_node_id
+                if task_run is not None
+                else None,
                 _cfuture=cfuture,
             )
         # Sequential / process / no shared pool: run body on the caller thread.
@@ -504,7 +508,8 @@ class TaskWrapper:
     def map(
         self,
         values: Iterable[Any],
-        wait_for: Sequence[TaskFuture[Any] | SubflowFuture[Any] | GateFuture[Any]] | None = None,
+        wait_for: Sequence[TaskFuture[Any] | SubflowFuture[Any] | GateFuture[Any]]
+        | None = None,
     ) -> list[TaskFuture[T]]:
         runner = _ACTIVE_TASK_RUNNER.get()
         if runner is None:
@@ -929,7 +934,9 @@ def flow(
             flow_token = _ACTIVE_FLOW_RUN.set(None)
             fh = compiled_flow_hooks
             submit_executor: ThreadPoolExecutor | None = None
-            submit_exec_token: contextvars.Token[ThreadPoolExecutor | None] | None = None
+            submit_exec_token: contextvars.Token[ThreadPoolExecutor | None] | None = (
+                None
+            )
             if (
                 isinstance(resolved_runner, ThreadPoolTaskRunner)
                 and resolved_runner.resolve_max_workers() > 1
@@ -1006,9 +1013,7 @@ def flow(
                         fallback_required=manifest_info["fallback_required"],
                         source=manifest_info["source"],
                     )
-                    start_transitions: list[
-                        tuple[RunState, UUID, str, int | None]
-                    ] = [
+                    start_transitions: list[tuple[RunState, UUID, str, int | None]] = [
                         (RunState.PENDING, uuid4(), "propose", 0),
                         (RunState.RUNNING, uuid4(), "start", 1),
                     ]
@@ -1051,9 +1056,7 @@ def flow(
                                 f"flow run {record.run_id} was cancelled"
                             )
                         if completion_mode == "wait_all":
-                            _finalize_wait_all(
-                                record.run_id, result, fh, current
-                            )
+                            _finalize_wait_all(record.run_id, result, fh, current)
                         else:
                             _finalize_explicit(record.run_id, result, fh, current)
                         return result
@@ -1159,9 +1162,7 @@ def _finalize_explicit(
         expected_version=current.version,
     )
     if fh and done.status == "applied":
-        _emit_flow_transition(
-            fh, flow_run_id, prev, RunState.COMPLETED, "complete"
-        )
+        _emit_flow_transition(fh, flow_run_id, prev, RunState.COMPLETED, "complete")
     _CONTROL_PLANE.set_flow_result(flow_run_id, result)
 
 
@@ -1193,9 +1194,7 @@ def _finalize_wait_all(
             expected_version=current.version,
         )
         if fh and done.status == "applied":
-            _emit_flow_transition(
-                fh, flow_run_id, prev, RunState.COMPLETED, "complete"
-            )
+            _emit_flow_transition(fh, flow_run_id, prev, RunState.COMPLETED, "complete")
         _CONTROL_PLANE.set_flow_result(flow_run_id, result)
         return
 
@@ -1223,14 +1222,10 @@ def _finalize_wait_all(
         expected_version=current.version,
     )
     if fh and failed.status == "applied":
-        _emit_flow_transition(
-            fh, flow_run_id, prev, RunState.FAILED, "child_failed"
-        )
+        _emit_flow_transition(fh, flow_run_id, prev, RunState.FAILED, "child_failed")
     samples = resolved.get("sample_failures") or resolved.get("sample_incomplete") or []
     names = [
-        str(s.get("task_name") or s.get("id"))
-        for s in samples
-        if isinstance(s, dict)
+        str(s.get("task_name") or s.get("id")) for s in samples if isinstance(s, dict)
     ]
     detail = ", ".join(names[:5]) if names else kind
     raise FlowChildrenFailed(

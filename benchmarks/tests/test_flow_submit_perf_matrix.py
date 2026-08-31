@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from benchmarks.perf_matrix import (
     WorkloadRecipe,
+    _presets,
+    _recipe_catalog,
     _run_recipe_iteration,
     canonical_matrix_compare_key,
     run_suite,
-    _presets,
-    _recipe_catalog,
 )
 
 

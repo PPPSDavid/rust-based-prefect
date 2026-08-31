@@ -17,6 +17,7 @@ from ..deploy.client import DEFAULT_WORK_POOL_NAME, DeployClient
 from ..deploy.pull import run_pull_steps
 from ..deploy.spec import DeploymentSpec, PullStepSpec, parse_entrypoint
 from ..deploy.yaml_loader import load_manifest
+from ..flow_registry import FLOW_REGISTRY
 from ..runtime import InMemoryControlPlane
 from ..services import run_services_loop
 from ..worker import resolve_worker_mode, run_http_worker_loop, run_worker_loop
@@ -165,8 +166,6 @@ def cmd_deploy(args: argparse.Namespace) -> int:
 def _build_flow_registry(spec: DeploymentSpec) -> dict[str, Callable[..., Any]]:
     entrypoint = spec.entrypoint
     if not entrypoint:
-        from ..server import FLOW_REGISTRY
-
         if spec.flow_name and spec.flow_name in FLOW_REGISTRY:
             return {spec.flow_name: FLOW_REGISTRY[spec.flow_name]}
         raise ValueError(
@@ -313,8 +312,6 @@ def cmd_worker_start(args: argparse.Namespace) -> int:
         except Exception as exc:
             print(f"Error running pull steps: {exc}", file=sys.stderr)
             return 1
-
-    from ..server import FLOW_REGISTRY
 
     pool_name = args.pool or DEFAULT_WORK_POOL_NAME
     worker_name = args.name or "ironflow-worker"
@@ -614,8 +611,7 @@ def cmd_server_services_start(args: argparse.Namespace) -> int:
     if getattr(plane, "_store", None) is not None:
         print(f"store_backend: {plane._store.backend_kind}")
     print(
-        "Note: run a single services replica per stack "
-        "(HA advisory lock deferred).",
+        "Note: run a single services replica per stack (HA advisory lock deferred).",
         file=sys.stderr,
     )
     try:

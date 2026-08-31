@@ -30,7 +30,7 @@ services:
       dockerfile: deploy/docker/Dockerfile.server
       args:
         INSTALL_MODE: ${INSTALL_MODE:-local}
-        IRONFLOW_VERSION: ${IRONFLOW_VERSION:-0.2.0}
+        IRONFLOW_VERSION: ${IRONFLOW_VERSION:-0.3.0}
     environment:
       IRONFLOW_DATABASE_URL: postgresql://ironflow:ironflow@postgres:5432/ironflow
       IRONFLOW_ENABLE_SCHEDULER: "0"
@@ -60,7 +60,7 @@ services:
       dockerfile: deploy/docker/Dockerfile.services
       args:
         INSTALL_MODE: ${INSTALL_MODE:-local}
-        IRONFLOW_VERSION: ${IRONFLOW_VERSION:-0.2.0}
+        IRONFLOW_VERSION: ${IRONFLOW_VERSION:-0.3.0}
     environment:
       IRONFLOW_DATABASE_URL: postgresql://ironflow:ironflow@postgres:5432/ironflow
       IRONFLOW_HISTORY_PATH: /data/ironflow_history.jsonl
@@ -78,7 +78,7 @@ services:
       dockerfile: deploy/docker/Dockerfile.worker
       args:
         INSTALL_MODE: ${INSTALL_MODE:-local}
-        IRONFLOW_VERSION: ${IRONFLOW_VERSION:-0.2.0}
+        IRONFLOW_VERSION: ${IRONFLOW_VERSION:-0.3.0}
     environment:
       IRONFLOW_API_URL: http://server:8000
       IRONFLOW_WORKER_MODE: http

@@ -7,7 +7,6 @@ from pathlib import Path
 from uuid import UUID
 
 import pytest
-
 from prefect_compat.decorators import set_control_plane
 from prefect_compat.runtime import InMemoryControlPlane
 from prefect_compat.server import control_plane

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
-from collections.abc import Callable
 
 
 @runtime_checkable

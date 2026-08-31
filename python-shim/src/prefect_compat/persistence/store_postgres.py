@@ -7,7 +7,6 @@ from typing import Any
 from .constants import DEFAULT_WORK_POOL_ID
 from .dialect import PostgresConnectionAdapter
 
-
 _SCHEMA_SQL = f"""
 CREATE TABLE IF NOT EXISTS flow_runs (
     seq BIGSERIAL PRIMARY KEY,
@@ -188,7 +187,9 @@ class PostgresStore:
 
     backend_kind = "postgres"
 
-    def __init__(self, database_url: str, conn: Any, adapter: PostgresConnectionAdapter) -> None:
+    def __init__(
+        self, database_url: str, conn: Any, adapter: PostgresConnectionAdapter
+    ) -> None:
         self._database_url = database_url
         self._raw = conn
         self._adapter = adapter

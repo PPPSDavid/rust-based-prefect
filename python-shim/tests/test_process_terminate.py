@@ -8,7 +8,6 @@ import time
 from pathlib import Path
 
 import pytest
-
 from prefect_compat import (
     ProcessPoolTaskRunner,
     flow,

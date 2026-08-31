@@ -11,7 +11,6 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
-
 from prefect_compat import (
     InMemoryControlPlane,
     RunState,
@@ -36,8 +35,12 @@ def _plane(tmp_path: Path, name: str = "airtight") -> InMemoryControlPlane:
 
 def _start_flow(plane: InMemoryControlPlane, name: str) -> FlowRunRecord:
     run = plane.create_flow_run(name)
-    plane.set_flow_state(run.run_id, RunState.PENDING, uuid4(), "propose", expected_version=0)
-    plane.set_flow_state(run.run_id, RunState.RUNNING, uuid4(), "start", expected_version=1)
+    plane.set_flow_state(
+        run.run_id, RunState.PENDING, uuid4(), "propose", expected_version=0
+    )
+    plane.set_flow_state(
+        run.run_id, RunState.RUNNING, uuid4(), "start", expected_version=1
+    )
     return plane.get_flow(run.run_id)
 
 
@@ -67,7 +70,11 @@ def test_parallel_distinct_flow_runs_legal_terminals(tmp_path: Path) -> None:
         assert row["state"] == "COMPLETED"
         assert int(row["version"]) >= 2
 
-    applied = [event for event in plane.events() if event.get("kind") or event.get("event_type")]
+    applied = [
+        event
+        for event in plane.events()
+        if event.get("kind") or event.get("event_type")
+    ]
     assert len(applied) >= 8 * 2
 
 

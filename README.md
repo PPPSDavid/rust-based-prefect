@@ -49,7 +49,7 @@ Expect **`True`** when a matching wheel loaded. **Developing the repo**, integra
 | PyPI / conda packaging notes (contributors) | [DISTRIBUTION.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/DISTRIBUTION.md) |
 | Releases & version bumps | [RELEASING.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/RELEASING.md) |
 | Change history | [CHANGELOG.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/CHANGELOG.md) |
-| Agent / contributor workflow | [AGENTS.md](AGENTS.md) |
+| Agent / contributor workflow | [AGENTS.md](AGENTS.md) · [CONTRIBUTING.md](CONTRIBUTING.md) |
 
 ## Goals
 
@@ -125,7 +125,7 @@ python -m pip install ironflow-prefect-compat
 python -c "from prefect_compat.rust_bridge import native_library_available; print(native_library_available())"
 ```
 
-### Using a numbered release (e.g. v0.1.2)
+### Using a numbered release (e.g. v0.3.0)
 
 Pick **one** approach depending on whether you need the **full stack** (Rust engine sources, Python shim, benchmarks, scripts) or only the installable Python packages.
 
@@ -134,7 +134,7 @@ Pick **one** approach depending on whether you need the **full stack** (Rust eng
 ```bash
 git clone https://github.com/PPPSDavid/rust-based-prefect.git
 cd rust-based-prefect
-git checkout v0.1.2
+git checkout v0.3.0
 ```
 
 Then follow the **Environment** subsection above (`environment.yml` or `requirements-ci.txt` at that tag). Run tests and scripts from the repo root as documented below.
@@ -144,16 +144,16 @@ Then follow the **Environment** subsection above (`environment.yml` or `requirem
 Use this when you want the **Python package alone** in another project. That install path does **not** ship the `rust-engine` crate or its native library; behavior falls back to Python-side implementations unless you **build `rust-engine` yourself** and point **`IRONFLOW_RUST_LIB`** at the resulting `cdylib`. For the intended architecture (kernel in Rust), prefer **full checkout** and `cargo build` below.
 
 ```bash
-python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v0.1.2#subdirectory=python-shim"
+python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v0.3.0#subdirectory=python-shim"
 ```
 
 The static planner package is optional and installs separately if you need it:
 
 ```bash
-python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v0.1.2#subdirectory=static-planner"
+python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v0.3.0#subdirectory=static-planner"
 ```
 
-Replace `v0.1.2` with the [latest release tag](https://github.com/PPPSDavid/rust-based-prefect/releases).
+Replace `v0.3.0` with the [latest release tag](https://github.com/PPPSDavid/rust-based-prefect/releases).
 
 **Install guide (users):** see [Installation](https://pppsdavid.github.io/rust-based-prefect/INSTALL/). Use `pip install ironflow-prefect-compat` when wheels are published for your platform/version; otherwise use the documented TestPyPI or source-install fallback paths. Packaging details for maintainers are in [DISTRIBUTION.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/DISTRIBUTION.md) (not published to the site).
 
@@ -244,7 +244,7 @@ Read the full caveats and tables in the [Performance overview](https://pppsdavid
 
 ## Versioning & releases
 
-- Current release: see GitHub [**Releases**](https://github.com/PPPSDavid/rust-based-prefect/releases) (e.g. **v0.1.2**). Single version in **`VERSION`**, kept in sync with Rust, Python packages, and `frontend/package.json` (`python scripts/check_version_sync.py`).
+- Current release: see GitHub [**Releases**](https://github.com/PPPSDavid/rust-based-prefect/releases) (e.g. **v0.3.0**). Single version in **`VERSION`**, kept in sync with Rust, Python packages, and `frontend/package.json` (`python scripts/check_version_sync.py`).
 - Tag **`vX.Y.Z`** must match `VERSION`; pushing a tag creates a GitHub Release (see [RELEASING.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/RELEASING.md)). Changes are listed in [CHANGELOG.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/CHANGELOG.md).
 
 ## Building docs locally

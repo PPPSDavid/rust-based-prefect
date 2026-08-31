@@ -21,7 +21,9 @@ def encode_task_result(value: Any) -> str:
     """Encode a JSON-safe task result to a compact UTF-8 JSON string."""
     _validate(value, depth=0)
     try:
-        raw = json.dumps(value, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
+        raw = json.dumps(
+            value, ensure_ascii=False, allow_nan=False, separators=(",", ":")
+        )
     except (TypeError, ValueError) as exc:
         raise ResultEncodeError(str(exc)) from exc
     if len(raw.encode("utf-8")) > MAX_ENCODED_BYTES:
@@ -36,7 +38,9 @@ def decode_task_result(raw: str) -> Any:
     return json.loads(raw)
 
 
-def fingerprint_task_inputs(args: list[Any] | tuple[Any, ...], kwargs: dict[str, Any]) -> str | None:
+def fingerprint_task_inputs(
+    args: list[Any] | tuple[Any, ...], kwargs: dict[str, Any]
+) -> str | None:
     """Stable SHA-256 of JSON-safe submit/map inputs, or ``None`` if not fingerprintable.
 
     ``None`` means the call must not resume-skip (cannot prove inputs match).

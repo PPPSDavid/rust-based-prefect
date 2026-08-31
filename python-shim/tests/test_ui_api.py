@@ -4,11 +4,11 @@ import json
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-
-from scripts import ironflow_server
 from prefect_compat.decorators import set_control_plane
 from prefect_compat.runtime import InMemoryControlPlane
 from prefect_compat.server import app, control_plane, failing_flow, mapped_flow
+
+from scripts import ironflow_server
 
 
 def _seed_data(tmp_path: Path) -> str:

@@ -1,0 +1,25 @@
+# File-LOC ratchet (see scripts/code_metrics.py).
+# New production files must stay at or under new_file_cap.
+# Files that already existed in the baseline may stay up to hard_cap unless
+# they are allowlisted (historically > hard_cap), in which case they must not grow.
+
+new_file_cap = 800
+hard_cap = 1000
+baseline = "scripts/metrics/baseline.json"
+
+# Production globs relative to the repo root. Tests are excluded in the script.
+[[roots]]
+path = "python-shim/src"
+suffixes = [".py"]
+
+[[roots]]
+path = "rust-engine/src"
+suffixes = [".rs"]
+
+[[roots]]
+path = "static-planner/src"
+suffixes = [".py"]
+
+[[roots]]
+path = "frontend/src"
+suffixes = [".ts", ".tsx"]

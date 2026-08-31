@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from prefect_compat.persistence import (
     DEFAULT_WORK_POOL_ID,
     SqliteStore,
@@ -52,7 +51,9 @@ def test_sqlite_store_upgrade_idempotent(tmp_path: Path) -> None:
     store.close()
 
 
-def test_create_store_sqlite_default(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_create_store_sqlite_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.delenv("IRONFLOW_DATABASE_URL", raising=False)
     history = tmp_path / "hist.jsonl"
     store = create_store(history_path=history)

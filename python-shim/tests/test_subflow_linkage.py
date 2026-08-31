@@ -6,8 +6,7 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
-
-from prefect_compat.runtime import InMemoryControlPlane, SUBFLOW_MAX_DEPTH
+from prefect_compat.runtime import SUBFLOW_MAX_DEPTH, InMemoryControlPlane
 
 
 def _plane(tmp_path: Path) -> InMemoryControlPlane:

@@ -324,7 +324,9 @@ def test_deployment_cancel_mid_run_then_retry_skips(tmp_path: Path) -> None:
         time.sleep(2.0)
         return "slept"
 
-    @flow(name="resume_cancel_pipeline", task_runner=ThreadPoolTaskRunner(max_workers=2))
+    @flow(
+        name="resume_cancel_pipeline", task_runner=ThreadPoolTaskRunner(max_workers=2)
+    )
     def pipeline(n: int = 1) -> int:
         setup.submit()
         payload = expensive.submit(n)

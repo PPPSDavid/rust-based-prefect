@@ -95,9 +95,7 @@ def create_tag_concurrency_limit(
     plane: InMemoryControlPlane | None = None,
 ) -> dict[str, Any]:
     """Create/update a tag-based limit stored as ``tag:{tag}``."""
-    return create_concurrency_limit(
-        f"tag:{tag}", limit, active=active, plane=plane
-    )
+    return create_concurrency_limit(f"tag:{tag}", limit, active=active, plane=plane)
 
 
 def _acquire_blocking(
@@ -260,9 +258,7 @@ def acquire_tag_slots_for_task(
         return []
     cp = plane or _plane()
     names = [f"tag:{t}" for t in tags]
-    wait = (
-        DEFAULT_TAG_WAIT_SECONDS if poll_seconds is None else float(poll_seconds)
-    )
+    wait = DEFAULT_TAG_WAIT_SECONDS if poll_seconds is None else float(poll_seconds)
     out = _acquire_blocking(
         cp,
         names,

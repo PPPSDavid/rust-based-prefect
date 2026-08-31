@@ -11,18 +11,19 @@ from uuid import UUID
 
 from .cancellation import FlowRunCancelled
 from .decorators import _ACTIVE_DEPLOYMENT_RUN
+from .flow_registry import FLOW_REGISTRY
 from .runtime import RunState
 
 
 def resolve_worker_mode(explicit: str | None = None) -> str:
     """Return ``http`` or ``file`` (default ``file`` for local shared-DB workers)."""
-    raw = (explicit if explicit is not None else os.getenv("IRONFLOW_WORKER_MODE", "file"))
+    raw = (
+        explicit if explicit is not None else os.getenv("IRONFLOW_WORKER_MODE", "file")
+    )
     mode = str(raw).strip().lower()
     if mode in ("http", "file"):
         return mode
-    raise ValueError(
-        f"IRONFLOW_WORKER_MODE must be 'http' or 'file' (got {raw!r})"
-    )
+    raise ValueError(f"IRONFLOW_WORKER_MODE must be 'http' or 'file' (got {raw!r})")
 
 
 def _deployment_run_flow_run_id(
@@ -44,8 +45,6 @@ def resolve_flow_callable(
     flow_registry: dict[str, Callable[..., Any]] | None = None,
 ) -> Callable[..., Any]:
     if flow_registry is None:
-        from .server import FLOW_REGISTRY
-
         flow_registry = FLOW_REGISTRY
     if flow_name in flow_registry:
         return flow_registry[flow_name]

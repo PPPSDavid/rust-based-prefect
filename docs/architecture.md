@@ -23,6 +23,43 @@ See **[DAG and forecast](concepts/dag-and-forecast.md)** for UI behavior and tes
 
 The optional Vite/React frontend renders run DAGs from `GET /api/flow-runs/{id}/dag` with **Aggregated fan-out** (planned manifest, `mode=logical`) and **Task runs** (`mode=expanded`) views. Dependencies always flow **left → right**; parallel siblings stack **top → bottom**. GPU-accelerated zoom/pan, search-to-focus, and upstream/downstream path highlighting.
 
+## Native wheel vs Python fallback
+
+A **production** install uses the native `rust-engine` `cdylib` (PyPI wheel or a local `cargo build` plus `IRONFLOW_RUST_LIB`). When that library loads, the shim prefers Rust for FSM validation, queries, deployment claim/lease, GCL slots, and sqlite-backed schedule ticks.
+
+Missing native library is a **degraded mode** for in-process authoring: Python fallbacks keep `@flow` / `@task` working so tests and demos can run without a wheel. Do not treat fallbacks as the production control plane.
+
+## Module map (0.3.0)
+
+### Python (`prefect_compat`)
+
+| Module | Role |
+| --- | --- |
+| `runtime.py` | Thin facade: `InMemoryControlPlane` composes mixins. Public import path is unchanged. |
+| `control_plane/` | Mixins: `types`, `rust_dispatch`, `runs`, `run_events`, `queries`, `dag`, `deployments`, `deployment_runs`, `gcl`, `gates`, `lifecycle`, `resume`, `store`, `base`. |
+| `server.py` | FastAPI app, CORS, optional embedded worker/scheduler threads. |
+| `routes/` | HTTP routers (`health`, `flow_runs`, `catalog`, `deployments`, `work_pools`, `concurrency`, `streams`, `workers`) plus `schemas`. |
+| `flow_registry.py` | Demo `@flow` / `@task` plus `FLOW_REGISTRY` so workers/CLI do not import FastAPI. |
+| `plane.py` | Process-wide control-plane singleton. |
+| `decorators.py` | `@flow` / `@task` authoring (largest remaining Python file). |
+
+`from prefect_compat.runtime import InMemoryControlPlane` remains the compatibility alias.
+
+### Rust (`rust-engine`)
+
+| Module | Role |
+| --- | --- |
+| `engine.rs` | FSM truth (`validate_transition`) and append-only history. |
+| `ffi/` | Unchanged C ABI (`ironflow_*`); dispatch split into `control_fsm`, `control_deployment`, `control_gcl`, `control_terminal`. |
+| `deployment_ops/` | Claim, CRUD, schedule, tick, lifecycle, rows. |
+| `concurrency_ops/` | Global/tag concurrency acquire and release. |
+| Domain ops | `gate_ops`, `ui_read` / `ui_write`, `flow_terminal_ops`, `deployment_ops_pg`. |
+
+### Persistence and schema ownership
+
+- **SQLite** is the zero-config default; **Postgres** via `IRONFLOW_DATABASE_URL`; **JSONL** history for replay.
+- Table DDL lives in the Python store adapters. Rust `ensure_schema` covers GCL and `bind_db` extras. Do not add a fourth schema owner. An Alembic-style migrator is a follow-up, not this release.
+
 ## Compatibility scope (MVP)
 
 - `task.submit` chains
