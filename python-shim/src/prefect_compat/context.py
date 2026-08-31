@@ -54,7 +54,11 @@ class RunContext:
 def get_run_context() -> RunContext:
     """Return the active ``RunContext``, or raise ``MissingContextError``."""
     # Circular: decorators own flow-run ContextVars and import bind_* from here.
-    from .decorators import _ACTIVE_DEPLOYMENT_RUN, _ACTIVE_FLOW_RUN, _require_control_plane
+    from .decorators import (
+        _ACTIVE_DEPLOYMENT_RUN,
+        _ACTIVE_FLOW_RUN,
+        _require_control_plane,
+    )
 
     flow_run_id = _ACTIVE_FLOW_RUN.get()
     if flow_run_id is None:
