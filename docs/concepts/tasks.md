@@ -60,7 +60,7 @@ Fresh runs never auto-hit. Cache hits do not re-fire `transition_hooks`. This is
 
 ## Transition hooks
 
-Tasks accept the same **`transition_hooks`** mechanism as flows: **`TransitionHookSpec`** + **`on_transition`**, with optional **`from_state`** / **`to_state`** filters. See **[Flows](flows.md)** and the compatibility matrix for behavior and differences from Prefect’s hook names.
+Tasks accept the same **`transition_hooks`** mechanism as flows: **`TransitionHookSpec`** + **`on_transition`**, with optional **`from_state`** / **`to_state`** filters. Returning ``None`` observes; returning a terminal **`RunState`** may rewrite a proposed `RUNNING`→terminal destination before the FSM apply. See **[Flows](flows.md)** and the compatibility matrix.
 
 ## Runtime context and logging
 

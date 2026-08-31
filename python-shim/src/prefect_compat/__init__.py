@@ -12,9 +12,13 @@ from .concurrency import (
 from .context import MissingContextError, RunContext, get_run_context
 from .control_plane_registry import set_control_plane
 from .decorators import flow, task, wait
-from .errors import FlowChildrenFailed
+from .errors import FlowChildrenFailed, TransitionRewriteFailed
 from .gates import GateFuture, gate
-from .hooks import TransitionContext, TransitionHookSpec, on_transition
+from .hooks import (
+    TransitionContext,
+    TransitionHookSpec,
+    on_transition,
+)
 from .lifecycle import InterruptMode
 from .run_logging import get_run_logger
 from .runtime import FlowRunSchedulingHeld, InMemoryControlPlane, RunState
@@ -34,6 +38,7 @@ __all__ = [
     "InMemoryControlPlane",
     "RunState",
     "FlowChildrenFailed",
+    "TransitionRewriteFailed",
     "TransitionContext",
     "TransitionHookSpec",
     "on_transition",

@@ -21,7 +21,7 @@ Use this table when a Prefect import fails or behaves differently. Status values
 | `@task(retries=…)` / `retry_delay_seconds` / `timeout_seconds` | unsupported | Decorators do not accept Prefect retry/timeout kwargs; spec for future in-run retry: `docs/plans/task-auto-retry.md`. Flow-run **cancel + deployment retry** exist via API/UI |
 | `@flow(graph_mode=…)` / static retry contract | deliberate | IronFlow **`auto`/`static`/`dynamic`** — [graph mode and retry](graph-mode-and-retry.md). Prefect has no equivalent |
 | `get_run_logger` / `log_prints=` | partial | `from prefect_compat import get_run_logger` writes to the run log store + UI Logs tab. `log_prints=` not supported yet; use the logger instead of bare `print` |
-| `on_running` / `on_failure` / … hooks | deliberate | Map to `transition_hooks=` + `on_transition(...)` edges |
+| `on_running` / `on_failure` / … hooks | deliberate | Map notify logic to `transition_hooks=` + `on_transition(...)` that return `None`. To change the recorded terminal, return a `RunState` (IronFlow extension; not Prefect hook behavior). |
 | `run_deployment` / nested-flow helpers | partial | Use `deployment_ref(...).submit()` or inline `child_flow(...)` — [subflows](subflows.md) |
 | Blocks (`prefect.blocks.*`) | deliberate | Not in scope; use env vars / your own config |
 | `cache_policy` / task result cache | unsupported | Different model: lineage resume + `@task(persist_result=True)` / `None` markers — [task resume](task-resume-and-persist.md). Not Prefect `cache_policy` |
