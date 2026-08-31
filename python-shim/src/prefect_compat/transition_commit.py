@@ -12,7 +12,6 @@ from .control_plane_registry import _require_control_plane
 from .errors import TransitionRewriteFailed
 from .hooks import (
     TransitionContext,
-    TransitionDecision,
     TransitionHookSpec,
     emit_flow_transition,
     emit_task_single_hook_edge,
@@ -48,7 +47,6 @@ class TaskTerminalOutcome:
     rewritten: bool
     result: Any
     event_type: str
-    message: str | None = None
 
 
 def _rewrite_audit_metadata(
@@ -93,16 +91,16 @@ def _observe_skip_ids(
     return invoked_ids
 
 
-def _resolve_decision(
+def _resolve_rewrite(
     specs: tuple[TransitionHookSpec, ...] | None,
     ctx: TransitionContext,
     *,
     allow_rewrite: bool,
-) -> tuple[TransitionDecision | None, frozenset[int], int | None]:
+) -> tuple[RunState | None, frozenset[int], int | None]:
     if not allow_rewrite or not specs:
         return None, frozenset(), None
     probe = resolve_terminal_rewrite(specs, ctx)
-    return probe.decision, probe.invoked_ids, probe.winner_id
+    return probe.to_state, probe.invoked_ids, probe.winner_id
 
 
 def commit_flow_terminal(
@@ -119,7 +117,7 @@ def commit_flow_terminal(
     allow_rewrite: bool = True,
 ) -> FlowTerminalOutcome:
     """Rewrite (optional) → ``set_flow_state`` once → observe the committed edge."""
-    decision, invoked_ids, winner_id = _resolve_decision(
+    rewritten_to, invoked_ids, winner_id = _resolve_rewrite(
         specs,
         TransitionContext(
             kind="flow",
@@ -133,11 +131,10 @@ def commit_flow_terminal(
         ),
         allow_rewrite=allow_rewrite,
     )
-    committed = decision.to_state if decision is not None else proposed
-    rewritten = decision is not None and decision.to_state != proposed
+    committed = rewritten_to if rewritten_to is not None else proposed
+    rewritten = rewritten_to is not None and rewritten_to != proposed
     applied_kind = _flow_kind(kind, proposed, committed)
     meta = _rewrite_audit_metadata(metadata, proposed=proposed, committed=committed)
-    effective_result = decision.result if rewritten else result
     applied = _require_control_plane().set_flow_state(
         flow_run_id,
         committed,
@@ -163,7 +160,7 @@ def commit_flow_terminal(
         committed=committed,
         rewritten=rewritten,
         status=applied.status,
-        result=effective_result,
+        result=result,
         kind=applied_kind,
     )
 
@@ -184,7 +181,7 @@ def commit_task_terminal(
     persist_completed: Callable[[Any], dict[str, Any]] | None = None,
 ) -> TaskTerminalOutcome:
     """Rewrite (optional) → ``record_task_event`` once → observe the committed edge."""
-    decision, invoked_ids, winner_id = _resolve_decision(
+    rewritten_to, invoked_ids, winner_id = _resolve_rewrite(
         specs,
         TransitionContext(
             kind="task",
@@ -201,20 +198,13 @@ def commit_task_terminal(
         ),
         allow_rewrite=allow_rewrite and fire_hooks,
     )
-    committed = decision.to_state if decision is not None else proposed
-    rewritten = decision is not None and decision.to_state != proposed
+    committed = rewritten_to if rewritten_to is not None else proposed
+    rewritten = rewritten_to is not None and rewritten_to != proposed
     applied_event = _task_event(event_type, proposed, committed)
-    effective_result = (
-        decision.result if rewritten and committed == RunState.COMPLETED else result
-    )
-    message = decision.message if decision is not None else None
     data: dict[str, Any] | None = dict(metadata or {}) if metadata else None
     if committed == RunState.COMPLETED and persist_completed is not None:
-        extra = persist_completed(effective_result)
+        extra = persist_completed(result)
         data = {**(data or {}), **extra}
-    elif rewritten and committed == RunState.FAILED and message:
-        data = dict(data or {})
-        data.setdefault("error", message)
     data = _rewrite_audit_metadata(data, proposed=proposed, committed=committed)
     _require_control_plane().record_task_event(
         task_run.task_run_id, applied_event, data
@@ -237,9 +227,8 @@ def commit_task_terminal(
     return TaskTerminalOutcome(
         committed=committed,
         rewritten=rewritten,
-        result=effective_result,
+        result=result,
         event_type=applied_event,
-        message=message,
     )
 
 
@@ -255,13 +244,13 @@ def raise_for_unsuccessful_task_terminal(
         raise FlowRunCancelled(f"task run cancelled by transition rewrite{suffix}")
     if outcome.rewritten:
         raise TransitionRewriteFailed(
-            outcome.message or "task completed state rewritten to FAILED",
+            "task completed state rewritten to FAILED",
             committed=outcome.committed.value,
             proposed=RunState.COMPLETED.value,
         )
     if original_exc is not None:
         raise original_exc
     raise TransitionRewriteFailed(
-        outcome.message or f"task ended in {outcome.committed.value}",
+        f"task ended in {outcome.committed.value}",
         committed=outcome.committed.value,
     )

@@ -1,4 +1,4 @@
-"""Return-value rewrite: a non-None RunState / TransitionDecision overrides destination."""
+"""Return-value rewrite: a non-None terminal RunState overrides destination."""
 
 from __future__ import annotations
 
@@ -12,7 +12,6 @@ from prefect_compat import (
     InMemoryControlPlane,
     RunState,
     TransitionContext,
-    TransitionDecision,
     TransitionRewriteFailed,
     flow,
     on_transition,
@@ -35,13 +34,13 @@ def _plane(tmp_path, name: str = "rw") -> InMemoryControlPlane:
 def test_first_non_none_rewrite_wins() -> None:
     calls: list[str] = []
 
-    def first(ctx: TransitionContext) -> TransitionDecision:
+    def first(ctx: TransitionContext) -> RunState:
         calls.append("first")
-        return TransitionDecision(to_state=RunState.COMPLETED, result="salvaged")
+        return RunState.COMPLETED
 
-    def second(ctx: TransitionContext) -> TransitionDecision:
+    def second(ctx: TransitionContext) -> RunState:
         calls.append("second")
-        return TransitionDecision(to_state=RunState.CANCELLED)
+        return RunState.CANCELLED
 
     specs = compile_transition_hooks(
         (
@@ -66,18 +65,15 @@ def test_first_non_none_rewrite_wins() -> None:
             to_state=RunState.FAILED,
         ),
     )
-    decided = probe.decision
-    assert decided is not None
-    assert decided.to_state == RunState.COMPLETED
-    assert decided.result == "salvaged"
+    assert probe.to_state == RunState.COMPLETED
     assert calls == ["first"]
 
 
 def test_illegal_rewrite_return_keeps_proposed(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    def bad_state(ctx: TransitionContext) -> TransitionDecision:
-        return TransitionDecision(to_state=RunState.PAUSED)
+    def bad_state(ctx: TransitionContext) -> RunState:
+        return RunState.PAUSED
 
     def not_decision(ctx: TransitionContext) -> str:
         return "nope"
@@ -98,13 +94,13 @@ def test_illegal_rewrite_return_keeps_proposed(
                 to_state=RunState.FAILED,
             ),
         )
-    assert probe.decision is None
+    assert probe.to_state is None
     assert "illegal to_state" in caplog.text
-    assert "expected RunState or TransitionDecision" in caplog.text
+    assert "expected RunState" in caplog.text
 
 
 def test_rewrite_exception_keeps_proposed(caplog: pytest.LogCaptureFixture) -> None:
-    def boom(ctx: TransitionContext) -> TransitionDecision:
+    def boom(ctx: TransitionContext) -> RunState:
         raise RuntimeError("rewrite oops")
 
     specs = compile_transition_hooks((on_transition(boom, to_state=RunState.FAILED),))
@@ -118,7 +114,7 @@ def test_rewrite_exception_keeps_proposed(caplog: pytest.LogCaptureFixture) -> N
                 to_state=RunState.FAILED,
             ),
         )
-    assert probe.decision is None
+    assert probe.to_state is None
     assert "transition rewrite handler failed" in caplog.text
 
 
@@ -135,16 +131,15 @@ def test_returning_runstate_rewrites() -> None:
             to_state=RunState.FAILED,
         ),
     )
-    assert probe.decision is not None
-    assert probe.decision.to_state == RunState.COMPLETED
+    assert probe.to_state == RunState.COMPLETED
 
 
 def test_observe_sees_committed_edge_after_task_salvage(tmp_path) -> None:
     plane = _plane(tmp_path, "observe")
     observed: list[str] = []
 
-    def salvage(ctx: TransitionContext) -> TransitionDecision:
-        return TransitionDecision(to_state=RunState.COMPLETED, result=7)
+    def salvage(ctx: TransitionContext) -> RunState:
+        return RunState.COMPLETED
 
     def on_failed(ctx: TransitionContext) -> None:
         observed.append("failed")
@@ -170,7 +165,7 @@ def test_observe_sees_committed_edge_after_task_salvage(tmp_path) -> None:
     def pipeline() -> int:
         return flaky.submit().result()
 
-    assert pipeline() == 7
+    assert pipeline() is None
     assert observed == ["completed"]
     flow_run = plane.latest_flow()
     assert flow_run is not None
@@ -191,8 +186,8 @@ def test_observe_sees_committed_edge_after_task_salvage(tmp_path) -> None:
 def test_task_demote_fails_wait_all_parent(tmp_path) -> None:
     plane = _plane(tmp_path, "demote")
 
-    def demote(ctx: TransitionContext) -> TransitionDecision:
-        return TransitionDecision(to_state=RunState.FAILED, message="invalid output")
+    def demote(ctx: TransitionContext) -> RunState:
+        return RunState.FAILED
 
     @task(
         transition_hooks=[
@@ -226,8 +221,8 @@ def test_task_demote_fails_wait_all_parent(tmp_path) -> None:
 def test_flow_body_exception_salvage(tmp_path) -> None:
     plane = _plane(tmp_path, "flow-salvage")
 
-    def salvage(ctx: TransitionContext) -> TransitionDecision:
-        return TransitionDecision(to_state=RunState.COMPLETED, result="recovered")
+    def salvage(ctx: TransitionContext) -> RunState:
+        return RunState.COMPLETED
 
     @flow(
         final_state="explicit",
@@ -242,7 +237,7 @@ def test_flow_body_exception_salvage(tmp_path) -> None:
     def boom() -> str:
         raise RuntimeError("nope")
 
-    assert boom() == "recovered"
+    assert boom() is None
     flow_run = plane.latest_flow()
     assert flow_run is not None
     assert flow_run.state == RunState.COMPLETED
@@ -251,8 +246,8 @@ def test_flow_body_exception_salvage(tmp_path) -> None:
 def test_wait_all_child_fail_salvage(tmp_path) -> None:
     plane = _plane(tmp_path, "wait-all-salvage")
 
-    def salvage_flow(ctx: TransitionContext) -> TransitionDecision:
-        return TransitionDecision(to_state=RunState.COMPLETED, result="ok-anyway")
+    def salvage_flow(ctx: TransitionContext) -> RunState:
+        return RunState.COMPLETED
 
     @task
     def flaky() -> int:
@@ -301,9 +296,9 @@ def test_operator_cancel_does_not_consult_rewrite(tmp_path) -> None:
     started = threading.Event()
     release = threading.Event()
 
-    def salvage_cancel(ctx: TransitionContext) -> TransitionDecision:
+    def salvage_cancel(ctx: TransitionContext) -> RunState:
         rewrite_calls.append("cancel")
-        return TransitionDecision(to_state=RunState.COMPLETED, result="nope")
+        return RunState.COMPLETED
 
     @task(
         transition_hooks=[

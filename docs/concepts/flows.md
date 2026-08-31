@@ -36,11 +36,11 @@ Step-by-step examples, UI notes, and choosing between the two: **[How to compose
 
 Flows support **`transition_hooks`**: a sequence of **`TransitionHookSpec`** values built with **`on_transition(fn, from_state=..., to_state=...)`**. Use **`None`** for `from_state` or `to_state` to match any state on that side.
 
-If `fn` returns **None**, it only observes (notifications, logging). If it returns a **`RunState`** or **`TransitionDecision`** on a proposed **`RUNNING` → terminal** edge (`COMPLETED` / `FAILED` / `CANCELLED`), that return **rewrites** the destination **before** commit. The first legal returned state wins. Remaining `None`-return hooks then run on the **committed** edge. Operator cancel and process-kill paths ignore return values.
+If `fn` returns **None**, it only observes (notifications, logging). If it returns a legal terminal **`RunState`** (`COMPLETED` / `FAILED` / `CANCELLED`) on a proposed **`RUNNING` → terminal** edge, that return **rewrites** the destination **before** commit. The first legal returned state wins. Remaining `None`-return hooks then run on the **committed** edge. Operator cancel and process-kill paths ignore return values.
 
 They are **not** the same API names as Prefect’s `on_running` / `on_failure` hooks; map notify logic to explicit edges (for example `PENDING` → `RUNNING`). Prefect 3 hooks cannot override destination state. For full semantics, see **[Compatibility matrix](../compatibility.md)**.
 
-Relevant exports: `TransitionHookSpec`, `TransitionDecision`, `on_transition`, `TransitionContext`, `TransitionRewriteFailed` from `prefect_compat`.
+Relevant exports: `TransitionHookSpec`, `on_transition`, `TransitionContext`, `TransitionRewriteFailed` from `prefect_compat`.
 
 ## Runtime context and logging
 

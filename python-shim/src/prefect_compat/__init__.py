@@ -16,7 +16,6 @@ from .errors import FlowChildrenFailed, TransitionRewriteFailed
 from .gates import GateFuture, gate
 from .hooks import (
     TransitionContext,
-    TransitionDecision,
     TransitionHookSpec,
     on_transition,
 )
@@ -41,7 +40,6 @@ __all__ = [
     "FlowChildrenFailed",
     "TransitionRewriteFailed",
     "TransitionContext",
-    "TransitionDecision",
     "TransitionHookSpec",
     "on_transition",
     "SequentialTaskRunner",

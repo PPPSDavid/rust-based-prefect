@@ -1289,7 +1289,7 @@ def _finalize_wait_all(
         result=result,
         allow_rewrite=prev == RunState.RUNNING,
     )
-    stored = done.result if done.rewritten and done.result is not None else result
+    stored = result
     if done.committed == RunState.COMPLETED:
         _require_control_plane().set_flow_result(flow_run_id, stored)
         return

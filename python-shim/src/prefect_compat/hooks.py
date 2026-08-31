@@ -38,15 +38,6 @@ class TransitionContext:
 
 
 @dataclass(frozen=True)
-class TransitionDecision:
-    """Rewrite a proposed RUNNING→terminal destination before the FSM apply."""
-
-    to_state: RunState
-    result: Any = None
-    message: str | None = None
-
-
-@dataclass(frozen=True)
 class TransitionHookSpec:
     fn: Callable[[TransitionContext], Any]
     from_state: RunState | None = None
@@ -57,7 +48,7 @@ class TransitionHookSpec:
 class RewriteProbe:
     """Result of a pre-commit rewrite scan (first legal returned state wins)."""
 
-    decision: TransitionDecision | None
+    to_state: RunState | None
     invoked_ids: frozenset[int]
     winner_id: int | None
 
@@ -71,8 +62,8 @@ def on_transition(
     """Register ``fn`` for edges matching optional ``from_state`` / ``to_state``.
 
     Returning ``None`` observes the committed edge (post-commit). Returning a
-    ``RunState`` or ``TransitionDecision`` on a proposed ``RUNNING`` → terminal
-    edge rewrites the destination before the FSM apply.
+    legal terminal ``RunState`` on a proposed ``RUNNING`` → terminal edge
+    rewrites the destination before the FSM apply.
     """
     return TransitionHookSpec(fn=fn, from_state=from_state, to_state=to_state)
 
@@ -132,9 +123,9 @@ def resolve_terminal_rewrite(
     and illegal returns are logged and skipped.
     """
     if not specs:
-        return RewriteProbe(decision=None, invoked_ids=frozenset(), winner_id=None)
+        return RewriteProbe(to_state=None, invoked_ids=frozenset(), winner_id=None)
     if ctx.from_state != RunState.RUNNING or ctx.to_state not in REWRITE_TERMINALS:
-        return RewriteProbe(decision=None, invoked_ids=frozenset(), winner_id=None)
+        return RewriteProbe(to_state=None, invoked_ids=frozenset(), winner_id=None)
     invoked: set[int] = set()
     for spec in specs:
         if not _edge_matches(spec, ctx):
@@ -154,23 +145,19 @@ def resolve_terminal_rewrite(
             continue
         if raw is None:
             continue
-        decision = _normalize_rewrite_decision(raw, ctx)
-        if decision is None:
+        rewritten = _normalize_rewrite_state(raw, ctx)
+        if rewritten is None:
             continue
         return RewriteProbe(
-            decision=decision, invoked_ids=frozenset(invoked), winner_id=spec_id
+            to_state=rewritten, invoked_ids=frozenset(invoked), winner_id=spec_id
         )
-    return RewriteProbe(decision=None, invoked_ids=frozenset(invoked), winner_id=None)
+    return RewriteProbe(to_state=None, invoked_ids=frozenset(invoked), winner_id=None)
 
 
-def _normalize_rewrite_decision(
-    raw: Any, ctx: TransitionContext
-) -> TransitionDecision | None:
-    if isinstance(raw, RunState):
-        raw = TransitionDecision(to_state=raw)
-    elif not isinstance(raw, TransitionDecision):
+def _normalize_rewrite_state(raw: Any, ctx: TransitionContext) -> RunState | None:
+    if not isinstance(raw, RunState):
         logger.warning(
-            "transition rewrite ignored (expected RunState or TransitionDecision) "
+            "transition rewrite ignored (expected RunState) "
             "kind=%s flow_run_id=%s from=%s to=%s got=%s",
             ctx.kind,
             ctx.flow_run_id,
@@ -179,11 +166,11 @@ def _normalize_rewrite_decision(
             type(raw).__name__,
         )
         return None
-    if raw.to_state not in REWRITE_TERMINALS:
+    if raw not in REWRITE_TERMINALS:
         logger.warning(
             "transition rewrite ignored (illegal to_state=%s) kind=%s "
             "flow_run_id=%s from=%s proposed=%s",
-            raw.to_state,
+            raw,
             ctx.kind,
             ctx.flow_run_id,
             ctx.from_state,
