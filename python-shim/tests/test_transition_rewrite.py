@@ -1,4 +1,4 @@
-"""Rewrite-mode transition handlers (pre-commit destination override)."""
+"""Return-value rewrite: a non-None RunState / TransitionDecision overrides destination."""
 
 from __future__ import annotations
 
@@ -22,7 +22,6 @@ from prefect_compat import (
 from prefect_compat.cancellation import FlowRunCancelled
 from prefect_compat.hooks import (
     compile_transition_hooks,
-    dispatch_transition_hooks,
     resolve_terminal_rewrite,
 )
 
@@ -50,17 +49,15 @@ def test_first_non_none_rewrite_wins() -> None:
                 first,
                 from_state=RunState.RUNNING,
                 to_state=RunState.FAILED,
-                mode="rewrite",
             ),
             on_transition(
                 second,
                 from_state=RunState.RUNNING,
                 to_state=RunState.FAILED,
-                mode="rewrite",
             ),
         )
     )
-    decided = resolve_terminal_rewrite(
+    probe = resolve_terminal_rewrite(
         specs,
         TransitionContext(
             kind="task",
@@ -69,6 +66,7 @@ def test_first_non_none_rewrite_wins() -> None:
             to_state=RunState.FAILED,
         ),
     )
+    decided = probe.decision
     assert decided is not None
     assert decided.to_state == RunState.COMPLETED
     assert decided.result == "salvaged"
@@ -81,17 +79,17 @@ def test_illegal_rewrite_return_keeps_proposed(
     def bad_state(ctx: TransitionContext) -> TransitionDecision:
         return TransitionDecision(to_state=RunState.PAUSED)
 
-    def not_decision(ctx: TransitionContext) -> RunState:
-        return RunState.COMPLETED
+    def not_decision(ctx: TransitionContext) -> str:
+        return "nope"
 
     specs = compile_transition_hooks(
         (
-            on_transition(bad_state, to_state=RunState.FAILED, mode="rewrite"),
-            on_transition(not_decision, to_state=RunState.FAILED, mode="rewrite"),
+            on_transition(bad_state, to_state=RunState.FAILED),
+            on_transition(not_decision, to_state=RunState.FAILED),
         )
     )
     with caplog.at_level(logging.WARNING, logger="prefect_compat.hooks"):
-        decided = resolve_terminal_rewrite(
+        probe = resolve_terminal_rewrite(
             specs,
             TransitionContext(
                 kind="flow",
@@ -100,20 +98,18 @@ def test_illegal_rewrite_return_keeps_proposed(
                 to_state=RunState.FAILED,
             ),
         )
-    assert decided is None
+    assert probe.decision is None
     assert "illegal to_state" in caplog.text
-    assert "expected TransitionDecision" in caplog.text
+    assert "expected RunState or TransitionDecision" in caplog.text
 
 
 def test_rewrite_exception_keeps_proposed(caplog: pytest.LogCaptureFixture) -> None:
     def boom(ctx: TransitionContext) -> TransitionDecision:
         raise RuntimeError("rewrite oops")
 
-    specs = compile_transition_hooks(
-        (on_transition(boom, to_state=RunState.FAILED, mode="rewrite"),)
-    )
+    specs = compile_transition_hooks((on_transition(boom, to_state=RunState.FAILED),))
     with caplog.at_level(logging.ERROR, logger="prefect_compat.hooks"):
-        decided = resolve_terminal_rewrite(
+        probe = resolve_terminal_rewrite(
             specs,
             TransitionContext(
                 kind="flow",
@@ -122,21 +118,15 @@ def test_rewrite_exception_keeps_proposed(caplog: pytest.LogCaptureFixture) -> N
                 to_state=RunState.FAILED,
             ),
         )
-    assert decided is None
+    assert probe.decision is None
     assert "transition rewrite handler failed" in caplog.text
 
 
-def test_rewrite_handlers_do_not_run_as_observe() -> None:
-    seen: list[str] = []
-
-    def rewrite_fn(ctx: TransitionContext) -> TransitionDecision:
-        seen.append("rewrite")
-        return TransitionDecision(to_state=RunState.COMPLETED)
-
+def test_returning_runstate_rewrites() -> None:
     specs = compile_transition_hooks(
-        (on_transition(rewrite_fn, to_state=RunState.FAILED, mode="rewrite"),)
+        (on_transition(lambda _c: RunState.COMPLETED, to_state=RunState.FAILED),)
     )
-    dispatch_transition_hooks(
+    probe = resolve_terminal_rewrite(
         specs,
         TransitionContext(
             kind="flow",
@@ -145,7 +135,8 @@ def test_rewrite_handlers_do_not_run_as_observe() -> None:
             to_state=RunState.FAILED,
         ),
     )
-    assert seen == []
+    assert probe.decision is not None
+    assert probe.decision.to_state == RunState.COMPLETED
 
 
 def test_observe_sees_committed_edge_after_task_salvage(tmp_path) -> None:
@@ -167,7 +158,6 @@ def test_observe_sees_committed_edge_after_task_salvage(tmp_path) -> None:
                 salvage,
                 from_state=RunState.RUNNING,
                 to_state=RunState.FAILED,
-                mode="rewrite",
             ),
             on_transition(on_failed, to_state=RunState.FAILED),
             on_transition(on_completed, to_state=RunState.COMPLETED),
@@ -210,7 +200,6 @@ def test_task_demote_fails_wait_all_parent(tmp_path) -> None:
                 demote,
                 from_state=RunState.RUNNING,
                 to_state=RunState.COMPLETED,
-                mode="rewrite",
             )
         ]
     )
@@ -247,7 +236,6 @@ def test_flow_body_exception_salvage(tmp_path) -> None:
                 salvage,
                 from_state=RunState.RUNNING,
                 to_state=RunState.FAILED,
-                mode="rewrite",
             )
         ],
     )
@@ -276,7 +264,6 @@ def test_wait_all_child_fail_salvage(tmp_path) -> None:
                 salvage_flow,
                 from_state=RunState.RUNNING,
                 to_state=RunState.FAILED,
-                mode="rewrite",
             )
         ]
     )
@@ -324,7 +311,6 @@ def test_operator_cancel_does_not_consult_rewrite(tmp_path) -> None:
                 salvage_cancel,
                 from_state=RunState.RUNNING,
                 to_state=RunState.CANCELLED,
-                mode="rewrite",
             )
         ]
     )
@@ -339,7 +325,6 @@ def test_operator_cancel_does_not_consult_rewrite(tmp_path) -> None:
                 salvage_cancel,
                 from_state=RunState.RUNNING,
                 to_state=RunState.CANCELLED,
-                mode="rewrite",
             )
         ]
     )
@@ -381,7 +366,6 @@ def test_cache_hit_does_not_run_rewrite(tmp_path) -> None:
                 count_rewrite,
                 from_state=RunState.RUNNING,
                 to_state=RunState.COMPLETED,
-                mode="rewrite",
             )
         ],
     )

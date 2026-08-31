@@ -544,6 +544,7 @@ class TaskWrapper:
             from_state=RunState.RUNNING,
             proposed=RunState.COMPLETED,
             event_type="task_completed",
+            metadata={"task_name": self.name},
             result=result,
             fire_hooks=fire_hooks,
             allow_rewrite=bool(fire_hooks and running),

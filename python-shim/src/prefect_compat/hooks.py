@@ -13,7 +13,6 @@ from .runtime import RunState, SetStateResult, TaskRunRecord
 logger = logging.getLogger(__name__)
 
 TransitionKind = Literal["flow", "task"]
-TransitionHookMode = Literal["observe", "rewrite"]
 
 REWRITE_TERMINALS: frozenset[RunState] = frozenset(
     {RunState.COMPLETED, RunState.FAILED, RunState.CANCELLED}
@@ -52,7 +51,15 @@ class TransitionHookSpec:
     fn: Callable[[TransitionContext], Any]
     from_state: RunState | None = None
     to_state: RunState | None = None
-    mode: TransitionHookMode = "observe"
+
+
+@dataclass(frozen=True)
+class RewriteProbe:
+    """Result of a pre-commit rewrite scan (first legal returned state wins)."""
+
+    decision: TransitionDecision | None
+    invoked_ids: frozenset[int]
+    winner_id: int | None
 
 
 def on_transition(
@@ -60,19 +67,14 @@ def on_transition(
     *,
     from_state: RunState | None = None,
     to_state: RunState | None = None,
-    mode: TransitionHookMode = "observe",
 ) -> TransitionHookSpec:
     """Register ``fn`` for edges matching optional ``from_state`` / ``to_state``.
 
-    ``mode="observe"`` (default) runs after a successful commit; the return
-    value is ignored. ``mode="rewrite"`` runs before commit on proposed
-    ``RUNNING`` → terminal edges and may return a ``TransitionDecision``.
+    Returning ``None`` observes the committed edge (post-commit). Returning a
+    ``RunState`` or ``TransitionDecision`` on a proposed ``RUNNING`` → terminal
+    edge rewrites the destination before the FSM apply.
     """
-    if mode not in ("observe", "rewrite"):
-        raise ValueError(f"mode must be 'observe' or 'rewrite', got {mode!r}")
-    return TransitionHookSpec(
-        fn=fn, from_state=from_state, to_state=to_state, mode=mode
-    )
+    return TransitionHookSpec(fn=fn, from_state=from_state, to_state=to_state)
 
 
 def compile_transition_hooks(
@@ -84,13 +86,6 @@ def compile_transition_hooks(
     return tuple(specs)
 
 
-def has_rewrite_specs(specs: tuple[TransitionHookSpec, ...] | None) -> bool:
-    """True when at least one compiled spec is a pre-commit rewrite handler."""
-    if not specs:
-        return False
-    return any(spec.mode == "rewrite" for spec in specs)
-
-
 def _edge_matches(spec: TransitionHookSpec, ctx: TransitionContext) -> bool:
     from_ok = spec.from_state is None or spec.from_state == ctx.from_state
     to_ok = spec.to_state is None or spec.to_state == ctx.to_state
@@ -98,13 +93,21 @@ def _edge_matches(spec: TransitionHookSpec, ctx: TransitionContext) -> bool:
 
 
 def dispatch_transition_hooks(
-    specs: tuple[TransitionHookSpec, ...] | None, ctx: TransitionContext
+    specs: tuple[TransitionHookSpec, ...] | None,
+    ctx: TransitionContext,
+    *,
+    skip_ids: frozenset[int] | None = None,
 ) -> None:
-    """Run matching observe hooks in registration order. Exceptions are logged and swallowed."""
+    """Run matching hooks in registration order. Exceptions are logged and swallowed.
+
+    Return values are ignored (observe). Use ``resolve_terminal_rewrite`` for
+    pre-commit destination overrides.
+    """
     if not specs:
         return
+    skip = skip_ids or frozenset()
     for spec in specs:
-        if spec.mode != "observe":
+        if id(spec) in skip:
             continue
         if not _edge_matches(spec, ctx):
             continue
@@ -122,21 +125,22 @@ def dispatch_transition_hooks(
 
 def resolve_terminal_rewrite(
     specs: tuple[TransitionHookSpec, ...] | None, ctx: TransitionContext
-) -> TransitionDecision | None:
-    """First matching rewrite handler that returns a legal terminal decision wins.
+) -> RewriteProbe:
+    """Call matching hooks on the proposed edge; first legal returned state wins.
 
-    Handlers still match the original proposed edge (no cascade). Exceptions and
-    illegal returns are logged; those handlers are skipped.
+    Later specs are not called once a rewrite is chosen (no cascade). Exceptions
+    and illegal returns are logged and skipped.
     """
     if not specs:
-        return None
+        return RewriteProbe(decision=None, invoked_ids=frozenset(), winner_id=None)
     if ctx.from_state != RunState.RUNNING or ctx.to_state not in REWRITE_TERMINALS:
-        return None
+        return RewriteProbe(decision=None, invoked_ids=frozenset(), winner_id=None)
+    invoked: set[int] = set()
     for spec in specs:
-        if spec.mode != "rewrite":
-            continue
         if not _edge_matches(spec, ctx):
             continue
+        spec_id = id(spec)
+        invoked.add(spec_id)
         try:
             raw = spec.fn(ctx)
         except Exception:
@@ -153,17 +157,21 @@ def resolve_terminal_rewrite(
         decision = _normalize_rewrite_decision(raw, ctx)
         if decision is None:
             continue
-        return decision
-    return None
+        return RewriteProbe(
+            decision=decision, invoked_ids=frozenset(invoked), winner_id=spec_id
+        )
+    return RewriteProbe(decision=None, invoked_ids=frozenset(invoked), winner_id=None)
 
 
 def _normalize_rewrite_decision(
     raw: Any, ctx: TransitionContext
 ) -> TransitionDecision | None:
-    if not isinstance(raw, TransitionDecision):
+    if isinstance(raw, RunState):
+        raw = TransitionDecision(to_state=raw)
+    elif not isinstance(raw, TransitionDecision):
         logger.warning(
-            "transition rewrite ignored (expected TransitionDecision) kind=%s "
-            "flow_run_id=%s from=%s to=%s got=%s",
+            "transition rewrite ignored (expected RunState or TransitionDecision) "
+            "kind=%s flow_run_id=%s from=%s to=%s got=%s",
             ctx.kind,
             ctx.flow_run_id,
             ctx.from_state,
@@ -195,6 +203,7 @@ def emit_flow_transition(
     *,
     proposed_to_state: RunState | None = None,
     exception: BaseException | None = None,
+    skip_ids: frozenset[int] | None = None,
 ) -> None:
     if not specs:
         return
@@ -208,7 +217,7 @@ def emit_flow_transition(
         proposed_to_state=proposed_to_state,
         exception=exception,
     )
-    dispatch_transition_hooks(specs, ctx)
+    dispatch_transition_hooks(specs, ctx, skip_ids=skip_ids)
 
 
 def emit_flow_hooks_for_batch(
@@ -261,6 +270,7 @@ def emit_task_single_hook_edge(
     *,
     proposed_to_state: RunState | None = None,
     exception: BaseException | None = None,
+    skip_ids: frozenset[int] | None = None,
 ) -> None:
     ctx = TransitionContext(
         kind="task",
@@ -275,4 +285,4 @@ def emit_task_single_hook_edge(
         proposed_to_state=proposed_to_state,
         exception=exception,
     )
-    dispatch_transition_hooks(specs, ctx)
+    dispatch_transition_hooks(specs, ctx, skip_ids=skip_ids)

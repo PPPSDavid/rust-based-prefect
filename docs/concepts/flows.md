@@ -34,13 +34,11 @@ Step-by-step examples, UI notes, and choosing between the two: **[How to compose
 
 ## Transition hooks (IronFlow extension)
 
-Flows support **`transition_hooks`**: a sequence of **`TransitionHookSpec`** values built with **`on_transition(fn, from_state=..., to_state=..., mode=...)`**. Use **`None`** for `from_state` or `to_state` to match any state on that side.
+Flows support **`transition_hooks`**: a sequence of **`TransitionHookSpec`** values built with **`on_transition(fn, from_state=..., to_state=...)`**. Use **`None`** for `from_state` or `to_state` to match any state on that side.
 
-**Observe** (`mode="observe"`, default): run **after** a successful control-plane transition, **in process**, without holding the control-plane lock. Return values are ignored; exceptions are logged and do not change the run.
+If `fn` returns **None**, it only observes (notifications, logging). If it returns a **`RunState`** or **`TransitionDecision`** on a proposed **`RUNNING` → terminal** edge (`COMPLETED` / `FAILED` / `CANCELLED`), that return **rewrites** the destination **before** commit. The first legal returned state wins. Remaining `None`-return hooks then run on the **committed** edge. Operator cancel and process-kill paths ignore return values.
 
-**Rewrite** (`mode="rewrite"`): run **before** commit on proposed **`RUNNING` → terminal** edges (`COMPLETED` / `FAILED` / `CANCELLED`). Return a **`TransitionDecision`** to change the destination, or **`None`** to keep the proposal. The first legal decision wins. Observe hooks then fire on the **committed** edge only. Operator cancel and process-kill paths do not consult rewrite handlers.
-
-They are **not** the same API names as Prefect’s `on_running` / `on_failure` hooks; map notify logic to explicit **observe** edges (for example `PENDING` → `RUNNING`). Prefect 3 hooks cannot override destination state. For full semantics, see **[Compatibility matrix](../compatibility.md)**.
+They are **not** the same API names as Prefect’s `on_running` / `on_failure` hooks; map notify logic to explicit edges (for example `PENDING` → `RUNNING`). Prefect 3 hooks cannot override destination state. For full semantics, see **[Compatibility matrix](../compatibility.md)**.
 
 Relevant exports: `TransitionHookSpec`, `TransitionDecision`, `on_transition`, `TransitionContext`, `TransitionRewriteFailed` from `prefect_compat`.
 

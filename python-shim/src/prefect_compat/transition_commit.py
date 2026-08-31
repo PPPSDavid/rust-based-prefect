@@ -16,7 +16,6 @@ from .hooks import (
     TransitionHookSpec,
     emit_flow_transition,
     emit_task_single_hook_edge,
-    has_rewrite_specs,
     resolve_terminal_rewrite,
 )
 from .runtime import RunState, TaskRunRecord
@@ -80,15 +79,30 @@ def _task_event(proposed_event: str, proposed: RunState, committed: RunState) ->
     return _TASK_EVENT_FOR_STATE[committed]
 
 
+def _observe_skip_ids(
+    *, rewritten: bool, invoked_ids: frozenset[int], winner_id: int | None
+) -> frozenset[int]:
+    """Avoid double-calling hooks already invoked on the proposed edge.
+
+    After a rewrite, only skip the winning spec so observers of the committed
+    edge still run. With no rewrite, skip everyone already invoked (proposed
+    equals committed).
+    """
+    if rewritten:
+        return frozenset({winner_id} if winner_id is not None else ())
+    return invoked_ids
+
+
 def _resolve_decision(
     specs: tuple[TransitionHookSpec, ...] | None,
     ctx: TransitionContext,
     *,
     allow_rewrite: bool,
-) -> TransitionDecision | None:
-    if not allow_rewrite or not has_rewrite_specs(specs):
-        return None
-    return resolve_terminal_rewrite(specs, ctx)
+) -> tuple[TransitionDecision | None, frozenset[int], int | None]:
+    if not allow_rewrite or not specs:
+        return None, frozenset(), None
+    probe = resolve_terminal_rewrite(specs, ctx)
+    return probe.decision, probe.invoked_ids, probe.winner_id
 
 
 def commit_flow_terminal(
@@ -105,7 +119,7 @@ def commit_flow_terminal(
     allow_rewrite: bool = True,
 ) -> FlowTerminalOutcome:
     """Rewrite (optional) → ``set_flow_state`` once → observe the committed edge."""
-    decision = _resolve_decision(
+    decision, invoked_ids, winner_id = _resolve_decision(
         specs,
         TransitionContext(
             kind="flow",
@@ -141,6 +155,9 @@ def commit_flow_terminal(
             meta,
             proposed_to_state=proposed if rewritten else None,
             exception=exception,
+            skip_ids=_observe_skip_ids(
+                rewritten=rewritten, invoked_ids=invoked_ids, winner_id=winner_id
+            ),
         )
     return FlowTerminalOutcome(
         committed=committed,
@@ -167,7 +184,7 @@ def commit_task_terminal(
     persist_completed: Callable[[Any], dict[str, Any]] | None = None,
 ) -> TaskTerminalOutcome:
     """Rewrite (optional) → ``record_task_event`` once → observe the committed edge."""
-    decision = _resolve_decision(
+    decision, invoked_ids, winner_id = _resolve_decision(
         specs,
         TransitionContext(
             kind="task",
@@ -213,6 +230,9 @@ def commit_task_terminal(
             data,
             proposed_to_state=proposed if rewritten else None,
             exception=exception,
+            skip_ids=_observe_skip_ids(
+                rewritten=rewritten, invoked_ids=invoked_ids, winner_id=winner_id
+            ),
         )
     return TaskTerminalOutcome(
         committed=committed,
