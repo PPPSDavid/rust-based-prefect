@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 from .cancellation import FlowRunCancelled
 from .context import bind_flow_metadata, bind_task_run, bound_flow_parameters
 from .control_plane_registry import _require_control_plane, set_control_plane
-from .errors import FlowChildrenFailed
+from .errors import FlowChildrenFailed, TransitionRewriteFailed
 from .forecast_compile import _compile_forecast_for_flow, clear_forecast_cache
 from .graph_mode import (
     normalize_declared_graph_mode,
@@ -41,6 +41,12 @@ from .task_runners import (
     ProcessPoolTaskRunner,
     ThreadPoolTaskRunner,
     default_task_runner_from_env,
+)
+from .transition_commit import (
+    TaskTerminalOutcome,
+    commit_flow_terminal,
+    commit_task_terminal,
+    raise_for_unsuccessful_task_terminal,
 )
 
 # Reused when ``transition_hooks`` is set (avoids per-submit list literals on the hot path).
@@ -364,7 +370,7 @@ class TaskWrapper:
                 if st == RunState.CANCELLED:
                     return result
                 if st in (RunState.RUNNING, RunState.PENDING, None):
-                    self._finalize_completed_task(
+                    return self._finalize_completed_task(
                         task_run,
                         result,
                         cache_hit=False,
@@ -412,22 +418,16 @@ class TaskWrapper:
                 if st == RunState.CANCELLED:
                     raise
                 if st in (RunState.RUNNING, RunState.PENDING):
-                    _require_control_plane().record_task_event(
-                        task_run.task_run_id,
-                        "task_failed",
-                        {"task_name": self.name, "error": str(exc)},
+                    outcome = self._commit_task_failed(
+                        task_run, exc, st, input_fingerprint=input_fingerprint
                     )
-                    th = self._transition_hooks
-                    if th and st == RunState.RUNNING:
-                        emit_task_single_hook_edge(
-                            th,
-                            task_run,
-                            self.name,
-                            RunState.RUNNING,
-                            RunState.FAILED,
-                            "task_failed",
-                            {"task_name": self.name, "error": str(exc)},
-                        )
+                    if outcome.committed == RunState.COMPLETED:
+                        return outcome.result
+                    raise_for_unsuccessful_task_terminal(
+                        outcome,
+                        original_exc=exc,
+                        flow_run_id=task_run.flow_run_id,
+                    )
             raise
         finally:
             self._release_tag_leases(lease_ids or [])
@@ -471,7 +471,7 @@ class TaskWrapper:
             planned_node_id=task_run.planned_node_id,
         )
 
-    def _finalize_completed_task(
+    def _task_resume_payload(
         self,
         task_run: TaskRunRecord,
         result: Any,
@@ -479,15 +479,8 @@ class TaskWrapper:
         cache_hit: bool,
         map_index: int | None = None,
         input_fingerprint: str | None = None,
-        fire_hooks: bool = True,
-    ) -> None:
-        try:
-            st = _require_control_plane().get_task_run(task_run.task_run_id).state
-        except Exception:
-            st = None
-        if st == RunState.CANCELLED:
-            return
-        summary_extra = _require_control_plane().store_task_result_for_resume(
+    ) -> dict[str, Any]:
+        extra = _require_control_plane().store_task_result_for_resume(
             task_run.flow_run_id,
             task_run.task_run_id,
             self.name,
@@ -497,23 +490,74 @@ class TaskWrapper:
             map_index=map_index,
             input_fingerprint=input_fingerprint,
         )
-        data: dict[str, Any] = {"task_name": self.name, **summary_extra}
+        data: dict[str, Any] = {"task_name": self.name, **extra}
         if cache_hit:
             data["cache_hit"] = True
-        _require_control_plane().record_task_event(
-            task_run.task_run_id, "task_completed", data
+        return data
+
+    def _commit_task_failed(
+        self,
+        task_run: TaskRunRecord,
+        exc: BaseException,
+        st: RunState,
+        *,
+        input_fingerprint: str | None = None,
+    ) -> TaskTerminalOutcome:
+        running = st == RunState.RUNNING
+        return commit_task_terminal(
+            self._transition_hooks,
+            task_run,
+            self.name,
+            from_state=RunState.RUNNING if running else st,
+            proposed=RunState.FAILED,
+            event_type="task_failed",
+            metadata={"task_name": self.name, "error": str(exc)},
+            exception=exc,
+            fire_hooks=running,
+            allow_rewrite=running,
+            persist_completed=lambda value: self._task_resume_payload(
+                task_run, value, cache_hit=False, input_fingerprint=input_fingerprint
+            ),
         )
-        th = self._transition_hooks
-        if th and fire_hooks:
-            emit_task_single_hook_edge(
-                th,
+
+    def _finalize_completed_task(
+        self,
+        task_run: TaskRunRecord,
+        result: Any,
+        *,
+        cache_hit: bool,
+        map_index: int | None = None,
+        input_fingerprint: str | None = None,
+        fire_hooks: bool = True,
+    ) -> Any:
+        try:
+            st = _require_control_plane().get_task_run(task_run.task_run_id).state
+        except Exception:
+            st = None
+        if st == RunState.CANCELLED:
+            return result
+        running = st == RunState.RUNNING
+        outcome = commit_task_terminal(
+            self._transition_hooks,
+            task_run,
+            self.name,
+            from_state=RunState.RUNNING,
+            proposed=RunState.COMPLETED,
+            event_type="task_completed",
+            result=result,
+            fire_hooks=fire_hooks,
+            allow_rewrite=bool(fire_hooks and running),
+            persist_completed=lambda value: self._task_resume_payload(
                 task_run,
-                self.name,
-                RunState.RUNNING,
-                RunState.COMPLETED,
-                "task_completed",
-                data,
-            )
+                value,
+                cache_hit=cache_hit,
+                map_index=map_index,
+                input_fingerprint=input_fingerprint,
+            ),
+        )
+        if outcome.committed == RunState.COMPLETED:
+            return outcome.result
+        raise_for_unsuccessful_task_terminal(outcome, flow_run_id=task_run.flow_run_id)
 
     def map(
         self,
@@ -626,7 +670,7 @@ class TaskWrapper:
     ) -> list[TaskFuture[T]]:
         for (task_run, _v, index, input_fp), raw in zip(to_run, outs, strict=True):
             if task_run is not None:
-                self._finalize_completed_task(
+                raw = self._finalize_completed_task(
                     task_run,
                     raw,
                     cache_hit=False,
@@ -670,22 +714,7 @@ class TaskWrapper:
                 except Exception:
                     pass
                 continue
-            _require_control_plane().record_task_event(
-                task_run.task_run_id,
-                "task_failed",
-                {"task_name": self.name, "error": str(exc)},
-            )
-            th = self._transition_hooks
-            if th and st == RunState.RUNNING:
-                emit_task_single_hook_edge(
-                    th,
-                    task_run,
-                    self.name,
-                    RunState.RUNNING,
-                    RunState.FAILED,
-                    "task_failed",
-                    {"task_name": self.name, "error": str(exc)},
-                )
+            self._commit_task_failed(task_run, exc, st)
 
     def _run_tagged_map_body(self, task_run: TaskRunRecord | None, value: Any) -> Any:
         """Acquire tag slots, enter RUNNING, execute body, release slots."""
@@ -1125,7 +1154,7 @@ def flow(
                         raise
                     except FlowChildrenFailed:
                         raise
-                    except Exception:
+                    except Exception as exc:
                         current = _require_control_plane().get_flow(record.run_id)
                         if current.state == RunState.CANCELLED:
                             raise
@@ -1135,18 +1164,26 @@ def flow(
                             record.run_id
                         ):
                             raise
-                        prev = current.state
-                        failed = _require_control_plane().set_flow_state(
+                        failed = commit_flow_terminal(
+                            fh,
                             record.run_id,
-                            RunState.FAILED,
-                            uuid4(),
-                            "fail",
+                            from_state=current.state,
+                            proposed=RunState.FAILED,
+                            kind="fail",
                             expected_version=current.version,
+                            exception=exc,
+                            allow_rewrite=current.state == RunState.RUNNING,
                         )
-                        if fh and failed.status == "applied":
-                            emit_flow_transition(
-                                fh, record.run_id, prev, RunState.FAILED, "fail"
+                        if failed.committed == RunState.COMPLETED:
+                            _require_control_plane().set_flow_result(
+                                record.run_id, failed.result
                             )
+                            return failed.result
+                        if failed.committed == RunState.CANCELLED:
+                            raise FlowRunCancelled(
+                                f"flow run {record.run_id} cancelled by "
+                                "transition rewrite"
+                            ) from exc
                         raise
             finally:
                 _drain_submit_executor(submit_executor, submit_exec_token)
@@ -1182,16 +1219,28 @@ def _finalize_explicit(
         _require_control_plane().set_flow_result(flow_run_id, result)
         return
     prev = current.state
-    done = _require_control_plane().set_flow_state(
+    done = commit_flow_terminal(
+        fh,
         flow_run_id,
-        RunState.COMPLETED,
-        uuid4(),
-        "complete",
+        from_state=prev,
+        proposed=RunState.COMPLETED,
+        kind="complete",
         expected_version=current.version,
+        result=result,
+        allow_rewrite=prev == RunState.RUNNING,
     )
-    if fh and done.status == "applied":
-        emit_flow_transition(fh, flow_run_id, prev, RunState.COMPLETED, "complete")
-    _require_control_plane().set_flow_result(flow_run_id, result)
+    if done.committed == RunState.COMPLETED:
+        _require_control_plane().set_flow_result(flow_run_id, done.result)
+        return
+    if done.committed == RunState.CANCELLED:
+        raise FlowRunCancelled(
+            f"flow run {flow_run_id} cancelled by transition rewrite"
+        )
+    raise TransitionRewriteFailed(
+        "flow completed state rewritten to FAILED",
+        committed=done.committed.value,
+        proposed=RunState.COMPLETED.value,
+    )
 
 
 def _finalize_wait_all(
@@ -1213,44 +1262,50 @@ def _finalize_wait_all(
         _require_control_plane().set_flow_result(flow_run_id, result)
         return
 
-    if state_name == "COMPLETED":
-        done = _require_control_plane().set_flow_state(
-            flow_run_id,
-            RunState.COMPLETED,
-            uuid4(),
-            "complete",
-            expected_version=current.version,
-        )
-        if fh and done.status == "applied":
-            emit_flow_transition(fh, flow_run_id, prev, RunState.COMPLETED, "complete")
-        _require_control_plane().set_flow_result(flow_run_id, result)
+    try:
+        proposed = RunState(state_name)
+    except ValueError:
+        proposed = RunState.FAILED
+    if proposed not in {
+        RunState.COMPLETED,
+        RunState.FAILED,
+        RunState.CANCELLED,
+    }:
+        proposed = RunState.FAILED
+    if proposed == RunState.COMPLETED:
+        apply_kind = "complete"
+    elif proposed == RunState.CANCELLED:
+        apply_kind = "child_cancelled"
+    else:
+        apply_kind = kind
+    done = commit_flow_terminal(
+        fh,
+        flow_run_id,
+        from_state=prev,
+        proposed=proposed,
+        kind=apply_kind,
+        expected_version=current.version,
+        result=result,
+        allow_rewrite=prev == RunState.RUNNING,
+    )
+    stored = done.result if done.rewritten and done.result is not None else result
+    if done.committed == RunState.COMPLETED:
+        _require_control_plane().set_flow_result(flow_run_id, stored)
         return
 
-    if state_name == "CANCELLED":
-        cancelled = _require_control_plane().set_flow_state(
-            flow_run_id,
-            RunState.CANCELLED,
-            uuid4(),
-            "child_cancelled",
-            expected_version=current.version,
-        )
-        if fh and cancelled.status == "applied":
-            emit_flow_transition(
-                fh, flow_run_id, prev, RunState.CANCELLED, "child_cancelled"
-            )
+    if done.committed == RunState.CANCELLED:
         raise FlowRunCancelled(
             f"flow run {flow_run_id} cancelled because a child was cancelled"
+            if not done.rewritten
+            else f"flow run {flow_run_id} cancelled by transition rewrite"
         )
 
-    failed = _require_control_plane().set_flow_state(
-        flow_run_id,
-        RunState.FAILED,
-        uuid4(),
-        "child_failed",
-        expected_version=current.version,
-    )
-    if fh and failed.status == "applied":
-        emit_flow_transition(fh, flow_run_id, prev, RunState.FAILED, "child_failed")
+    if done.rewritten:
+        raise TransitionRewriteFailed(
+            "flow completed state rewritten to FAILED",
+            committed=done.committed.value,
+            proposed=RunState.COMPLETED.value,
+        )
     samples = resolved.get("sample_failures") or resolved.get("sample_incomplete") or []
     names = [
         str(s.get("task_name") or s.get("id")) for s in samples if isinstance(s, dict)

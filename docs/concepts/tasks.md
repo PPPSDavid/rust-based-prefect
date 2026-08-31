@@ -60,7 +60,7 @@ Fresh runs never auto-hit. Cache hits do not re-fire `transition_hooks`. This is
 
 ## Transition hooks
 
-Tasks accept the same **`transition_hooks`** mechanism as flows: **`TransitionHookSpec`** + **`on_transition`**, with optional **`from_state`** / **`to_state`** filters. See **[Flows](flows.md)** and the compatibility matrix for behavior and differences from Prefect’s hook names.
+Tasks accept the same **`transition_hooks`** mechanism as flows: **`TransitionHookSpec`** + **`on_transition`**, with optional **`from_state`** / **`to_state`** filters and **`mode="observe"|"rewrite"`**. Observe hooks run after commit; rewrite handlers may change a proposed `RUNNING`→terminal destination before the FSM apply. See **[Flows](flows.md)** and the compatibility matrix.
 
 ## Runtime context and logging
 

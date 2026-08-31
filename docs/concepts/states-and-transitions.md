@@ -50,4 +50,6 @@ Writes stay **single-writer** per control plane. Do not shard the FSM lock to ch
 
 ## Transition hooks
 
-User **`transition_hooks`** observe **successful** transitions **after** commit. Some start paths may emit **multiple** edges in quick succession (for example the batched `PENDING` / `RUNNING` path); see **[Compatibility matrix](../compatibility.md)** for hook ordering details.
+User **`transition_hooks`** default to **observe** mode: they see **successful** transitions **after** commit. Some start paths may emit **multiple** edges in quick succession (for example the batched `PENDING` / `RUNNING` path); see **[Compatibility matrix](../compatibility.md)** for hook ordering details.
+
+**Rewrite** handlers (`on_transition(..., mode="rewrite")`) run **before** commit and may return a **`TransitionDecision`** that changes a proposed **`RUNNING` → `{COMPLETED, FAILED, CANCELLED}`** destination. The engine still applies **one** legal edge; `FAILED→COMPLETED` after commit is impossible because terminals are strict. Observe hooks fire on the committed edge only (a salvage to `COMPLETED` does not also fire `to_state=FAILED` observers). Operator/user cancel does not consult rewrite handlers.

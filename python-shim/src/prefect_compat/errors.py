@@ -22,3 +22,18 @@ class FlowChildrenFailed(RuntimeError):
         self.resolved_state = resolved_state
         self.kind = kind
         self.details = details or {}
+
+
+class TransitionRewriteFailed(RuntimeError):
+    """Raised when a rewrite handler demotes a successful terminal to FAILED."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        committed: str | None = None,
+        proposed: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.committed = committed
+        self.proposed = proposed
