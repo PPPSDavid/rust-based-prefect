@@ -201,6 +201,58 @@ def pipeline() -> dict:
     assert upstream_node["node_id"] in downstream_node["deps"]
 
 
+def test_compile_gate_bound_variable_uses_gate_name():
+    source = """
+def f() -> None:
+    p = prep.submit()
+    g = gate(name="wait-barrier")
+    gf = g.submit(after=timedelta(seconds=0), wait_for=[p])
+    downstream.submit(wait_for=[gf])
+"""
+    graph, diagnostics = compile_flow_source(source, flow_name="f")
+    manifest = graph.as_manifest()
+    assert diagnostics.fallback_required is False
+    gate_nodes = [n for n in manifest["nodes"] if n.get("op_type") == "gate"]
+    assert len(gate_nodes) == 1
+    assert gate_nodes[0]["task_name"] == "gate:wait-barrier"
+
+
+def test_compile_deployment_ref_bound_variable():
+    source = """
+def parent_flow(x: int) -> int:
+    handle = deployment_ref("child-deploy")
+    fut = handle.submit(n=x)
+    return fut.result()
+"""
+    graph, diagnostics = compile_flow_source(source, flow_name="parent_flow")
+    manifest = graph.as_manifest()
+    assert diagnostics.fallback_required is False
+    assert len(manifest["nodes"]) == 1
+    assert manifest["nodes"][0]["task_name"] == "subflow:child-deploy"
+
+
+def test_compile_non_literal_deployment_ref_falls_back():
+    source = """
+def parent_flow() -> int:
+    return deployment_ref(CHILD_NAME).submit(k=1).result()
+"""
+    graph, diagnostics = compile_flow_source(source, flow_name="parent_flow")
+    assert diagnostics.fallback_required is True
+
+
+def test_compile_cast_submit_resolves_task_name():
+    source = """
+def flow_fn() -> int:
+    return cast(Any, bootstrap_task).submit().result()
+"""
+    graph, diagnostics = compile_flow_source(
+        source, flow_name="flow_fn", task_names={"bootstrap_task": "bootstrap_task"}
+    )
+    manifest = graph.as_manifest()
+    assert diagnostics.fallback_required is False
+    assert manifest["nodes"][0]["task_name"] == "bootstrap_task"
+
+
 def test_compile_map_in_list_comprehension_return():
     source = """
 def pipeline() -> list[int]:
