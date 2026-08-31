@@ -60,7 +60,11 @@ def test_retry_creates_new_flow_run_preserves_lineage(tmp_path: Path) -> None:
     run = plane.create_flow_run("lineage-test")
     plane.configure_flow_graph_mode(
         run.run_id,
-        resolve_graph_mode("auto", fallback_required=False, manifest={"nodes": [{"node_id": "n1", "task_name": "t", "deps": []}]}),
+        resolve_graph_mode(
+            "auto",
+            fallback_required=False,
+            manifest={"nodes": [{"node_id": "n1", "task_name": "t", "deps": []}]},
+        ),
     )
     second = plane.create_flow_run(
         "lineage-test",

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextvars
 import inspect
+import multiprocessing as mp
 import sys
 import textwrap
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -58,7 +59,12 @@ _FORECAST_BY_FLOW_FN: dict[int, dict[str, Any]] = {}
 
 T = TypeVar("T")
 
-_CONTROL_PLANE = InMemoryControlPlane()
+_CONTROL_PLANE: InMemoryControlPlane | None = None
+
+# Spawned process-pool workers import ``prefect_compat`` to unpickle task bodies.
+# Skip eager SQLite open in children so parallel map workers do not race the default DB.
+if mp.current_process().name == "MainProcess":
+    _CONTROL_PLANE = InMemoryControlPlane()
 
 _ACTIVE_TASK_RUNNER: contextvars.ContextVar[
     MapTaskRunner | ProcessPoolTaskRunner | None

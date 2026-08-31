@@ -125,8 +125,13 @@ def compile_flow_source(
             ):
                 var_name = stmt.targets[0].id
                 maybe = _extract_task_call(
-            call, bound_nodes, gate_symbols, gate_labels, subflow_symbols, name_lookup
-        )
+                    call,
+                    bound_nodes,
+                    gate_symbols,
+                    gate_labels,
+                    subflow_symbols,
+                    name_lookup,
+                )
                 if maybe is not None:
                     node_id = _ensure_task_node_from_call(call, {})
                     if node_id is not None:

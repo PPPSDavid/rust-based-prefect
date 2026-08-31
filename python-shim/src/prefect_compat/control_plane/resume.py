@@ -331,8 +331,7 @@ class ResumeMixin:
         if resume_lineage_id is None:
             return 1
         rows = self._query_rows(
-            "SELECT COUNT(*) AS c FROM flow_runs "
-            "WHERE id = ? OR resume_lineage_id = ?",
+            "SELECT COUNT(*) AS c FROM flow_runs WHERE id = ? OR resume_lineage_id = ?",
             [str(resume_lineage_id), str(resume_lineage_id)],
         )
         if not rows:
