@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 from uuid import UUID
 
-from .runtime import RunState
+from .runtime import RunState, SetStateResult, TaskRunRecord
 
 logger = logging.getLogger(__name__)
 
@@ -78,3 +78,86 @@ def dispatch_transition_hooks(
                 ctx.from_state,
                 ctx.to_state,
             )
+
+
+def emit_flow_transition(
+    specs: tuple[TransitionHookSpec, ...] | None,
+    flow_run_id: UUID,
+    from_state: RunState,
+    to_state: RunState,
+    transition_kind: str,
+    metadata: dict[str, Any] | None = None,
+) -> None:
+    if not specs:
+        return
+    ctx = TransitionContext(
+        kind="flow",
+        flow_run_id=flow_run_id,
+        from_state=from_state,
+        to_state=to_state,
+        transition_kind=transition_kind,
+        metadata=metadata,
+    )
+    dispatch_transition_hooks(specs, ctx)
+
+
+def emit_flow_hooks_for_batch(
+    specs: tuple[TransitionHookSpec, ...] | None,
+    flow_run_id: UUID,
+    initial_from: RunState,
+    transitions: list[tuple[RunState, UUID, str, int | None]],
+    results: list[SetStateResult],
+) -> None:
+    if not specs:
+        return
+    prev = initial_from
+    for (to_state, _tok, kind, _exp), res in zip(transitions, results, strict=True):
+        if res.status != "applied":
+            prev = res.state
+            continue
+        emit_flow_transition(specs, flow_run_id, prev, to_state, kind)
+        prev = res.state
+
+
+def emit_task_transition_edges(
+    specs: tuple[TransitionHookSpec, ...],
+    task_run: TaskRunRecord,
+    task_name: str,
+    edges: tuple[tuple[RunState, RunState, str, dict[str, Any] | None], ...],
+) -> None:
+    for from_state, to_state, event_type, meta in edges:
+        ctx = TransitionContext(
+            kind="task",
+            flow_run_id=task_run.flow_run_id,
+            from_state=from_state,
+            to_state=to_state,
+            event_type=event_type,
+            task_run_id=task_run.task_run_id,
+            task_name=task_name,
+            planned_node_id=task_run.planned_node_id,
+            metadata=meta,
+        )
+        dispatch_transition_hooks(specs, ctx)
+
+
+def emit_task_single_hook_edge(
+    specs: tuple[TransitionHookSpec, ...],
+    task_run: TaskRunRecord,
+    task_name: str,
+    from_state: RunState,
+    to_state: RunState,
+    event_type: str,
+    metadata: dict[str, Any] | None = None,
+) -> None:
+    ctx = TransitionContext(
+        kind="task",
+        flow_run_id=task_run.flow_run_id,
+        from_state=from_state,
+        to_state=to_state,
+        event_type=event_type,
+        task_run_id=task_run.task_run_id,
+        task_name=task_name,
+        planned_node_id=task_run.planned_node_id,
+        metadata=metadata,
+    )
+    dispatch_transition_hooks(specs, ctx)

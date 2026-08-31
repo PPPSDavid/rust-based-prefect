@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from .decorators import set_control_plane
+from .control_plane_registry import set_control_plane
 from .runtime import InMemoryControlPlane
 
 history_path = os.getenv("IRONFLOW_HISTORY_PATH")

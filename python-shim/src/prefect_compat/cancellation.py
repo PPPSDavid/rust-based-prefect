@@ -13,7 +13,7 @@ class FlowRunCancelled(RuntimeError):
 
 
 def _control_plane():
-    from .decorators import _require_control_plane
+    from .control_plane_registry import _require_control_plane
 
     return _require_control_plane()
 

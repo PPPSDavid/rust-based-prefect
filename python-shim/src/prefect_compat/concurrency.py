@@ -34,7 +34,7 @@ class ConcurrencyLimitError(RuntimeError):
 
 
 def _plane() -> InMemoryControlPlane:
-    from .decorators import _require_control_plane
+    from .control_plane_registry import _require_control_plane
 
     return _require_control_plane()
 
