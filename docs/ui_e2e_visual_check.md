@@ -87,3 +87,7 @@ Stop and restart API server, then refresh UI:
 - `http://localhost:4173/runs` should still show previously seeded runs
 
 This confirms persisted data is being picked up from local storage.
+
+## README screenshots
+
+Landing-page shots live in **`docs/assets/readme/`**: `ui-runs.png`, `ui-deployments.png`, `ui-run-dag.png` (still), plus a short DAG clip (`ui-run-dag.mp4` with `ui-run-dag.gif` fallback). Recapture them after major UI changes (same seed flow as above, ~1280px wide). The DAG clip should show **Aggregated fan-out** → **Task runs** → **Fit**.

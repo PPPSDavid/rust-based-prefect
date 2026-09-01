@@ -64,7 +64,7 @@ ironflow_events=15
 | `ironflow_result=26` | The flow returned **26**. The example uses `submit`, `map`, and `aggregate`: starting from `5`, it computes a small DAG and sums the mapped results (here \(12 + 14 = 26\)). |
 | `ironflow_events=15` | The in-memory control plane recorded **15** append-only events for this run (flow/task lifecycle transitions and related records). The exact count can vary slightly with version, but it should be **stable** for the same code and parameters. |
 
-Nothing listens on a port: orchestration runs **in-process**. If you set `IRONFLOW_HISTORY_PATH` to a file path before running, the same flow also **persists** history to that JSONL file (see the repository README for persistence defaults).
+Nothing listens on a port: orchestration runs **in-process**. If you set `IRONFLOW_HISTORY_PATH` to a file path before running, the same flow also **persists** history to that JSONL file (see [Environment variables](reference/env-vars.md) and [CONTRIBUTING.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/CONTRIBUTING.md) for persistence defaults).
 
 ## 4. What this proves
 
@@ -79,4 +79,4 @@ Nothing listens on a port: orchestration runs **in-process**. If you set `IRONFL
 - **[Prefect → IronFlow](PREFECT_IRONFLOW_MAPPING.md)** — map Prefect concepts to this project.
 - **[Compatibility](compatibility.md)** — what is supported vs not.
 - **[How to set up IronFlow](how-to/setup.md)** · **[How to run the server and UI](how-to/server-and-ui.md)** — optional stack beyond in-process runs.
-- **README** in the repo — optional HTTP API, UI, and `cargo build` for the Rust engine.
+- **[CONTRIBUTING.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/CONTRIBUTING.md)** — `cargo build`, tests, and contributor setup.

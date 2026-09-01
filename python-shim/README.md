@@ -39,6 +39,7 @@ Expect **`True`** when the wheel matched your platform. If **`False`**, set **`I
 
 ## Documentation
 
+- **Project landing (code sample + UI screenshots):** [repository README](https://github.com/PPPSDavid/rust-based-prefect#readme)
 - **User install & matrices:** [Installation](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/INSTALL.md)
 - **Hosted docs:** [https://pppsdavid.github.io/rust-based-prefect/](https://pppsdavid.github.io/rust-based-prefect/)
 - **Repository / issues:** [github.com/PPPSDavid/rust-based-prefect](https://github.com/PPPSDavid/rust-based-prefect)
