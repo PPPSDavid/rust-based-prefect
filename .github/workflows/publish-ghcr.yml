@@ -6,11 +6,14 @@
 name: Publish GHCR images
 
 on:
+  push:
+    tags:
+      - "v*.*.*"
   workflow_dispatch:
     inputs:
       version:
         description: "IronFlow version to install from PyPI (must match published wheel)"
-        required: true
+        required: false
         default: "0.3.0"
       push_float_tags:
         description: "Also push ironflow-server :0.3 and :latest float tags"
@@ -37,11 +40,27 @@ jobs:
       - name: Prepare dist/wheels stub for Dockerfile COPY
         run: mkdir -p dist/wheels
 
+      - name: Resolve release version
+        id: ver
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "push" ]; then
+            ver="${GITHUB_REF_NAME#v}"
+          else
+            ver="${{ inputs.version }}"
+          fi
+          if [ -z "$ver" ]; then
+            ver="$(tr -d '\r\n' < VERSION)"
+          fi
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          echo "Using IronFlow version: $ver"
+
       - name: Build and push images
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ steps.ver.outputs.version }}
           OWNER: pppsdavid
-          PUSH_FLOAT: ${{ inputs.push_float_tags }}
+          PUSH_FLOAT: ${{ github.event_name == 'push' && 'true' || inputs.push_float_tags }}
         run: |
           set -euo pipefail
           build_push() {
@@ -72,7 +91,7 @@ jobs:
 
       - name: Smoke server image (PyPI install)
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ steps.ver.outputs.version }}
           OWNER: pppsdavid
         run: |
           set -euo pipefail
