@@ -178,9 +178,11 @@ def test_bootstrap_native_check_passes_when_ironflow_lib_set_despite_native_fals
 
 def test_docs_reference_bootstrap_and_doctor():
     readme = Path("README.md").read_text(encoding="utf-8")
+    contributing = Path("CONTRIBUTING.md").read_text(encoding="utf-8")
     install = Path("docs/INSTALL.md").read_text(encoding="utf-8")
     hosted = Path("docs/SELF_HOSTED_SERVER.md").read_text(encoding="utf-8")
-    assert "python scripts/bootstrap.py" in readme
+    assert "CONTRIBUTING.md" in readme
+    assert "python scripts/bootstrap.py" in contributing
     assert "python scripts/bootstrap.py" in install
     assert "python scripts/bootstrap.py --native-check" in install
     assert "python scripts/ironflow_server.py doctor" in hosted
