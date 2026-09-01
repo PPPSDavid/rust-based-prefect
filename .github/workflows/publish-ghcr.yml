@@ -1,0 +1,93 @@
+# Build and push ironflow-server / services / worker images to GHCR from PyPI wheels.
+#
+# Run after ironflow-prefect-compat is published to PyPI for the target VERSION.
+# Actions → "Publish GHCR images" → Run workflow.
+
+name: Publish GHCR images
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "IronFlow version to install from PyPI (must match published wheel)"
+        required: true
+        default: "0.3.0"
+      push_float_tags:
+        description: "Also push ironflow-server :0.3 and :latest float tags"
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare dist/wheels stub for Dockerfile COPY
+        run: mkdir -p dist/wheels
+
+      - name: Build and push images
+        env:
+          VERSION: ${{ inputs.version }}
+          OWNER: pppsdavid
+          PUSH_FLOAT: ${{ inputs.push_float_tags }}
+        run: |
+          set -euo pipefail
+          build_push() {
+            local name="$1"
+            local file="$2"
+            local image="ghcr.io/${OWNER}/${name}"
+            docker build -f "$file" \
+              --build-arg IRONFLOW_VERSION="$VERSION" \
+              --build-arg INSTALL_MODE=pypi \
+              -t "${image}:${VERSION}" \
+              .
+            docker push "${image}:${VERSION}"
+            echo "Pushed ${image}:${VERSION}"
+          }
+
+          build_push ironflow-server deploy/docker/Dockerfile.server
+          build_push ironflow-services deploy/docker/Dockerfile.services
+          build_push ironflow-worker deploy/docker/Dockerfile.worker
+
+          if [ "$PUSH_FLOAT" = "true" ]; then
+            server="ghcr.io/${OWNER}/ironflow-server"
+            docker tag "${server}:${VERSION}" "${server}:0.3"
+            docker tag "${server}:${VERSION}" "${server}:latest"
+            docker push "${server}:0.3"
+            docker push "${server}:latest"
+            echo "Pushed ${server}:0.3 and ${server}:latest"
+          fi
+
+      - name: Smoke server image (PyPI install)
+        env:
+          VERSION: ${{ inputs.version }}
+          OWNER: pppsdavid
+        run: |
+          set -euo pipefail
+          IMAGE="ghcr.io/${OWNER}/ironflow-server:${VERSION}"
+          CONTAINER="ironflow-ghcr-smoke-$$"
+          docker run -d --name "$CONTAINER" -p 18080:8000 "$IMAGE"
+          for i in $(seq 1 30); do
+            if curl -fsS "http://127.0.0.1:18080/health" >/dev/null; then
+              echo "Health OK"
+              docker rm -f "$CONTAINER"
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs "$CONTAINER" || true
+          docker rm -f "$CONTAINER" || true
+          echo "Server health check failed" >&2
+          exit 1
