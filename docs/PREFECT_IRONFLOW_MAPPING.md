@@ -6,7 +6,7 @@ This project is **not** a drop-in replacement for Prefect Cloud or the full Pref
 
 | Prefect (typical mental model) | In IronFlow |
 | --- | --- |
-| Prefect engine / orchestrator (Python services, workers, …) | **Rust `rust-engine`** owns the deterministic state machine and durable history; Python proposes transitions and runs user task code. Build the `cdylib` and load it from the shim (see README). |
+| Prefect engine / orchestrator (Python services, workers, …) | **Rust `rust-engine`** owns the deterministic state machine and durable history; Python proposes transitions and runs user task code. Build the `cdylib` and load it from the shim (see [CONTRIBUTING.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/CONTRIBUTING.md)). |
 | `from prefect import flow, task` | `from prefect_compat import flow, task` (and `wait`, `set_control_plane`, etc.). Imports come from the **`prefect_compat`** package in this repo, not from `prefect`. |
 | Prefect orchestration / API server | Optional HTTP API in `prefect_compat.server` (e.g. `uvicorn python-shim.src.prefect_compat.server:app`). Start with `python scripts/ironflow_server.py start` or run flows **without** any server—orchestration works in-process. Guide: **[Self-hosted server](SELF_HOSTED_SERVER.md)**. |
 | Self-hosted Docker / Compose ([server-docker](https://docs.prefect.io/v3/how-to-guides/self-hosted/server-docker), [docker-compose](https://docs.prefect.io/v3/how-to-guides/self-hosted/docker-compose)) | **Subset:** single-container Tier A ([docker quickstart](how-to/docker-quickstart.md)); compose with Postgres + services + HTTP workers ([docker-compose](how-to/docker-compose.md)). Redis, multi-worker uvicorn, and compose UI image deferred. |
@@ -31,7 +31,7 @@ This project is **not** a drop-in replacement for Prefect Cloud or the full Pref
 | Task caching (`cache_policy`, …) | **Different model:** IronFlow **resume** skips DAG nodes on retry lineage (`None` auto; `@task(persist_result=True)` for JSON-safe values; param + input fingerprints). Not Prefect cache-policy parity. Guide: **[How to resume tasks and persist results](how-to/task-resume-and-persist.md)**. |
 | Blocks, integrations, secrets | **Deliberate park** for the MVP; many patterns are unsupported. Use env + optional Basic auth. |
 | State hooks (`on_running`, …) | IronFlow uses **`transition_hooks`** on `@flow` / `@task` with `TransitionHookSpec` / `on_transition`—see `COMPATIBILITY.md`. Returning `None` matches Prefect notify-style hooks. Returning a terminal `RunState` can rewrite a proposed `RUNNING`→terminal destination before commit (IronFlow extension; Prefect 3 hooks cannot do this). |
-| Event stream / observability | Local persistence (JSONL + SQLite) and optional API/SSE; see README **History persistence**. Automations on those events are not supported. |
+| Event stream / observability | Local persistence (JSONL + SQLite) and optional API/SSE; see [Environment variables](reference/env-vars.md). Automations on those events are not supported. |
 | Static DAG / compile-time insights | `static-planner/` analyzes `@flow` bodies (`submit`, `map`, `wait_for`, repeated tasks, `@task(name=...)`) and stores a per-run manifest + forecast. See **[DAG and forecast](concepts/dag-and-forecast.md)**. Dynamic regions fall back to runtime-inferred DAGs. |
 | Run DAG UI | Local UI **DAG** tab: **Aggregated fan-out** (planned graph, fan-out collapsed) vs **Task runs**; dependencies always left→right, parallel top→bottom; zoom/pan, search, path highlight. API: `mode=logical|expanded`. |
 | Graph mode / execution contract | **IronFlow extension:** `@flow(graph_mode="auto"|"static"|"dynamic")`; resume skips only when **effective=static** and manifest/parameters match. Prefect has no equivalent — all flows treated as potentially dynamic at retry. Guide: **[graph mode and retry](how-to/graph-mode-and-retry.md)**. |
@@ -61,7 +61,7 @@ Deep dive: **[State transition matrix](concepts/state-transition-matrix.md)**, *
 
 ## Practical “bring your own tasks” path
 
-1. **Clone** the repo, **checkout a [release tag](https://github.com/PPPSDavid/rust-based-prefect/releases)** (for example `v0.3.0`) when you want a stable baseline, then create the conda env from `environment.yml` (or install `requirements-ci.txt` in a venv). Alternatively install only `prefect_compat` with pip from git — see the root README *Using a numbered release*.
+1. **Clone** the repo, **checkout a [release tag](https://github.com/PPPSDavid/rust-based-prefect/releases)** (for example `v0.3.0`) when you want a stable baseline, then create the conda env from `environment.yml` (or install `requirements-ci.txt` in a venv). Alternatively install only `prefect_compat` with pip from git — see [Installation](INSTALL.md) §6.
 2. **Port imports**: replace `prefect` flow/task imports with `prefect_compat` (and wire `set_control_plane` / `InMemoryControlPlane` as in tests under `python-shim/tests/`).
 3. **Stay inside the subset**: prefer `submit` chains, `map` with clear static shape, **supported subflows** ([how-to](how-to/subflows.md)), and control-plane features listed in `COMPATIBILITY.md`.
 4. **Validate**: run `python -m pytest python-shim/tests` and your own scripts locally; add a small script under `scripts/` if you want a repeatable smoke test.

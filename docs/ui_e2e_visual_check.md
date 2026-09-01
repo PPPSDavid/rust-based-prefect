@@ -87,3 +87,16 @@ Stop and restart API server, then refresh UI:
 - `http://localhost:4173/runs` should still show previously seeded runs
 
 This confirms persisted data is being picked up from local storage.
+
+## README screenshots
+
+Landing-page shots live in **`docs/assets/readme/`**. Recapture after major UI changes (~1280–1440px wide). Prefer MP4 (`<video autoplay loop muted playsinline>`) with a GIF `<img>` fallback. Use motion only where a still cannot show the behavior.
+
+| Asset | What it must show | How to film |
+| --- | --- | --- |
+| `ui-run-dag.{mp4,gif}` | Sequential chain PENDING/RUNNING → COMPLETED | Trigger `cancelable_flow-local` with `sleep_duration` ≈ 4s, open **DAG**, Fit, wait until the **flow** header badge is COMPLETED (not the first task node). |
+| `ui-run-dag-fanout.{mp4,gif}` | Mapped children all RUNNING, then COMPLETED | Trigger `slow_wide_flow-local` with `{"n": 8}`, DAG tab → **Task runs**, Fit. Demo flow is in `FLOW_REGISTRY` only (not `BENCHMARK_FLOW_MAP` / default seed). |
+| `ui-dag-modes.{mp4,gif}` | Aggregated fan-out ↔ Task runs on the same completed wide run | Trigger `wide_flow-local` `{"n": 8}`, wait COMPLETED, toggle **Task runs** (many `dbl:` nodes) then **Aggregated fan-out** (`inc-0` → `dbl-0`). |
+| `ui-runs-live.{mp4,gif}` | New table row RUNNING → COMPLETED | Stay on `/runs`, trigger `cancelable_flow-local`. Keep `ui-runs.png` as a static table still. |
+| `ui-pause-terminate.{mp4,gif}` | RUNNING → PAUSED; sleep CANCELLED; downstream NOT_REACHABLE | Trigger `cancelable_flow-local` with a long `sleep_duration`, DAG tab, click **Pause (terminate)** while `sleep_seconds` is RUNNING. |
+| `ui-deployments.png`, `ui-run-dag.png` | Stills (deployments table; completed wide DAG) | Screenshot only. |

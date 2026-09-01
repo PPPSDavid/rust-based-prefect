@@ -43,6 +43,12 @@ Use when you want a **hard brake**.
 3. Registered process workers are SIGTERM→SIGKILL’d (same as cancel).
 4. Flow holds `PAUSED`.
 
+In the UI the DAG shows the in-flight node **CANCELLED** and downstream work **NOT_REACHABLE** (a still of the final `PAUSED` badge does not show that transition):
+
+<video src="../assets/readme/ui-pause-terminate.mp4" width="900" autoplay loop muted playsinline>
+  <img alt="Pause terminate: sleep_seconds goes from RUNNING to CANCELLED, dbl becomes NOT_REACHABLE, flow badge PAUSED" src="../assets/readme/ui-pause-terminate.gif" width="900">
+</video>
+
 ### Resume after terminate
 
 | Path | Behavior |

@@ -55,7 +55,7 @@ Attach `docker pull ghcr.io/pppsdavid/ironflow-server:vX.Y.Z` to GitHub Release 
 
 Consumers should take artifacts from [**GitHub Releases**](https://github.com/PPPSDavid/rust-based-prefect/releases), not from unlabeled `main` snapshots, when they need a reproducible version.
 
-1. **Full stack:** clone the repository and `git checkout vX.Y.Z`, then use **`uv sync --group dev`** (preferred) or `environment.yml` / `requirements-ci.txt`, and run from the repo root — including **`rust-engine`** (see README `cargo build`), benchmarks, `scripts/`, and optional UI as in the root `README.md`.
+1. **Full stack:** clone the repository and `git checkout vX.Y.Z`, then use **`uv sync --group dev`** (preferred) or `environment.yml` / `requirements-ci.txt`, and run from the repo root — including **`rust-engine`** (`cargo build`), benchmarks, `scripts/`, and optional UI as in **`CONTRIBUTING.md`**.
 2. **Python packages only:** install from **PyPI** when published (`pip install ironflow-prefect-compat`), or from git, for example:
    - `pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@vX.Y.Z#subdirectory=python-shim"`
    - optional: `#subdirectory=static-planner` for `ironflow-static-planner`.

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from prefect_compat.flow_registry import FLOW_REGISTRY
+from prefect_compat.flow_registry import BENCHMARK_FLOW_MAP, FLOW_REGISTRY
 from prefect_compat.worker import resolve_flow_callable
 
 WORKER_SRC = (
@@ -16,6 +16,9 @@ def test_registry_includes_demo_flows() -> None:
     assert "simple_flow" in FLOW_REGISTRY
     assert "failing_flow" in FLOW_REGISTRY
     assert "persist_result_demo" in FLOW_REGISTRY
+    assert "cancelable_flow" in FLOW_REGISTRY
+    assert "slow_wide_flow" in FLOW_REGISTRY
+    assert "slow_wide_flow" not in BENCHMARK_FLOW_MAP
 
 
 def test_resolve_flow_callable_default_registry() -> None:

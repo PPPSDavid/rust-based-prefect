@@ -1,6 +1,10 @@
 # Project IronFlow
 
-**IronFlow** is a **Rust-first** orchestration system with **Prefect-style** Python authoring (`prefect_compat`): you write `@flow` / `@task` flows in Python; the **control plane and durable history** live in the Rust engine. An optional HTTP API and web UI help you inspect runs.
+Prefect-style `@flow` / `@task` workflows in Python, with a **Rust** orchestration kernel for deterministic state and durable history. Write flows the way you already know; IronFlow runs them **in-process** (no server required) and optionally serves a local API and UI so you can inspect runs, logs, and DAGs.
+
+> **Subset, not a drop-in.** Import **`prefect_compat`**, not `prefect`. See the [compatibility matrix](compatibility.md) for what is supported vs Prefect OSS 3.x.
+
+<img alt="IronFlow run detail DAG tab showing a completed wide_flow with mapped task-run fan-out" src="assets/readme/ui-run-dag.png" width="900">
 
 ## Choose your path
 
@@ -30,7 +34,7 @@
 2. **[Quick start (demo flow)](QUICKSTART_DEMO.md)** — bundled `flow_ironflow.py` example.
 3. **[How to run the server and UI](how-to/server-and-ui.md)** — optional API + Vite UI.
 
-For performance expectations, see **[Performance (vs Prefect)](PERFORMANCE_OVERVIEW.md)**. The repository **README** has the full command reference (tests, benchmarks).
+For performance expectations, see **[Performance (vs Prefect)](PERFORMANCE_OVERVIEW.md)**. Clone, tests, lint, and benchmarks: repository **[CONTRIBUTING.md](https://github.com/PPPSDavid/rust-based-prefect/blob/main/CONTRIBUTING.md)**.
 
 ## AI assistants and agents
 

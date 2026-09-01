@@ -207,7 +207,7 @@ python -m pip install "git+https://github.com/PPPSDavid/rust-based-prefect.git@v
 
 ## 7. Optional: API and UI
 
-After the above, you can start the bundled HTTP server and UI — see **[How to run the server and UI](how-to/server-and-ui.md)** or the repository **README** (`scripts/ironflow_server.py`, `uvicorn`, and `frontend/`). These are optional for running flows in-process.
+After the above, you can start the bundled HTTP server and UI — see **[How to run the server and UI](how-to/server-and-ui.md)** (`scripts/ironflow_server.py`, `uvicorn`, and `frontend/`). These are optional for running flows in-process.
 
 ## See also
 

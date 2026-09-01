@@ -103,6 +103,21 @@ def cancelable_flow(n: int, sleep_duration: float = 10.0) -> int:
     return second.result()
 
 
+@task
+def slow_dbl(x: int) -> int:
+    sleep_cancelable(2.2)
+    return x * 2
+
+
+@flow(task_runner=ThreadPoolTaskRunner())
+def slow_wide_flow(n: int = 8) -> int:
+    """UI demo: mapped fan-out stays RUNNING long enough to film live DAG updates."""
+    first = inc.submit(n)
+    mapped_futs = slow_dbl.map(range(n), wait_for=[first])
+    wait(mapped_futs)
+    return sum(f.result() for f in mapped_futs)
+
+
 @flow
 def failing_flow(n: int) -> int:
     first = inc.submit(n)
@@ -179,6 +194,7 @@ FLOW_REGISTRY = {
     "chained_flow": chained_flow,
     "failing_flow": failing_flow,
     "cancelable_flow": cancelable_flow,
+    "slow_wide_flow": slow_wide_flow,
     "gated_flow": gated_flow,
     "wait_all_ok_flow": wait_all_ok_flow,
     "wait_all_orphan_fail_flow": wait_all_orphan_fail_flow,

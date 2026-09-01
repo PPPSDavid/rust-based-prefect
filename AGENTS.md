@@ -266,7 +266,7 @@ and was how the original snapshot was made; repo `environment.json` overrides it
 when present.
 
 After setup, you should not need to reinstall anything to run tests or the app.
-Standard commands live in `README.md` (Quickstart) and **Expected Validation** above.
+Standard commands live in `CONTRIBUTING.md` (checkout, tests, lint, docs) and **Expected Validation** above. The root `README.md` is the user-facing landing page.
 
 Non-obvious caveats for this environment:
 

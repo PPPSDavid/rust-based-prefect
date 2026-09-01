@@ -19,7 +19,11 @@ The UI exposes two views. API query parameter names are unchanged (`mode=logical
 | **Aggregated fan-out** | `logical` | **Planned graph** from the static forecast. **One node per forecast step**; `map()` fan-out is **collapsed** into a single node. Repeated `submit` calls appear as separate planned steps (`task-0`, `task-1`, …). |
 | **Task runs** | `expanded` | **One node per task execution** — every mapped child, every submit invocation, with run id suffix on the label. |
 
-Use **Aggregated fan-out** to understand structure; use **Task runs** to debug individual executions at scale (with zoom, pan, and search).
+Use **Aggregated fan-out** to understand structure; use **Task runs** to debug individual executions at scale (with zoom, pan, and search). Toggle the same completed `wide_flow` (`n=8`) to see `map()` collapse and expand:
+
+<video src="../assets/readme/ui-dag-modes.mp4" width="900" autoplay loop muted playsinline>
+  <img alt="DAG toolbar toggling Task runs (one node per mapped child) and Aggregated fan-out (one planned dbl node)" src="../assets/readme/ui-dag-modes.gif" width="900">
+</video>
 
 ## Static forecast (`static-planner/`)
 
@@ -41,6 +45,18 @@ When analysis cannot see the shape (dynamic `range(n)`, `if` branches, tasks not
 ## Run detail → DAG tab
 
 Open any flow run → **DAG** tab.
+
+**Sequential run** — a chain updates in place (`inc` → `sleep_seconds` → `dbl`):
+
+<video src="../assets/readme/ui-run-dag.mp4" width="900" autoplay loop muted playsinline>
+  <img alt="Live DAG: tasks move from RUNNING to COMPLETED left to right" src="../assets/readme/ui-run-dag.gif" width="900">
+</video>
+
+**Mapped fan-out** — Task runs view, several `slow_dbl` children RUNNING together after `inc`:
+
+<video src="../assets/readme/ui-run-dag-fanout.mp4" width="900" autoplay loop muted playsinline>
+  <img alt="Live DAG fan-out: mapped slow_dbl tasks run in parallel then complete" src="../assets/readme/ui-run-dag-fanout.gif" width="900">
+</video>
 
 | Control | Behavior |
 | --- | --- |
