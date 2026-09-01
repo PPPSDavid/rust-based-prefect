@@ -72,11 +72,23 @@ python scripts/ironflow_server.py start
 python scripts/ui_e2e_seed.py
 ```
 
+**Sequential DAG** — nodes move PENDING → RUNNING → COMPLETED left to right.
+
 <video src="docs/assets/readme/ui-run-dag.mp4" width="900" autoplay loop muted playsinline>
   <img alt="IronFlow run DAG updating live: inc completes, sleep_seconds runs, then dbl completes and the flow turns COMPLETED" src="docs/assets/readme/ui-run-dag.gif" width="900">
 </video>
 
-<img alt="IronFlow Flow Runs page with state badges and a table of completed and failed runs" src="docs/assets/readme/ui-runs.png" width="900">
+**Mapped fan-out** — after `inc` completes, mapped children run in parallel (not a completed still).
+
+<video src="docs/assets/readme/ui-run-dag-fanout.mp4" width="900" autoplay loop muted playsinline>
+  <img alt="IronFlow DAG Task runs view: inc completed, several slow_dbl mapped tasks RUNNING in parallel, then the fan-out and flow COMPLETED" src="docs/assets/readme/ui-run-dag-fanout.gif" width="900">
+</video>
+
+**Flow runs list** — a new row appears RUNNING, then settles COMPLETED.
+
+<video src="docs/assets/readme/ui-runs-live.mp4" width="900" autoplay loop muted playsinline>
+  <img alt="IronFlow Flow Runs table: a cancelable_flow row appears with a RUNNING badge, then turns COMPLETED" src="docs/assets/readme/ui-runs-live.gif" width="900">
+</video>
 
 <img alt="IronFlow Deployments page listing seeded deployments with Quick Run" src="docs/assets/readme/ui-deployments.png" width="900">
 

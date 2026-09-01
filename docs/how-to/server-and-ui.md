@@ -38,4 +38,4 @@ For deployment lifecycle operations (create/update/trigger) and schedule example
 
 Use **[Optional: verify the web UI](../ui_e2e_visual_check.md)** for a quick visual smoke check once services are up.
 
-README screenshots and the DAG clip live in `docs/assets/readme/`; recapture them after major UI changes.
+README screenshots and UI clips live in `docs/assets/readme/` (sequential DAG, mapped fan-out, runs-list live, DAG mode toggle, pause-terminate). Recapture notes: **[Optional: verify the web UI](../ui_e2e_visual_check.md)** § README screenshots.
