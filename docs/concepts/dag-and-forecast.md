@@ -42,6 +42,10 @@ When analysis cannot see the shape (dynamic `range(n)`, `if` branches, tasks not
 
 Open any flow run → **DAG** tab.
 
+<video src="../assets/readme/ui-run-dag.mp4" width="900" autoplay loop muted playsinline>
+  <img alt="Live DAG: tasks move from RUNNING to COMPLETED left to right" src="../assets/readme/ui-run-dag.gif" width="900">
+</video>
+
 | Control | Behavior |
 | --- | --- |
 | **Aggregated fan-out** | Planned graph; `map()` fan-out collapsed |

@@ -90,4 +90,4 @@ This confirms persisted data is being picked up from local storage.
 
 ## README screenshots
 
-Landing-page shots live in **`docs/assets/readme/`**: `ui-runs.png`, `ui-deployments.png`, `ui-run-dag.png` (still), plus a short DAG clip (`ui-run-dag.mp4` with `ui-run-dag.gif` fallback). Recapture them after major UI changes (same seed flow as above, ~1280px wide). The DAG clip should show **Aggregated fan-out** → **Task runs** → **Fit**.
+Landing-page shots live in **`docs/assets/readme/`**: `ui-runs.png`, `ui-deployments.png`, `ui-run-dag.png` (wide fan-out still), plus a live DAG clip (`ui-run-dag.mp4` with `ui-run-dag.gif` fallback). Recapture after major UI changes (~1280px wide). The DAG clip should show a **running** flow whose nodes move PENDING/RUNNING → COMPLETED (trigger `cancelable_flow-local` with `sleep_duration` around 4s, open the run DAG tab, Fit).

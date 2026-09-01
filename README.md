@@ -73,7 +73,7 @@ python scripts/ui_e2e_seed.py
 ```
 
 <video src="docs/assets/readme/ui-run-dag.mp4" width="900" autoplay loop muted playsinline>
-  <img alt="IronFlow run DAG: switch between aggregated fan-out and per-task-run view, then Fit" src="docs/assets/readme/ui-run-dag.gif" width="900">
+  <img alt="IronFlow run DAG updating live: inc completes, sleep_seconds runs, then dbl completes and the flow turns COMPLETED" src="docs/assets/readme/ui-run-dag.gif" width="900">
 </video>
 
 <img alt="IronFlow Flow Runs page with state badges and a table of completed and failed runs" src="docs/assets/readme/ui-runs.png" width="900">
