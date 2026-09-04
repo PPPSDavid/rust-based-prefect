@@ -8,7 +8,7 @@ All notable changes to this project are documented here. Version numbers follow 
 
 - **CPython 3.13 and 3.14 GIL wheels** on the same platforms as 3.11/3.12 (Linux x86_64 + aarch64, Windows, macOS). `requires-python` stays `>=3.11`.
 - **`scripts/check_python_support_matrix.py`:** CI fails when a still-supported CPython minor matching `requires-python` is missing from test/wheel matrices (endoflife.date + `scripts/python_support_snapshot.json` fallback).
-- **Experimental CPython 3.14t:** non-blocking CI job and optional TestPyPI Linux `cp314t` wheel (`include_freethreaded`); not uploaded to production PyPI. CPU-bound `ThreadPoolTaskRunner` microbench preset `cpu_task`.
+- **Experimental CPython 3.14t:** non-blocking CI job and optional TestPyPI Linux `cp314t` wheel (`include_freethreaded`); not uploaded to production PyPI. CPU-bound `ThreadPoolTaskRunner` microbench preset `cpu_task`. The 3.14t job skips `psycopg-binary` (no `cp314t` wheel).
 
 ## [0.3.0] — 2026-08-30
 

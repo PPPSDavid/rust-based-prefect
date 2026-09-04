@@ -95,12 +95,18 @@ jobs:
         with:
           enable-cache: true
       - name: Sync Python deps
-        run: uv sync --frozen --group dev --python 3.14t
+        # psycopg-binary has GIL cp314 wheels only (no cp314t tag, no sdist).
+        # This job does not run Postgres tests; skip the binary extra.
+        run: >
+          uv sync --frozen --group dev --python 3.14t
+          --no-install-package psycopg-binary
       - uses: dtolnay/rust-toolchain@stable
       - name: Python tests
-        run: uv run --python 3.14t pytest python-shim/tests static-planner/tests benchmarks/tests
+        run: >
+          uv run --no-sync --python 3.14t
+          pytest python-shim/tests static-planner/tests benchmarks/tests
       - name: Airtight concurrency invariants
-        run: uv run --python 3.14t pytest -m airtight
+        run: uv run --no-sync --python 3.14t pytest -m airtight
       - name: Install packaging tools
         run: |
           sudo apt-get update

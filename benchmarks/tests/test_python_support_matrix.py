@@ -90,3 +90,10 @@ def test_require_freethreaded_on_repo() -> None:
     mod = _load_module()
     rc = mod.main(["--offline", "--root", str(ROOT), "--require-freethreaded", "3.14"])
     assert rc == 0
+
+
+def test_freethread_job_skips_psycopg_binary() -> None:
+    text = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    job = text.split("python-rust-freethread:", 1)[1].split("\n  python-rust-postgres:", 1)[0]
+    assert "--no-install-package psycopg-binary" in job
+    assert "uv run --no-sync --python 3.14t" in job

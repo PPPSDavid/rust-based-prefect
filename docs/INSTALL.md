@@ -77,6 +77,8 @@ uv pip install --index-url https://test.pypi.org/simple/ \
   --extra-index-url https://pypi.org/simple/ ironflow-prefect-compat
 ```
 
+A full checkout `uv sync --frozen --group dev --python 3.14t` needs `--no-install-package psycopg-binary` because that extra has no `cp314t` wheel. Docker/self-hosted Postgres still uses `psycopg[binary]` on GIL 3.12; this experimental job is not that path.
+
 The bundled `ironflow_engine` cdylib does not link `libpython`; GIL and free-threaded wheels share that native build and differ by wheel tag. **Hard cancel / terminate-pause** still requires `ProcessPoolTaskRunner`. CPU-bound `ThreadPoolTaskRunner` overlap on 3.14t is experimental — see [How to choose a task runner](how-to/choose-task-runners.md) and `perf_matrix.py --preset cpu_task`.
 
 Other Python versions may install from **sdist** or need a **source build**; check PyPI “Download files” or use a full checkout + `cargo build`.
