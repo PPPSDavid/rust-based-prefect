@@ -10,16 +10,16 @@ Common issues when installing IronFlow, running flows, or operating the self-hos
 
 **Checks:**
 
-1. Confirm Python **3.11** or **3.12** on a [supported platform](../INSTALL.md) (wheels bundle the Rust engine).
+1. Confirm Python **3.11–3.14** on a [supported platform](../INSTALL.md) (wheels bundle the Rust engine).
 2. Reinstall: `python -m pip install --upgrade --force-reinstall ironflow-prefect-compat`
 3. If you built from source, run `cargo build --manifest-path rust-engine/Cargo.toml` and set `IRONFLOW_RUST_LIB` to the `cdylib` path.
 4. See [Environment variables](env-vars.md) for `IRONFLOW_RUST_LIB` and `IRONFLOW_USE_RUST_FSM`.
 
 ### `pip` installs sdist and fails (needs Rust)
 
-**Cause:** No prebuilt wheel for your Python version or platform (e.g. CPython 3.13+).
+**Cause:** No prebuilt wheel for your Python version or platform (e.g. CPython 3.15+, or free-threaded 3.14t on production PyPI).
 
-**Fix:** Use Python 3.11 or 3.12, or clone the repo and build `rust-engine` before installing.
+**Fix:** Use CPython **3.11–3.14** (GIL build), or clone the repo and build `rust-engine` before installing. For experimental **3.14t**, use TestPyPI / CI artifacts as in [Installation](../INSTALL.md).
 
 ### `ironflow: command not found`
 

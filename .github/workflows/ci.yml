@@ -55,6 +55,8 @@ jobs:
           python-version: "3.11"
       - name: Check VERSION matches artifacts
         run: python scripts/check_version_sync.py
+      - name: Check CPython support matrix
+        run: python scripts/check_python_support_matrix.py --require-freethreaded 3.14
 
   python-rust:
     name: Python + Rust tests (py${{ matrix.python-version }})
@@ -62,7 +64,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -79,6 +81,61 @@ jobs:
         run: uv run --python ${{ matrix.python-version }} pytest -m airtight
       - name: Rust tests
         run: cargo test --manifest-path rust-engine/Cargo.toml
+
+  python-rust-freethread:
+    name: Python 3.14t experimental (non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14t"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Sync Python deps
+        # psycopg-binary has GIL cp314 wheels only (no cp314t tag, no sdist).
+        # This job does not run Postgres tests; skip the binary extra.
+        run: >
+          uv sync --frozen --group dev --python 3.14t
+          --no-install-package psycopg-binary
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Python tests
+        run: >
+          uv run --no-sync --python 3.14t
+          pytest python-shim/tests static-planner/tests benchmarks/tests
+      - name: Airtight concurrency invariants
+        run: uv run --no-sync --python 3.14t pytest -m airtight
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y patchelf
+          python -m pip install --upgrade pip
+          python -m pip install build auditwheel
+      - name: Build Linux cp314t wheel
+        working-directory: python-shim
+        run: python -m build --wheel
+      - name: Auditwheel repair
+        working-directory: python-shim
+        shell: bash
+        run: |
+          mkdir -p wheelhouse
+          shopt -s nullglob
+          for f in dist/*.whl; do
+            auditwheel repair "$f" -w wheelhouse || cp "$f" wheelhouse/
+          done
+      - name: Smoke install wheel on 3.14t
+        shell: bash
+        run: |
+          python -m venv /tmp/ifwh-ft
+          . /tmp/ifwh-ft/bin/activate
+          pip install python-shim/wheelhouse/*.whl
+          python -c "from prefect_compat.rust_bridge import native_library_available as n; assert n(); print('native ok', __import__('sys').abiflags)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ironflow-prefect-compat-wheel-linux-3.14t
+          path: python-shim/wheelhouse/*.whl
 
   python-rust-postgres:
     name: Python + Postgres (B1)
@@ -124,7 +181,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -182,7 +239,7 @@ jobs:
           "${RUNNER_TEMP}/if-aarch64-venv/bin/pip" install cibuildwheel
       - name: Build aarch64 wheel (python-shim via cibuildwheel)
         env:
-          CIBW_BUILD: "cp311-* cp312-*"
+          CIBW_BUILD: "cp311-* cp312-* cp313-* cp314-*"
           CIBW_ARCHS_LINUX: "aarch64"
           CIBW_SKIP: "*musllinux*"
           CIBW_BEFORE_ALL_LINUX: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal && ln -sf /root/.cargo/bin/cargo /usr/local/bin/cargo && ln -sf /root/.cargo/bin/rustc /usr/local/bin/rustc"
@@ -194,6 +251,8 @@ jobs:
           ls -la python-shim/wheelhouse/
           ls python-shim/wheelhouse/*cp311*aarch64*.whl
           ls python-shim/wheelhouse/*cp312*aarch64*.whl
+          ls python-shim/wheelhouse/*cp313*aarch64*.whl
+          ls python-shim/wheelhouse/*cp314*aarch64*.whl
       - uses: actions/upload-artifact@v4
         with:
           name: ironflow-prefect-compat-wheel-linux-aarch64
@@ -205,7 +264,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -246,7 +305,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

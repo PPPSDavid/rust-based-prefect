@@ -22,7 +22,7 @@ Write flows the way you already know. IronFlow runs them **in-process** (no serv
 
 ## Install
 
-The published package is **[`ironflow-prefect-compat`](https://pypi.org/project/ironflow-prefect-compat/)**. On supported platforms, **prebuilt wheels include the Rust engine** — no Rust toolchain required. Use **CPython 3.11 or 3.12**.
+The published package is **[`ironflow-prefect-compat`](https://pypi.org/project/ironflow-prefect-compat/)**. On supported platforms, **prebuilt wheels include the Rust engine** — no Rust toolchain required. Use **CPython 3.11–3.14**.
 
 ```bash
 pip install ironflow-prefect-compat

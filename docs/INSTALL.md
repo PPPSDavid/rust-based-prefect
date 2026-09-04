@@ -5,7 +5,7 @@
     python -m pip install --upgrade pip
     python -m pip install ironflow-prefect-compat
     ```
-    Requires **CPython 3.11 or 3.12** (see wheel platform table below). Then run the [Quick start: PyPI](QUICKSTART_PYPI.md) (no clone) or [Quickstart: first deployment](quickstart-first-deployment.md).
+    Requires **CPython 3.11–3.14** (see wheel platform table below). Then run the [Quick start: PyPI](QUICKSTART_PYPI.md) (no clone) or [Quickstart: first deployment](quickstart-first-deployment.md).
 
 **Primary path:** install **`ironflow-prefect-compat`** from **PyPI** with **`pip`** or **`uv`** — the same workflow as other wheel-published Python packages. On supported platforms, **prebuilt wheels bundle** the Rust **`ironflow_engine`** library under `prefect_compat/native/`; you **do not** need a Rust toolchain for those wheels.
 
@@ -16,7 +16,7 @@
 | Requirement | Notes |
 | --- | --- |
 | **Git** | To clone and update the repository (source / git-install paths). |
-| **Python 3.11+** | PyPI ships **wheels for 3.11 and 3.12**; `environment.yml` pins 3.12 for the full dev stack. |
+| **Python 3.11+** | PyPI ships **wheels for 3.11–3.14**; `environment.yml` / `.python-version` pin **3.12** for the full dev stack. |
 | **Rust toolchain** | Needed only for **source** workflows: building `rust-engine/` from a checkout, or building the shim when **`cargo`** runs during an sdist/wheel build. **Not** required when you install a **prebuilt wheel** that includes `prefect_compat/native/*`. |
 | **Conda or venv** | Either is fine; conda is what the repo’s `environment.yml` is written for. |
 
@@ -56,16 +56,30 @@ You want **`native_library_available=True`** when using the intended Rust-backed
 
 Maintainers may publish to **TestPyPI** (validation) and/or **production PyPI**; see [Distribution](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/DISTRIBUTION.md) and [Releasing](https://github.com/PPPSDavid/rust-based-prefect/blob/main/RELEASING.md) (maintainer-oriented files; not part of the hosted MkDocs site).
 
-Prebuilt wheels are published for **CPython 3.11 and 3.12** on:
+Prebuilt wheels are published for **CPython 3.11, 3.12, 3.13, and 3.14** on:
 
 | Platform | Typical wheel tag |
 | --- | --- |
-| Linux x86_64 | `manylinux_*_x86_64` · `cp311` / `cp312` |
-| Linux aarch64 (e.g. Raspberry Pi 64-bit) | `manylinux_*_aarch64` · `cp311` / `cp312` |
-| Windows x86_64 | `win_amd64` · `cp311` / `cp312` |
-| macOS (universal2 from CI) | `macosx_*_universal2` · `cp311` / `cp312` |
+| Linux x86_64 | `manylinux_*_x86_64` · `cp311` / `cp312` / `cp313` / `cp314` |
+| Linux aarch64 (e.g. Raspberry Pi 64-bit) | `manylinux_*_aarch64` · `cp311` / `cp312` / `cp313` / `cp314` |
+| Windows x86_64 | `win_amd64` · `cp311` / `cp312` / `cp313` / `cp314` |
+| macOS (universal2 from CI) | `macosx_*_universal2` · `cp311` / `cp312` / `cp313` / `cp314` |
 
-**CPython 3.13 and newer** are not guaranteed to have prebuilt wheels yet; **`pip`** / **`uv`** may fall back to **sdist** (needs Rust/`cargo` during install) or fail until wheels exist—use **3.11** or **3.12** for the smoothest install, or a full checkout + `cargo build`.
+**CPython 3.15 and newer** are not guaranteed to have prebuilt wheels yet; **`pip`** / **`uv`** may fall back to **sdist** (needs Rust/`cargo` during install) or fail until wheels exist—use **3.11–3.14** for the smoothest install, or a full checkout + `cargo build`.
+
+### Free-threaded CPython 3.14t (experimental)
+
+IronFlow does **not** publish `cp314t` wheels to production PyPI yet. There is no `pip install ironflow-prefect-compat[nogil]` extra — pip selects the wheel from the interpreter ABI (`cp314` vs `cp314t`). Maintainers can build a Linux `cp314t` wheel via **Publish to TestPyPI** with **`include_freethreaded`**, or download the CI **`python-rust-freethread`** artifact.
+
+```bash
+uv venv --python 3.14t
+uv pip install --index-url https://test.pypi.org/simple/ \
+  --extra-index-url https://pypi.org/simple/ ironflow-prefect-compat
+```
+
+A full checkout `uv sync --frozen --group dev --python 3.14t` needs `--no-install-package psycopg-binary` because that extra has no `cp314t` wheel. Docker/self-hosted Postgres still uses `psycopg[binary]` on GIL 3.12; this experimental job is not that path.
+
+The bundled `ironflow_engine` cdylib does not link `libpython`; GIL and free-threaded wheels share that native build and differ by wheel tag. **Hard cancel / terminate-pause** still requires `ProcessPoolTaskRunner`. CPU-bound `ThreadPoolTaskRunner` overlap on 3.14t is experimental — see [How to choose a task runner](how-to/choose-task-runners.md) and `perf_matrix.py --preset cpu_task`.
 
 Other Python versions may install from **sdist** or need a **source build**; check PyPI “Download files” or use a full checkout + `cargo build`.
 
