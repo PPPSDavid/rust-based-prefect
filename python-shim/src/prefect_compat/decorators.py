@@ -1194,8 +1194,8 @@ def flow(
                 _ACTIVE_FLOW_RUN.reset(flow_token)
                 _ACTIVE_TASK_RUNNER.reset(token)
 
-        wrapped._ironflow_flow_name = flow_name
-        wrapped._ironflow_formerly = former_names
+        setattr(wrapped, "_ironflow_flow_name", flow_name)
+        setattr(wrapped, "_ironflow_formerly", former_names)
         return wrapped
 
     if fn is None:

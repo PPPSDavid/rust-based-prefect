@@ -101,4 +101,5 @@ exclude = [
     "python-shim/src/prefect_compat/control_plane/runs.py",
     "python-shim/src/prefect_compat/control_plane/rust_dispatch.py",
     "python-shim/src/prefect_compat/control_plane/store.py",
+    "python-shim/src/prefect_compat/control_plane/flow_catalog.py",
 ]
