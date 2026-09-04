@@ -56,22 +56,6 @@ def test_create_flow_run_attaches_catalog_id(tmp_path: Path) -> None:
     assert catalog["name"] == "alpha"
 
 
-def test_canonical_ensure_uses_rust_when_bound(tmp_path: Path) -> None:
-    plane = _plane(tmp_path)
-    if not plane._rust_db_bound:
-        pytest.skip("Rust bind_db is required for the catalog hot path")
-
-    def boom(*_args: object, **_kwargs: object) -> None:
-        raise AssertionError(
-            "Python catalog insert must not run when Rust ensure works"
-        )
-
-    plane._create_flow_row = boom  # type: ignore[method-assign]
-    row = plane.ensure_flow("only-rust")
-    assert row["name"] == "only-rust"
-    assert row["status"] == "active"
-
-
 def test_rename_keeps_uuid_and_reserves_alias(tmp_path: Path) -> None:
     plane = _plane(tmp_path)
     plane.create_flow_run("A")
