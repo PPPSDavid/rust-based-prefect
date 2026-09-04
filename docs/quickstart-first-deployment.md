@@ -3,7 +3,7 @@
 End-to-end path for a **PyPI user** who wants a named deployment, a running API, and a triggered run — similar to Prefect's "first deployable workflow" tutorial.
 
 !!! warning "Prerequisites"
-    1. [Installation](INSTALL.md) — `pip install ironflow-prefect-compat` (Python 3.11 or 3.12).
+    1. [Installation](INSTALL.md) — `pip install ironflow-prefect-compat` (Python 3.11–3.14).
     2. A terminal where the **`ironflow`** CLI is on your `PATH` (included in the wheel).
     3. This tutorial uses **`uvicorn`** to start the API (bundled with the package dependencies). The repository's `scripts/ironflow_server.py` helper is optional and requires a clone.
 

@@ -31,7 +31,9 @@ python -m pip install -r requirements-ci.txt
 cargo build --manifest-path rust-engine/Cargo.toml
 ```
 
-Python **3.11+** is supported; `.python-version` / `environment.yml` default to **3.12**. Published wheels on PyPI target **CPython 3.11 and 3.12**; other versions may install from **sdist** or require this source checkout + `cargo build`.
+Python **3.11–3.14** have published wheels; `.python-version` / `environment.yml` default to **3.12** (dev/Docker stay on 3.12). `requires-python` remains `>=3.11`; `scripts/check_python_support_matrix.py` fails CI when a still-supported CPython minor is missing from wheels. Other versions may install from **sdist** or require this source checkout + `cargo build`.
+
+CI compiles **`rust-engine`** with current **Rust stable** (`rust-toolchain.toml` channel `stable`, edition 2021; no MSRV pin).
 
 The Python shim auto-discovers `ironflow_engine` under `rust-engine/target/`. Override with **`IRONFLOW_RUST_LIB`** if you build elsewhere. Skipping the cargo step leaves Python fallbacks where implemented; treat **`cargo build` as part of the normal full stack**.
 

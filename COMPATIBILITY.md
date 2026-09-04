@@ -12,9 +12,10 @@ Maintainers should use `docs/compatibility_review_workflow.md` before changing t
 
 ## Python versions & PyPI (`ironflow-prefect-compat`)
 
-- **`requires-python`:** `>=3.11` (see `python-shim/pyproject.toml`).
-- **Prebuilt wheels:** CI publishes **manylinux** (x86_64 + aarch64), **Windows** (`win_amd64`), and **macOS** wheels for **CPython 3.11 and 3.12**. Confirm exact filenames on [PyPI → Download files](https://pypi.org/project/ironflow-prefect-compat/#files).
-- **Other CPython versions** (for example 3.13): may resolve to **sdist** or fail until wheels exist — build from a **full checkout** with **`cargo build`** and/or set **`IRONFLOW_RUST_LIB`** per the hosted [Installation](https://pppsdavid.github.io/rust-based-prefect/INSTALL/) guide (see also [`docs/INSTALL.md` on GitHub](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/INSTALL.md)).
+- **`requires-python`:** `>=3.11` (see `python-shim/pyproject.toml`). CI job **Check CPython support matrix** (`scripts/check_python_support_matrix.py`) fails when a still-supported GIL CPython minor matching that specifier is missing from test/wheel matrices, `CIBW_BUILD`, publish workflows, or PyPI classifiers. Snapshot: `scripts/python_support_snapshot.json`.
+- **Prebuilt wheels:** CI publishes **manylinux** (x86_64 + aarch64), **Windows** (`win_amd64`), and **macOS** wheels for **CPython 3.11–3.14**. Confirm exact filenames on [PyPI → Download files](https://pypi.org/project/ironflow-prefect-compat/#files).
+- **CPython 3.15+** (and other minors not yet in the wheel matrix): may resolve to **sdist** or fail until wheels exist — build from a **full checkout** with **`cargo build`** and/or set **`IRONFLOW_RUST_LIB`** per the hosted [Installation](https://pppsdavid.github.io/rust-based-prefect/INSTALL/) guide (see also [`docs/INSTALL.md` on GitHub](https://github.com/PPPSDavid/rust-based-prefect/blob/main/docs/INSTALL.md)).
+- **Free-threaded CPython 3.14t (experimental):** not a production PyPI ABI. Optional TestPyPI / CI artifact wheels use the same package version with a `cp314t` tag (no `[nogil]` extra). See [Installation](https://pppsdavid.github.io/rust-based-prefect/INSTALL/). Process-pool hard-kill semantics are unchanged.
 
 ## Phase 1 runtime compatibility (current MVP target)
 

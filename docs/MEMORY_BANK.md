@@ -1,7 +1,7 @@
 # Memory Bank
 
 Compact context handoff for future sessions. Process/validation contract: root `AGENTS.md`.
-Last updated: 2026-08-30.
+Last updated: 2026-09-04.
 
 ## Project Snapshot
 
@@ -16,6 +16,7 @@ Last updated: 2026-08-30.
 - Rust: C ABI `ironflow_*` unchanged; dispatch in `ffi/control_*.rs`; `deployment_ops/` and `concurrency_ops/` are packages. No `rust-engine/src` file >800.
 - Allowlisted production file >1000 LOC: **`decorators.py` only** (parked: `benchmarks/perf_matrix.py`).
 - Hosted docs: Get started ≤4 nav entries; published pages must not MkDocs-link into excluded `docs/plans/**`.
+- **Python wheels:** GIL **3.11–3.14**; `scripts/check_python_support_matrix.py` ratchets CI to `requires-python`. Dev/Docker stay on **3.12**. Experimental **3.14t** is TestPyPI/CI-artifact only.
 
 ## Core Architecture
 
