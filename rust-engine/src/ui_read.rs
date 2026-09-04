@@ -71,7 +71,12 @@ fn query_task_runs(conn: &Connection, params_json: &str) -> Result<String, Strin
         .ok_or_else(|| "flow_run_id required".to_string())?;
     let cursor = parse_opt_string(params_json, "cursor").and_then(|v| v.parse::<i64>().ok());
     let limit = parse_limit(params_json, 200);
-    let mut sql = "SELECT seq,id,flow_run_id,task_name,planned_node_id,state,version,created_at,updated_at,kind,child_flow_run_id,child_deployment_run_id FROM task_runs WHERE flow_run_id = ?1".to_string();
+    let has_attempt = crate::flow_catalog_ops::column_exists(conn, "task_runs", "task_run_attempt");
+    let mut sql = "SELECT seq,id,flow_run_id,task_name,planned_node_id,state,version,created_at,updated_at,kind,child_flow_run_id,child_deployment_run_id".to_string();
+    if has_attempt {
+        sql.push_str(",task_run_attempt");
+    }
+    sql.push_str(" FROM task_runs WHERE flow_run_id = ?1");
     if cursor.is_some() {
         sql.push_str(" AND seq < ?2");
     }
@@ -79,7 +84,7 @@ fn query_task_runs(conn: &Connection, params_json: &str) -> Result<String, Strin
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
     let items = stmt
         .query_map(params![flow_run_id, cursor, limit], |row| {
-            Ok(json!({
+            let mut obj = json!({
                 "id": row.get::<_, String>(1)?,
                 "flow_run_id": row.get::<_, String>(2)?,
                 "task_name": row.get::<_, String>(3)?,
@@ -91,8 +96,13 @@ fn query_task_runs(conn: &Connection, params_json: &str) -> Result<String, Strin
                 "kind": row.get::<_, Option<String>>(9)?.unwrap_or_else(|| "task".to_string()),
                 "child_flow_run_id": row.get::<_, Option<String>>(10)?,
                 "child_deployment_run_id": row.get::<_, Option<String>>(11)?,
-                "seq": row.get::<_, i64>(0)?
-            }))
+                "seq": row.get::<_, i64>(0)?,
+                "task_run_attempt": 1
+            });
+            if has_attempt {
+                obj["task_run_attempt"] = json!(row.get::<_, Option<i64>>(12)?.unwrap_or(1));
+            }
+            Ok(obj)
         })
         .map_err(|e| e.to_string())?
         .collect::<Result<Vec<_>, _>>()

@@ -44,9 +44,7 @@ class QueriesMixin:
             conditions.append("fr.state = ?")
             params.append(state)
         if hide:
-            conditions.append(
-                "(catalog.id IS NULL OR catalog.status = 'active')"
-            )
+            conditions.append("(catalog.id IS NULL OR catalog.status = 'active')")
         else:
             conditions.append(
                 "(catalog.id IS NULL OR catalog.status IN ('active','archived'))"
@@ -175,9 +173,10 @@ class QueriesMixin:
             {"flow_run_id": str(flow_run_id), "limit": limit, "cursor": cursor},
         )
         if rust_result is not None:
-            return PageResult(
-                items=rust_result["items"], next_cursor=rust_result["next_cursor"]
-            )
+            items = rust_result["items"]
+            for item in items:
+                item.setdefault("task_run_attempt", 1)
+            return PageResult(items=items, next_cursor=rust_result["next_cursor"])
         query = (
             "SELECT seq,id,flow_run_id,task_name,planned_node_id,state,version,created_at,updated_at,"
             "kind,child_flow_run_id,child_deployment_run_id,task_run_attempt "

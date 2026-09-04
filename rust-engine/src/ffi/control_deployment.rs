@@ -375,6 +375,23 @@ pub(crate) fn handle(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<
             }
             Ok(json!({"ok": true, "summary": summary}))
         }
+        "ensure_flow_canonical" => {
+            if ctx.pg_client.is_some() {
+                return Ok(pg_fallback("ensure_flow_canonical"));
+            }
+            let conn = ctx
+                .db_conn
+                .as_ref()
+                .ok_or_else(|| "ensure_flow_canonical requires bind_db".to_string())?;
+            let name = body
+                .get("name")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| "ensure_flow_canonical requires name".to_string())?;
+            match crate::flow_catalog_ops::ensure_flow_canonical(conn, name) {
+                Ok(summary) => Ok(summary),
+                Err(e) => Ok(json!({"ok": false, "error": {"code": "catalog", "message": e}})),
+            }
+        }
         "catalog_retention_sweep" => {
             if ctx.pg_client.is_some() {
                 return Ok(pg_fallback("catalog_retention_sweep"));

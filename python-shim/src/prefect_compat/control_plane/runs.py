@@ -160,6 +160,8 @@ class RunsMixin:
             )
             if (not self._rust_native_persistence) and self._rust_fsm_active():
                 self._rust_register_flow(record)
+            # Always stamp the catalog UUID returned by ensure_flow so Python and
+            # Rust connections cannot diverge on flow_id.
             self.attach_run_to_flow(record.run_id, str(catalog["id"]))
         return record
 

@@ -50,6 +50,10 @@ pub fn attach_flow_run_to_catalog(
     if !table_exists(conn, "flows") || !column_exists(conn, "flow_runs", "flow_id") {
         return Ok(());
     }
+    if lookup_flow_id(conn, flow_name)?.is_none() && alias_owner(conn, flow_name)?.is_some() {
+        // Do not fork a second identity when the persist name is only a reserved alias.
+        return Ok(());
+    }
     let flow_id = resolve_or_insert_flow_id(conn, flow_name)?;
     conn.execute(
         "UPDATE flow_runs SET flow_id = ?1 WHERE id = ?2",
@@ -75,17 +79,18 @@ fn resolve_or_insert_flow_id(conn: &Connection, flow_name: &str) -> Result<Strin
 }
 
 fn lookup_flow_id(conn: &Connection, flow_name: &str) -> Result<Option<String>, String> {
-    let by_name: Option<String> = conn
-        .query_row(
-            "SELECT id FROM flows WHERE name = ?1 LIMIT 1",
-            params![flow_name],
-            |row| row.get(0),
-        )
-        .optional()
-        .map_err(|e| e.to_string())?;
-    if by_name.is_some() {
-        return Ok(by_name);
-    }
+    // Canonical name only. Alias names are reserved by ensure_flow_canonical and must
+    // not silently attach (or fork a second catalog row).
+    conn.query_row(
+        "SELECT id FROM flows WHERE name = ?1 LIMIT 1",
+        params![flow_name],
+        |row| row.get(0),
+    )
+    .optional()
+    .map_err(|e| e.to_string())
+}
+
+fn alias_owner(conn: &Connection, flow_name: &str) -> Result<Option<String>, String> {
     if !table_exists(conn, "flow_aliases") {
         return Ok(None);
     }
@@ -96,6 +101,68 @@ fn lookup_flow_id(conn: &Connection, flow_name: &str) -> Result<Option<String>, 
     )
     .optional()
     .map_err(|e| e.to_string())
+}
+
+fn flow_row_json(conn: &Connection, flow_id: &str) -> Result<Value, String> {
+    conn.query_row(
+        "SELECT id,name,status,created_at,updated_at,archived_at,deleted_at \
+         FROM flows WHERE id = ?1 LIMIT 1",
+        params![flow_id],
+        |row| {
+            Ok(json!({
+                "id": row.get::<_, String>(0)?,
+                "name": row.get::<_, String>(1)?,
+                "status": row.get::<_, String>(2)?,
+                "created_at": row.get::<_, String>(3)?,
+                "updated_at": row.get::<_, String>(4)?,
+                "archived_at": row.get::<_, Option<String>>(5)?,
+                "deleted_at": row.get::<_, Option<String>>(6)?,
+            }))
+        },
+    )
+    .map_err(|e| e.to_string())
+}
+
+/// Canonical-name upsert used on every `create_flow_run` / `create_deployment`.
+/// Alias-only names return `alias_reserved`; deleted rows return `deleted_flow`.
+pub fn ensure_flow_canonical(conn: &Connection, name: &str) -> Result<Value, String> {
+    let canonical = name.trim();
+    if canonical.is_empty() {
+        return Ok(json!({
+            "ok": false,
+            "error": {"code": "invalid_name", "message": "flow name is required"}
+        }));
+    }
+    if !table_exists(conn, "flows") {
+        return Ok(json!({"ok": false, "fallback": true}));
+    }
+    if let Some(owner) = alias_owner(conn, canonical)? {
+        if lookup_flow_id(conn, canonical)?.as_deref() != Some(owner.as_str()) {
+            return Ok(json!({
+                "ok": false,
+                "error": {
+                    "code": "alias_reserved",
+                    "message": format!("name {canonical:?} is reserved as an alias of another flow")
+                }
+            }));
+        }
+    }
+    if let Some(flow_id) = lookup_flow_id(conn, canonical)? {
+        let flow = flow_row_json(conn, &flow_id)?;
+        if flow.get("status").and_then(Value::as_str) == Some("deleted") {
+            return Ok(json!({
+                "ok": false,
+                "error": {
+                    "code": "deleted_flow",
+                    "message": format!("flow {canonical:?} is deleted; restore it before reuse")
+                }
+            }));
+        }
+        return Ok(json!({"ok": true, "flow": flow}));
+    }
+    let flow_id = resolve_or_insert_flow_id(conn, canonical)?;
+    let flow = flow_row_json(conn, &flow_id)?;
+    Ok(json!({"ok": true, "flow": flow}))
 }
 
 fn parse_limit(params_json: &str, default_limit: i64) -> i64 {
@@ -631,5 +698,56 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM task_runs", [], |r| r.get(0))
             .unwrap();
         assert_eq!(tasks, 0);
+    }
+
+    #[test]
+    fn ensure_canonical_inserts_and_rejects_alias() {
+        let conn = memory_catalog();
+        let created = ensure_flow_canonical(&conn, "alpha").unwrap();
+        assert_eq!(created["ok"], true);
+        let flow_id = created["flow"]["id"].as_str().unwrap().to_string();
+        let again = ensure_flow_canonical(&conn, "alpha").unwrap();
+        assert_eq!(again["flow"]["id"], flow_id);
+        conn.execute(
+            "INSERT INTO flow_aliases(name,flow_id,created_at) VALUES('old',?1,?2)",
+            params![flow_id, "2026-01-01T00:00:00+00:00"],
+        )
+        .unwrap();
+        let reserved = ensure_flow_canonical(&conn, "old").unwrap();
+        assert_eq!(reserved["ok"], false);
+        assert_eq!(reserved["error"]["code"], "alias_reserved");
+    }
+
+    #[test]
+    fn attach_does_not_fork_when_name_is_only_an_alias() {
+        let conn = memory_catalog();
+        let now = "2026-01-01T00:00:00+00:00";
+        conn.execute(
+            "INSERT INTO flows(id,name,status,created_at,updated_at) VALUES('f1','beta','active',?1,?1)",
+            params![now],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO flow_aliases(name,flow_id,created_at) VALUES('alpha','f1',?1)",
+            params![now],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO flow_runs(id,name,state,version,created_at,updated_at,depth) \
+             VALUES('r1','alpha','SCHEDULED',0,?1,?1,0)",
+            params![now],
+        )
+        .unwrap();
+        attach_flow_run_to_catalog(&conn, "r1", "alpha").unwrap();
+        let catalogs: i64 = conn
+            .query_row("SELECT COUNT(*) FROM flows", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(catalogs, 1);
+        let flow_id: Option<String> = conn
+            .query_row("SELECT flow_id FROM flow_runs WHERE id = 'r1'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert!(flow_id.is_none());
     }
 }

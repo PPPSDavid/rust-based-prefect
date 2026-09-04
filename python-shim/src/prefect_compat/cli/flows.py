@@ -58,7 +58,9 @@ class FlowCatalogClient:
         return response.json()
 
     def rename_flow(self, flow_id: str, name: str) -> dict[str, Any]:
-        return self._mutate("POST", f"/api/flows/{quote(flow_id, safe='')}/rename", {"name": name})
+        return self._mutate(
+            "POST", f"/api/flows/{quote(flow_id, safe='')}/rename", {"name": name}
+        )
 
     def archive_flow(self, flow_id: str) -> dict[str, Any]:
         return self._mutate("POST", f"/api/flows/{quote(flow_id, safe='')}/archive")

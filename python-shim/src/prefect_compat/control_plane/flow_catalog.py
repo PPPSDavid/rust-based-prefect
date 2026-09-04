@@ -139,6 +139,18 @@ class FlowCatalogMixin:
             [name, flow_id, self._catalog_now()],
         )
 
+    def _ensure_flow_canonical_rust(self, name: str) -> dict[str, Any] | None:
+        rust = self._rust_deployment_dispatch("ensure_flow_canonical", {"name": name})
+        if rust is None:
+            return None
+        if rust.get("ok") and isinstance(rust.get("flow"), dict):
+            return rust["flow"]
+        err = rust.get("error") or {}
+        code = err.get("code")
+        if code in {"alias_reserved", "deleted_flow"}:
+            raise FlowCatalogConflict(str(err.get("message") or code), code=str(code))
+        return None
+
     def _create_flow_row(self, name: str) -> dict[str, Any]:
         now = self._catalog_now()
         flow_id = str(uuid4())
@@ -163,6 +175,10 @@ class FlowCatalogMixin:
             if item and str(item).strip() and str(item).strip() != canonical
         ]
         with self._lock:
+            if not former_names:
+                rust_flow = self._ensure_flow_canonical_rust(canonical)
+                if rust_flow is not None:
+                    return rust_flow
             target = self._get_flow_catalog_by_name(canonical)
             sources = [
                 self._lookup_flow_name(old)
@@ -328,11 +344,19 @@ class FlowCatalogMixin:
         if catalog["status"] == "deleted":
             return None
         tasks = self.list_tasks(flow_name=catalog["name"], limit=500)
-        deployments = [
-            item
-            for item in self.list_deployments(limit=500).items
-            if item.get("flow_id") == catalog["id"] or item.get("flow_name") == catalog["name"]
-        ]
+        dep_rows = self._query_rows(
+            """
+            SELECT id,name,flow_name,entrypoint,path,default_parameters,paused,
+                   concurrency_limit,collision_strategy,schedule_interval_seconds,
+                   schedule_cron,schedule_rrule,schedule_next_run_at,schedule_enabled,
+                   work_pool_id,flow_id,deleted_at,created_at,updated_at
+            FROM deployments
+            WHERE deleted_at IS NULL AND (flow_id = ? OR flow_name = ?)
+            ORDER BY name LIMIT 500
+            """,
+            [catalog["id"], catalog["name"]],
+        )
+        deployments = [self._deployment_row_to_dict(row) for row in dep_rows]
         runs = self._query_rows(
             "SELECT seq,id,name,state,version,created_at,updated_at "
             "FROM flow_runs WHERE flow_id = ? ORDER BY seq DESC LIMIT 20",
@@ -355,7 +379,9 @@ class FlowCatalogMixin:
             if catalog is None:
                 raise ValueError("flow not found")
             if catalog["status"] == "deleted":
-                raise FlowCatalogConflict("cannot rename a deleted flow", code="deleted_flow")
+                raise FlowCatalogConflict(
+                    "cannot rename a deleted flow", code="deleted_flow"
+                )
             self._require_no_undeleted_deployments(flow_id, "rename")
             self._rename_flow_unlocked(flow_id, str(new_name).strip())
             result = self._get_flow_catalog(flow_id)
@@ -369,7 +395,9 @@ class FlowCatalogMixin:
             if catalog is None:
                 raise ValueError("flow not found")
             if catalog["status"] == "deleted":
-                raise FlowCatalogConflict("cannot archive a deleted flow", code="deleted_flow")
+                raise FlowCatalogConflict(
+                    "cannot archive a deleted flow", code="deleted_flow"
+                )
             self._require_no_undeleted_deployments(flow_id, "archive")
             now = self._catalog_now()
             self._sqlite_conn.execute(
@@ -511,7 +539,8 @@ class FlowCatalogMixin:
                 created_or_updated.append(self._upsert_deployment_from_apply(item))
             if prune:
                 alive = self._query_rows(
-                    "SELECT id,name,flow_id FROM deployments WHERE deleted_at IS NULL"
+                    "SELECT id,name,flow_id FROM deployments WHERE deleted_at IS NULL",
+                    [],
                 )
                 for row in alive:
                     if row["name"] not in keep_names:
@@ -551,22 +580,41 @@ class FlowCatalogMixin:
             formerly=item.get("formerly") or [],
         )
 
-    def _archive_orphan_flows_unlocked(self, keep_flow_names: set[str]) -> list[dict[str, Any]]:
-        archived: list[dict[str, Any]] = []
+    def _archive_orphan_flows_unlocked(
+        self, keep_flow_names: set[str]
+    ) -> list[dict[str, Any]]:
+        now = self._catalog_now()
+        keep = list(keep_flow_names)
+        if keep:
+            placeholders = ",".join("?" * len(keep))
+            keep_sql = f"AND name NOT IN ({placeholders})"
+            select_params: list[Any] = keep
+        else:
+            keep_sql = ""
+            select_params = []
         rows = self._query_rows(
-            "SELECT id,name,status FROM flows WHERE status = 'active'"
-        )
-        for row in rows:
-            if row["name"] in keep_flow_names:
-                continue
-            if self._undeleted_deployments(str(row["id"])):
-                continue
-            now = self._catalog_now()
-            self._sqlite_conn.execute(
-                "UPDATE flows SET status = 'archived', archived_at = ?, updated_at = ? WHERE id = ?",
-                [now, now, str(row["id"])],
+            f"""
+            SELECT id FROM flows
+            WHERE status = 'active' {keep_sql}
+            AND NOT EXISTS (
+                SELECT 1 FROM deployments d
+                WHERE d.flow_id = flows.id AND d.deleted_at IS NULL
             )
-            item = self._get_flow_catalog(str(row["id"]))
+            """,
+            select_params,
+        )
+        ids = [str(row["id"]) for row in rows]
+        if not ids:
+            return []
+        id_placeholders = ",".join("?" * len(ids))
+        self._sqlite_conn.execute(
+            f"UPDATE flows SET status = 'archived', archived_at = ?, updated_at = ? "
+            f"WHERE id IN ({id_placeholders})",
+            [now, now, *ids],
+        )
+        archived: list[dict[str, Any]] = []
+        for flow_id in ids:
+            item = self._get_flow_catalog(flow_id)
             if item is not None:
                 archived.append(item)
         return archived

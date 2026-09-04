@@ -144,7 +144,9 @@ def test_apply_prune_renames_and_archives(tmp_path: Path) -> None:
         ],
         prune=True,
     )
-    assert any(item["id"] == flow_id and item["name"] == "B" for item in result["renamed"])
+    assert any(
+        item["id"] == flow_id and item["name"] == "B" for item in result["renamed"]
+    )
     assert plane.get_deployment_by_name("A-prod") is None
     assert plane.get_deployment_by_name("B-prod") is not None
     catalog = plane._get_flow_catalog(flow_id)
@@ -161,7 +163,9 @@ def test_prune_last_deployment_auto_archives(tmp_path: Path) -> None:
     assert any(item["name"] == "B" for item in archived.items)
 
 
-def test_retention_skips_live_runs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_retention_skips_live_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setenv("IRONFLOW_RUN_RETENTION_DAYS", "1")
     plane = _plane(tmp_path)
     done = plane.create_flow_run("ttl")
@@ -177,7 +181,7 @@ def test_retention_skips_live_runs(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     )
     summary = plane.retention_sweep()
     assert summary["deleted_runs"] >= 1
-    remaining = plane._query_rows("SELECT id, state FROM flow_runs")
+    remaining = plane._query_rows("SELECT id, state FROM flow_runs", [])
     ids = {row["id"] for row in remaining}
     assert str(live.run_id) in ids
     assert str(done.run_id) not in ids

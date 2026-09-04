@@ -37,7 +37,7 @@ function renderPage() {
 describe("FlowDetailPage", () => {
   it("shows alias banner and lifecycle actions", async () => {
     renderPage();
-    expect(await screen.findByText("beta")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "beta" })).toBeInTheDocument();
     expect(screen.getByText(/is now an alias of/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Rename" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Archive" })).toBeInTheDocument();

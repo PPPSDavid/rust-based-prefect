@@ -193,7 +193,9 @@ def _cmd_deploy_prune(
     except Exception as exc:
         print(f"Error applying deployments: {exc}", file=sys.stderr)
         return 1
-    print(json.dumps(result, indent=2, default=str) if dry_run else _format_apply(result))
+    print(
+        json.dumps(result, indent=2, default=str) if dry_run else _format_apply(result)
+    )
     return 0
 
 
