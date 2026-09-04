@@ -1,0 +1,11 @@
+{
+  "fetched": "2026-09-04",
+  "url": "https://endoflife.date/api/python.json",
+  "cycles": [
+    {"cycle": "3.14", "eol": "2030-10-31", "latest": "3.14.7"},
+    {"cycle": "3.13", "eol": "2029-10-31", "latest": "3.13.15"},
+    {"cycle": "3.12", "eol": "2028-10-31", "latest": "3.12.14"},
+    {"cycle": "3.11", "eol": "2027-10-31", "latest": "3.11.16"},
+    {"cycle": "3.10", "eol": "2026-10-31", "latest": "3.10.21"}
+  ]
+}

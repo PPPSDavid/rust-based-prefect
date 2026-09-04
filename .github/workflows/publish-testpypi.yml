@@ -38,6 +38,14 @@ jobs:
             runner: ubuntu-latest
             python-version: "3.12"
             artifact-name: wheel-linux-py312
+          - slug: linux
+            runner: ubuntu-latest
+            python-version: "3.13"
+            artifact-name: wheel-linux-py313
+          - slug: linux
+            runner: ubuntu-latest
+            python-version: "3.14"
+            artifact-name: wheel-linux-py314
           - slug: linux-aarch64
             runner:
               - self-hosted
@@ -52,6 +60,14 @@ jobs:
             runner: windows-latest
             python-version: "3.12"
             artifact-name: wheel-windows-py312
+          - slug: windows
+            runner: windows-latest
+            python-version: "3.13"
+            artifact-name: wheel-windows-py313
+          - slug: windows
+            runner: windows-latest
+            python-version: "3.14"
+            artifact-name: wheel-windows-py314
           - slug: macos
             runner: macos-latest
             python-version: "3.11"
@@ -60,6 +76,14 @@ jobs:
             runner: macos-latest
             python-version: "3.12"
             artifact-name: wheel-macos-py312
+          - slug: macos
+            runner: macos-latest
+            python-version: "3.13"
+            artifact-name: wheel-macos-py313
+          - slug: macos
+            runner: macos-latest
+            python-version: "3.14"
+            artifact-name: wheel-macos-py314
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -107,7 +131,7 @@ jobs:
       - name: Build wheel (python-shim, Linux aarch64 via cibuildwheel)
         if: matrix.slug == 'linux-aarch64'
         env:
-          CIBW_BUILD: "cp311-* cp312-*"
+          CIBW_BUILD: "cp311-* cp312-* cp313-* cp314-*"
           CIBW_ARCHS_LINUX: "aarch64"
           CIBW_SKIP: "*musllinux*"
           CIBW_BEFORE_ALL_LINUX: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal && ln -sf /root/.cargo/bin/cargo /usr/local/bin/cargo && ln -sf /root/.cargo/bin/rustc /usr/local/bin/rustc"

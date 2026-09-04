@@ -55,6 +55,8 @@ jobs:
           python-version: "3.11"
       - name: Check VERSION matches artifacts
         run: python scripts/check_version_sync.py
+      - name: Check CPython support matrix
+        run: python scripts/check_python_support_matrix.py
 
   python-rust:
     name: Python + Rust tests (py${{ matrix.python-version }})
@@ -62,7 +64,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -124,7 +126,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -182,7 +184,7 @@ jobs:
           "${RUNNER_TEMP}/if-aarch64-venv/bin/pip" install cibuildwheel
       - name: Build aarch64 wheel (python-shim via cibuildwheel)
         env:
-          CIBW_BUILD: "cp311-* cp312-*"
+          CIBW_BUILD: "cp311-* cp312-* cp313-* cp314-*"
           CIBW_ARCHS_LINUX: "aarch64"
           CIBW_SKIP: "*musllinux*"
           CIBW_BEFORE_ALL_LINUX: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal && ln -sf /root/.cargo/bin/cargo /usr/local/bin/cargo && ln -sf /root/.cargo/bin/rustc /usr/local/bin/rustc"
@@ -194,6 +196,8 @@ jobs:
           ls -la python-shim/wheelhouse/
           ls python-shim/wheelhouse/*cp311*aarch64*.whl
           ls python-shim/wheelhouse/*cp312*aarch64*.whl
+          ls python-shim/wheelhouse/*cp313*aarch64*.whl
+          ls python-shim/wheelhouse/*cp314*aarch64*.whl
       - uses: actions/upload-artifact@v4
         with:
           name: ironflow-prefect-compat-wheel-linux-aarch64
@@ -205,7 +209,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -246,7 +250,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
