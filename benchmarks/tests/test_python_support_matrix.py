@@ -84,3 +84,9 @@ def test_require_freethreaded_flag() -> None:
     mod = _load_module()
     assert mod.has_freethreaded_locus('python-version: "3.14t"\n', "3.14")
     assert not mod.has_freethreaded_locus('python-version: "3.14"\n', "3.14")
+
+
+def test_require_freethreaded_on_repo() -> None:
+    mod = _load_module()
+    rc = mod.main(["--offline", "--root", str(ROOT), "--require-freethreaded", "3.14"])
+    assert rc == 0

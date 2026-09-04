@@ -14,8 +14,8 @@ name: Publish to TestPyPI
 on:
   workflow_dispatch:
     inputs:
-      dry_run:
-        description: "Build wheels only (skip upload)"
+      include_freethreaded:
+        description: "Also build Linux cp314t wheel (experimental TestPyPI ABI; same VERSION)"
         required: false
         default: false
         type: boolean
@@ -162,9 +162,54 @@ jobs:
           name: ${{ matrix.artifact-name }}
           path: python-shim/wheelhouse/*.whl
 
+  build-freethreaded:
+    name: Linux x86_64 wheel (py3.14t experimental)
+    if: ${{ github.event.inputs.include_freethreaded == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14t"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y patchelf
+          python -m pip install --upgrade pip
+          python -m pip install build auditwheel
+      - name: Build wheel (python-shim)
+        working-directory: python-shim
+        run: python -m build --wheel
+      - name: Auditwheel repair
+        working-directory: python-shim
+        shell: bash
+        run: |
+          mkdir -p wheelhouse
+          shopt -s nullglob
+          for f in dist/*.whl; do
+            auditwheel repair "$f" -w wheelhouse || cp "$f" wheelhouse/
+          done
+      - name: Smoke install wheel on 3.14t
+        shell: bash
+        run: |
+          python -m venv /tmp/ifwh-ft
+          . /tmp/ifwh-ft/bin/activate
+          pip install python-shim/wheelhouse/*.whl
+          python -c "from prefect_compat.rust_bridge import native_library_available as n; assert n(); print('native ok')"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-linux-py314t
+          path: python-shim/wheelhouse/*.whl
+
   publish:
-    needs: build
-    if: ${{ github.event.inputs.dry_run != 'true' }}
+    needs: [build, build-freethreaded]
+    if: >-
+      ${{ !cancelled()
+          && needs.build.result == 'success'
+          && (needs.build-freethreaded.result == 'success'
+              || needs.build-freethreaded.result == 'skipped')
+          && github.event.inputs.dry_run != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
