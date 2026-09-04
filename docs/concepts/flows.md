@@ -8,6 +8,14 @@ A **flow** is a Python function decorated with **`@flow`** from **`prefect_compa
 - A flow coordinates **task runs** by calling **`task.submit(...)`**, **`task.map(...)`**, and **`wait(...)`** on futures—see **[Tasks](tasks.md)**.
 - You typically register a control plane (for example **`InMemoryControlPlane`**) with **`set_control_plane`** before executing the flow; see **[Quick start (demo flow)](../QUICKSTART_DEMO.md)**.
 
+## Catalog identity vs the name in source
+
+The control plane stores a **UUID-stable flow catalog**. `@flow(name=...)` is a **claim** on the next run or deploy, not a live pointer the UI can rewrite.
+
+If you still have the flow file, **that source is the source of truth**. Rename with `@flow(name="B", formerly=["A"])` and `ironflow deploy --all --prune`. Re-running `serve()` with a new name and no `formerly=` forks a second identity.
+
+The UI **Rename** / **Archive** / **Delete** actions are catalog-only. Use them when there is **no undeleted (including paused) deployment** — you never served this flow, or you already removed the deployment — **and** you will not keep executing a file that still claims the old name. Step-by-step: **[How to rename, archive, and delete flows](../how-to/rename-archive-flows.md)**.
+
 ## Final state (`wait_all` default)
 
 By default IronFlow uses **`@flow(final_state="wait_all")`**: after the flow body returns, it drains in-process submits, waits for non-detached children (including deployment-backed subflows), then resolves the flow terminal state in **Rust** from contributing task-run rows (`CANCELLED` > `FAILED` > all `COMPLETED`). Unobserved failed concurrent submits fail the flow (`FlowChildrenFailed`).

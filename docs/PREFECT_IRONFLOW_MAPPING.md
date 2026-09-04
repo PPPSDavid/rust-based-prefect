@@ -35,7 +35,7 @@ This project is **not** a drop-in replacement for Prefect Cloud or the full Pref
 | Static DAG / compile-time insights | `static-planner/` analyzes `@flow` bodies (`submit`, `map`, `wait_for`, repeated tasks, `@task(name=...)`) and stores a per-run manifest + forecast. See **[DAG and forecast](concepts/dag-and-forecast.md)**. Dynamic regions fall back to runtime-inferred DAGs. |
 | Run DAG UI | Local UI **DAG** tab: **Aggregated fan-out** (planned graph, fan-out collapsed) vs **Task runs**; dependencies always left→right, parallel top→bottom; zoom/pan, search, path highlight. API: `mode=logical|expanded`. |
 | Graph mode / execution contract | **IronFlow extension:** `@flow(graph_mode="auto"|"static"|"dynamic")`; resume skips only when **effective=static** and manifest/parameters match. Prefect has no equivalent — all flows treated as potentially dynamic at retry. Guide: **[graph mode and retry](how-to/graph-mode-and-retry.md)**. |
-| Flow identity / rename | **Deliberate:** UUID-stable catalog + aliases. Prefect cannot rename a flow in place. Guide: **[rename / archive / delete](how-to/rename-archive-flows.md)**. |
+| Flow identity / rename | **Deliberate:** UUID-stable catalog + aliases. **Source is truth** when the `.py` still exists (`formerly=` + `ironflow deploy --all --prune`). UI rename/delete is catalog-only (no undeleted deployment; does not edit the file). Prefect cannot rename a flow in place. Guide: **[rename / archive / delete](how-to/rename-archive-flows.md)**. |
 
 ## State & retry identity
 

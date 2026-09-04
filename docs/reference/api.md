@@ -49,7 +49,7 @@ Monotonic `seq` in storage backs cursors.
 | --- | --- | --- |
 | `GET` | `/api/flows` | Flow catalog (`status=active\|archived`) |
 | `GET` | `/api/flows/{flow_name}` | Flow metadata (aliases resolve) |
-| `POST` | `/api/flows/{flow_id}/rename` | In-place rename (409 if undeleted deployments) |
+| `POST` | `/api/flows/{flow_id}/rename` | Catalog-only rename (409 if undeleted deployments). Prefer `formerly=` + `POST /api/deployments/apply` when source still exists — **[rename how-to](../how-to/rename-archive-flows.md)**. |
 | `POST` | `/api/flows/{flow_id}/archive` | Archive (409 if undeleted deployments) |
 | `POST` | `/api/flows/{flow_id}/restore` | Restore archived/deleted |
 | `DELETE` | `/api/flows/{flow_id}` | Soft-delete (409 if undeleted deployments or live runs) |
@@ -64,7 +64,7 @@ Monotonic `seq` in storage backs cursors.
 | `GET` | `/api/deployments/{deployment_id}` | Deployment detail |
 | `GET` | `/api/deployments/by-name/{name}` | Lookup by unique name |
 | `PATCH` | `/api/deployments/{deployment_id}` | Update schedule, pause, parameters |
-| `POST` | `/api/deployments/apply` | Upsert + optional prune/rename (`prune=true`) |
+| `POST` | `/api/deployments/apply` | Primary source rename: upsert + optional prune/`formerly=` (`prune=true`) |
 | `DELETE` | `/api/deployments/{deployment_id}` | Soft-delete (409 if live runs or schedule enabled) |
 | `GET` | `/api/deployment-runs` | List deployment runs |
 

@@ -41,11 +41,12 @@ Exposed on `GET /api/server-info`.
 
 ## Worked cases
 
-See **[How to rename, archive, and delete flows](../how-to/rename-archive-flows.md)** (Cases 1–3). Maintainer summary:
+See **[How to rename, archive, and delete flows](../how-to/rename-archive-flows.md)**. Maintainer summary:
 
-1. **Rename A→B in one PR** — `formerly=` + `ironflow deploy --all --prune` deletes `A-prod`, renames UUID in place, creates `B-prod`. `/flows/A` resolves to `B`.
-2. **Remove B’s Python/yaml** — file deletion alone does nothing. `deploy --all --prune` deletes the last deployment and auto-archives `B`.
-3. **Destroy a live flow** — archive/delete/rename `409` while any undeleted deployment exists (paused included). Deployment delete `409` while live runs or schedule-on.
+1. **Primary rename A→B in source** — `formerly=` + `ironflow deploy --all --prune` deletes `A-prod`, renames UUID in place, creates `B-prod`. `/flows/A` resolves to `B`. The `.py` file is source of truth when it still exists.
+2. **Catalog-only UI/CLI** — rename/archive/delete when there is no undeleted deployment and you will not keep running the old decorator name. Does not edit source.
+3. **Remove B’s Python/yaml** — file deletion alone does nothing. `deploy --all --prune` deletes the last deployment and auto-archives `B`.
+4. **Destroy a live flow** — archive/delete/rename `409` while any undeleted deployment exists (paused included). Deployment delete `409` while live runs or schedule-on.
 
 ## Conflict rules
 

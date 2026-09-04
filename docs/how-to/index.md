@@ -12,7 +12,7 @@ Task-focused guides for common goals. For a minimal first run, use **[Get starte
 - **[How to run workers in HTTP mode](worker-http-mode.md)** — `IRONFLOW_WORKER_MODE=http`, claim API, no shared DB volume.
 - **[How to secure a self-hosted server](secure-self-hosted.md)** — `IRONFLOW_*_AUTH_STRING` Basic auth and reverse-proxy notes.
 - **[How to deploy with the CLI and `ironflow.yaml`](deploy-with-cli.md)** — `ironflow init` / `deploy` / `serve` / `worker start`, manifest schema, and `deploy()` / `serve()` Python API.
-- **[How to rename, archive, and delete flows](rename-archive-flows.md)** — UUID-stable catalog, aliases, `--prune`, Archived panel.
+- **[How to rename, archive, and delete flows](rename-archive-flows.md)** — **Primary:** `@flow(name=…, formerly=…)` + `ironflow deploy --all --prune`. UI rename/delete is catalog-only when no served deployment remains.
 - **[How to create and update deployments](deployments.md)** — create/patch deployments, trigger runs, and configure interval or cron schedules.
 - **[How to compose flows with subflows](subflows.md)** — inline blocking children vs `deployment_ref(...).submit()`, `wait_for`, fire-and-forget, and UI navigation.
 - **[How to choose a task runner](choose-task-runners.md)** — thread vs process vs sequential for `submit` / `map`; API/remote vs local CPU workloads.

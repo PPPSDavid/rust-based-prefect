@@ -4,7 +4,7 @@ IronFlow splits work into a **Rust orchestration kernel** (`rust-engine`) and **
 
 Use these pages to learn the IronFlow model end-to-end:
 
-- **[Flows](flows.md)** — `@flow`, flow runs, **subflows (inline + deployment-backed)**, and transition hooks.
+- **[Flows](flows.md)** — `@flow`, flow runs, **catalog identity vs source name**, **subflows (inline + deployment-backed)**, and transition hooks.
 - **[Tasks](tasks.md)** — `@task`, `submit`, `map`, futures, custom names, repeated invocations, **`persist_result` / resume**.
 - **[Runners](runners.md)** — task runners for concurrent `submit` / `map`. Practical choice guide: **[How to choose a task runner](../how-to/choose-task-runners.md)**.
 - **[DAG and forecast](dag-and-forecast.md)** — static planner, run DAG UI, subflow node kinds, wide/long graphs.

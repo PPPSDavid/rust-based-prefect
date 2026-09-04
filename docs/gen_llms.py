@@ -101,7 +101,7 @@ PAGES: list[tuple[str, str, str]] = [
     (
         "How to rename, archive, and delete flows",
         "how-to/rename-archive-flows/",
-        "UUID-stable catalog, aliases, prune deploy, Archived panel.",
+        "Primary: formerly= in source plus deploy --prune. UI is catalog-only.",
     ),
     (
         "How to create deployments",
