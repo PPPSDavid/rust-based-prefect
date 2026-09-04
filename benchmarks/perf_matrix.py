@@ -27,6 +27,8 @@ if str(PYTHON_SHIM_SRC) not in sys.path:
 
 from prefect_compat.runtime import InMemoryControlPlane, RunState  # noqa: E402
 
+from benchmarks.cpu_task_micro import decorator_cpu_flow  # noqa: E402
+
 BASE_SEED = 20260416
 
 
@@ -58,6 +60,10 @@ class WorkloadRecipe:
     gcl_profile: str | None = None
     # When set, microbench Rust ``resolve_flow_terminal_state`` over N synthetic children.
     resolve_terminal_children: int | None = None
+    # CPU-bound ``cpu_burn`` bodies (GIL vs 3.14t / process-pool comparison).
+    cpu_bound: bool = False
+    # ``thread`` or ``process`` — only used when ``cpu_bound`` is true.
+    map_runner: str = "thread"
 
 
 @dataclass
@@ -330,6 +336,45 @@ def _recipe_catalog() -> dict[str, WorkloadRecipe]:
             sqlite_enabled=True,
             decorator_submit_width=100,
         ),
+        "micro_map_cpu_threadpool": WorkloadRecipe(
+            name="micro_map_cpu_threadpool",
+            flow_count=4,
+            tasks_per_flow=1,
+            task_events_per_task=0,
+            read_ratio=0.0,
+            mixed=False,
+            cold_start=True,
+            sqlite_enabled=True,
+            decorator_map_width=8,
+            cpu_bound=True,
+            map_runner="thread",
+        ),
+        "micro_map_cpu_processpool": WorkloadRecipe(
+            name="micro_map_cpu_processpool",
+            flow_count=4,
+            tasks_per_flow=1,
+            task_events_per_task=0,
+            read_ratio=0.0,
+            mixed=False,
+            cold_start=True,
+            sqlite_enabled=True,
+            decorator_map_width=8,
+            cpu_bound=True,
+            map_runner="process",
+        ),
+        "micro_submit_cpu_threadpool": WorkloadRecipe(
+            name="micro_submit_cpu_threadpool",
+            flow_count=4,
+            tasks_per_flow=1,
+            task_events_per_task=0,
+            read_ratio=0.0,
+            mixed=False,
+            cold_start=True,
+            sqlite_enabled=True,
+            decorator_submit_width=8,
+            cpu_bound=True,
+            map_runner="thread",
+        ),
         "gcl_cm_contention": WorkloadRecipe(
             name="gcl_cm_contention",
             flow_count=20,
@@ -467,6 +512,11 @@ def _presets() -> dict[str, list[str]]:
         "flow_submit": [
             "micro_submit_threadpool_narrow",
             "micro_submit_threadpool_wide",
+        ],
+        "cpu_task": [
+            "micro_map_cpu_threadpool",
+            "micro_map_cpu_processpool",
+            "micro_submit_cpu_threadpool",
         ],
         "concurrency": [
             "medium_narrow_fsm_batch_warm",
@@ -797,6 +847,8 @@ def _run_decorator_map_micro_iteration(
 
     latencies: dict[str, list[float]] = {}
     notes: list[str] = [f"decorator_map_micro width={map_width}"]
+    if recipe.cpu_bound:
+        notes.append(f"cpu_bound runner={recipe.map_runner}")
 
     with tempfile.TemporaryDirectory(prefix="perf-matrix-map-") as td:
         history_path = Path(td) / "history.jsonl"
@@ -820,23 +872,31 @@ def _run_decorator_map_micro_iteration(
 
         set_control_plane(plane)
 
-        @task
-        def _inc(x: int) -> int:
-            return x + 1
+        if recipe.cpu_bound:
+            sample = decorator_cpu_flow(
+                width=map_width,
+                mode="map",
+                runner_kind=recipe.map_runner,
+            )
+        else:
 
-        @task
-        def _dbl(x: int) -> int:
-            return x * 2
+            @task
+            def _inc(x: int) -> int:
+                return x + 1
 
-        inc = as_task_wrapper(_inc)
-        dbl = as_task_wrapper(_dbl)
+            @task
+            def _dbl(x: int) -> int:
+                return x * 2
 
-        @flow(task_runner=ThreadPoolTaskRunner())
-        def sample() -> int:
-            first = inc.submit(map_width)
-            mapped_futs = dbl.map(range(map_width), wait_for=[first])
-            wait(mapped_futs)
-            return sum(f.result() for f in mapped_futs)
+            inc = as_task_wrapper(_inc)
+            dbl = as_task_wrapper(_dbl)
+
+            @flow(task_runner=ThreadPoolTaskRunner())
+            def sample() -> int:
+                first = inc.submit(map_width)
+                mapped_futs = dbl.map(range(map_width), wait_for=[first])
+                wait(mapped_futs)
+                return sum(f.result() for f in mapped_futs)
 
         for _ in range(warmup_iters):
             _timed_call(latencies, "decorator_map_micro.warmup_invocation", sample)
@@ -855,7 +915,7 @@ def _run_decorator_map_micro_iteration(
         )
         wal_after = float(wal_path.stat().st_size) if wal_path.exists() else wal_before
 
-        tasks_per_flow = map_width + 1
+        tasks_per_flow = map_width if recipe.cpu_bound else map_width + 1
         counts = {
             "flows_created": iterations,
             "tasks_created": iterations * tasks_per_flow,
@@ -956,19 +1016,30 @@ def _run_decorator_submit_micro_iteration(
 
         set_control_plane(plane)
 
-        @task
-        def _inc(x: int) -> int:
-            return x + 1
+        if recipe.cpu_bound:
+            notes.append(f"cpu_bound runner={recipe.map_runner}")
+            sample = decorator_cpu_flow(
+                width=submit_width,
+                mode="submit",
+                runner_kind=recipe.map_runner,
+            )
+        else:
 
-        inc = as_task_wrapper(_inc)
+            @task
+            def _inc(x: int) -> int:
+                return x + 1
 
-        @flow(
-            task_runner=ThreadPoolTaskRunner(max_workers=min(32, max(4, submit_width)))
-        )
-        def sample() -> int:
-            futs = [inc.submit(i) for i in range(submit_width)]
-            wait(futs)
-            return sum(f.result() for f in futs)
+            inc = as_task_wrapper(_inc)
+
+            @flow(
+                task_runner=ThreadPoolTaskRunner(
+                    max_workers=min(32, max(4, submit_width))
+                )
+            )
+            def sample() -> int:
+                futs = [inc.submit(i) for i in range(submit_width)]
+                wait(futs)
+                return sum(f.result() for f in futs)
 
         for _ in range(warmup_iters):
             _timed_call(latencies, "decorator_submit_micro.warmup_invocation", sample)

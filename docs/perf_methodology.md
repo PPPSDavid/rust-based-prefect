@@ -26,6 +26,10 @@ Transition-hook microbench (same `perf_matrix` harness; exercises real `@flow` /
 - `python benchmarks/perf_matrix.py run --preset flow_map --repetitions 3 --warmups 1 --jobs 1`
 - `python benchmarks/perf_matrix.py run --preset flow_submit --repetitions 3 --warmups 1 --jobs 1`
 
+CPU-bound user-task microbench (pure-Python `cpu_burn` bodies — **not** the control-plane lite gate). Compare **GIL 3.14** vs **free-threaded 3.14t** on `micro_map_cpu_threadpool`; `micro_map_cpu_processpool` is the documented GIL-era CPU baseline. Do not use `--preset lite` to judge 3.14t.
+
+- `python benchmarks/perf_matrix.py run --preset cpu_task --repetitions 3 --warmups 1 --jobs 1 --out-json /tmp/cpu_task.json --out-md /tmp/cpu_task.md`
+
 Concurrency / FSM batch regression gate (FSM batch transitions + multi-reader mixed workload):
 
 - `python benchmarks/perf_matrix.py run --preset concurrency --repetitions 2 --warmups 1 --jobs 1`
