@@ -35,8 +35,15 @@ function pageUrl(path: string, params: Record<string, string | undefined>) {
 }
 
 export const api = {
-  listFlowRuns: (cursor?: string, state?: string) =>
-    readJson<CursorPage<FlowRun>>(pageUrl("/api/flow-runs", { limit: "50", cursor, state })),
+  listFlowRuns: (cursor?: string, state?: string, includeArchived?: boolean) =>
+    readJson<CursorPage<FlowRun>>(
+      pageUrl("/api/flow-runs", {
+        limit: "50",
+        cursor,
+        state,
+        include_archived: includeArchived ? "true" : undefined
+      })
+    ),
   getFlowRun: (id: string) => readJson<FlowRun>(`${base}/api/flow-runs/${id}`),
   cancelFlowRun: (id: string) =>
     readJson<FlowRun>(`${base}/api/flow-runs/${id}/cancel`, { method: "POST" }),
@@ -60,11 +67,31 @@ export const api = {
         level: params?.level
       })
     ),
-  listFlows: (cursor?: string) =>
-    readJson<CursorPage<{ name: string; run_count: number; updated_at: string }>>(
-      pageUrl("/api/flows", { limit: "200", cursor })
-    ),
+  listFlows: (cursor?: string, status?: string) =>
+    readJson<
+      CursorPage<{
+        id?: string;
+        name: string;
+        status?: string;
+        run_count: number;
+        updated_at: string;
+      }>
+    >(pageUrl("/api/flows", { limit: "200", cursor, status })),
   getFlow: (flowName: string) => readJson<FlowDetail>(`${base}/api/flows/${encodeURIComponent(flowName)}`),
+  renameFlow: (flowId: string, name: string) =>
+    readJson<FlowDetail>(`${base}/api/flows/${encodeURIComponent(flowId)}/rename`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name })
+    }),
+  archiveFlow: (flowId: string) =>
+    readJson<FlowDetail>(`${base}/api/flows/${encodeURIComponent(flowId)}/archive`, { method: "POST" }),
+  restoreFlow: (flowId: string) =>
+    readJson<FlowDetail>(`${base}/api/flows/${encodeURIComponent(flowId)}/restore`, { method: "POST" }),
+  deleteFlow: (flowId: string) =>
+    readJson<{ deleted?: boolean; id?: string }>(`${base}/api/flows/${encodeURIComponent(flowId)}`, {
+      method: "DELETE"
+    }),
   listTasks: (flowName?: string) =>
     readJson<Array<{ task_name: string; run_count: number; updated_at: string }>>(
       `${base}/api/tasks${flowName ? `?flow_name=${encodeURIComponent(flowName)}` : ""}`

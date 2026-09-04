@@ -18,8 +18,11 @@ def list_flow_runs(
     state: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=500),
     cursor: str | None = Query(default=None),
+    include_archived: bool = Query(default=False),
 ) -> CursorPage:
-    page = control_plane.list_flow_runs(state=state, limit=limit, cursor=cursor)
+    page = control_plane.list_flow_runs(
+        state=state, limit=limit, cursor=cursor, include_archived=include_archived
+    )
     return CursorPage(items=page.items, next_cursor=page.next_cursor)
 
 

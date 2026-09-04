@@ -4,6 +4,7 @@ import json
 from typing import Any
 from uuid import UUID
 
+from ..flow_catalog_settings import catalog_hide_archived
 from .types import (
     PageResult,
 )
@@ -11,30 +12,51 @@ from .types import (
 
 class QueriesMixin:
     def list_flow_runs(
-        self, state: str | None = None, limit: int = 50, cursor: str | None = None
+        self,
+        state: str | None = None,
+        limit: int = 50,
+        cursor: str | None = None,
+        include_archived: bool = False,
     ) -> PageResult:
+        hide = catalog_hide_archived() and not include_archived
         rust_result = self._query_rust(
-            "flow_runs", {"state": state, "limit": limit, "cursor": cursor}
+            "flow_runs",
+            {
+                "state": state,
+                "limit": limit,
+                "cursor": cursor,
+                "hide_archived": hide,
+            },
         )
         if rust_result is not None:
             return PageResult(
                 items=rust_result["items"], next_cursor=rust_result["next_cursor"]
             )
         query = (
-            "SELECT seq,id,name,state,version,created_at,updated_at,parent_flow_run_id,parent_task_run_id,"
-            "root_flow_run_id,execution_mode,depth FROM flow_runs"
+            "SELECT fr.seq,fr.id,fr.name,fr.state,fr.version,fr.created_at,fr.updated_at,"
+            "fr.parent_flow_run_id,fr.parent_task_run_id,fr.root_flow_run_id,"
+            "fr.execution_mode,fr.depth,fr.flow_id FROM flow_runs fr "
+            "LEFT JOIN flows catalog ON catalog.id = fr.flow_id"
         )
         conditions: list[str] = []
         params: list[Any] = []
         if state:
-            conditions.append("state = ?")
+            conditions.append("fr.state = ?")
             params.append(state)
+        if hide:
+            conditions.append(
+                "(catalog.id IS NULL OR catalog.status = 'active')"
+            )
+        else:
+            conditions.append(
+                "(catalog.id IS NULL OR catalog.status IN ('active','archived'))"
+            )
         if cursor:
-            conditions.append("seq < ?")
+            conditions.append("fr.seq < ?")
             params.append(int(cursor))
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
-        query += " ORDER BY seq DESC LIMIT ?"
+        query += " ORDER BY fr.seq DESC LIMIT ?"
         params.append(limit)
         rows = self._query_rows(query, params)
         items = [self._flow_row_to_dict(r) for r in rows]

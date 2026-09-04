@@ -18,6 +18,7 @@ class CursorPage(BaseModel):
 class DeploymentCreateRequest(BaseModel):
     name: str
     flow_name: str
+    formerly: list[str] = Field(default_factory=list)
     entrypoint: str | None = None
     path: str | None = None
     default_parameters: dict = Field(default_factory=dict)
@@ -78,6 +79,15 @@ class FlowRunPauseRequest(BaseModel):
     """Operator pause — ``mode`` is required (``drain`` or ``terminate``)."""
 
     mode: str
+
+
+class FlowRenameRequest(BaseModel):
+    name: str
+
+
+class DeploymentsApplyRequest(BaseModel):
+    deployments: list[dict] = Field(default_factory=list)
+    prune: bool = False
 
 
 class FlowRunCancelRequest(BaseModel):

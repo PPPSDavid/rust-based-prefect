@@ -15,7 +15,7 @@ Use this table when a Prefect import fails or behaves differently. Status values
 
 | Prefect import / API | IronFlow status | What to do |
 | --- | --- | --- |
-| `from prefect import flow, task` | supported | `from prefect_compat import flow, task` |
+| `from prefect import flow` / rename a flow | deliberate | IronFlow UUID catalog + `formerly=` / `ironflow deploy --all --prune`. Prefect cannot rename in place. Guide: [rename-archive-flows](rename-archive-flows.md) |
 | `task.submit` / `wait_for` / `wait` | supported | Same patterns; default flow finalization is **`wait_all`** (see matrix) |
 | `task.map` | supported | Moderate fan-out; pick a runner via [how-to](choose-task-runners.md) |
 | `@task(retries=…)` / `retry_delay_seconds` / `timeout_seconds` | unsupported | Decorators do not accept Prefect retry/timeout kwargs; spec for future in-run retry: `docs/plans/task-auto-retry.md`. Flow-run **cancel + deployment retry** exist via API/UI |

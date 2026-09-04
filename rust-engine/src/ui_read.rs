@@ -23,11 +23,11 @@ fn parse_opt_string(params_json: &str, key: &str) -> Option<String> {
 
 pub fn query(db_path: &str, kind: &str, params_json: &str) -> Result<String, String> {
     ui_read_pool::with_read_connection(db_path, |conn| match kind {
-        "flow_runs" => query_flow_runs(conn, params_json),
+        "flow_runs" => crate::flow_catalog_ops::query_flow_runs(conn, params_json),
         "flow_run_detail" => query_flow_run_detail(conn, params_json),
         "task_runs" => query_task_runs(conn, params_json),
         "logs" => query_logs(conn, params_json),
-        "flows" => query_flows(conn, params_json),
+        "flows" => crate::flow_catalog_ops::query_flows(conn, params_json),
         "tasks" => query_tasks(conn, params_json),
         "events" => query_events(conn, params_json),
         "artifacts_flow" => query_artifacts_flow(conn, params_json),
@@ -35,51 +35,6 @@ pub fn query(db_path: &str, kind: &str, params_json: &str) -> Result<String, Str
         "artifact" => query_artifact(conn, params_json),
         _ => Err(format!("unknown query kind: {kind}")),
     })
-}
-
-fn query_flow_runs(conn: &Connection, params_json: &str) -> Result<String, String> {
-    let state = parse_opt_string(params_json, "state");
-    let cursor = parse_opt_string(params_json, "cursor").and_then(|v| v.parse::<i64>().ok());
-    let limit = parse_limit(params_json, 50);
-    let mut sql =
-        "SELECT seq,id,name,state,version,created_at,updated_at,parent_flow_run_id,parent_task_run_id,root_flow_run_id,execution_mode,depth FROM flow_runs".to_string();
-    let mut has_where = false;
-    if state.is_some() {
-        sql.push_str(" WHERE state = ?1");
-        has_where = true;
-    }
-    if cursor.is_some() {
-        sql.push_str(if has_where {
-            " AND seq < ?2"
-        } else {
-            " WHERE seq < ?2"
-        });
-    }
-    sql.push_str(" ORDER BY seq DESC LIMIT ?3");
-
-    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
-    let items = stmt
-        .query_map(params![state.as_deref(), cursor, limit], |row| {
-            Ok(json!({
-                "id": row.get::<_, String>(1)?,
-                "name": row.get::<_, String>(2)?,
-                "state": row.get::<_, String>(3)?,
-                "version": row.get::<_, i64>(4)?,
-                "created_at": row.get::<_, String>(5)?,
-                "updated_at": row.get::<_, String>(6)?,
-                "parent_flow_run_id": row.get::<_, Option<String>>(7)?,
-                "parent_task_run_id": row.get::<_, Option<String>>(8)?,
-                "root_flow_run_id": row.get::<_, Option<String>>(9)?,
-                "execution_mode": row.get::<_, Option<String>>(10)?,
-                "depth": row.get::<_, i64>(11)?,
-                "seq": row.get::<_, i64>(0)?
-            }))
-        })
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
-
-    page_with_cursor(items, limit)
 }
 
 fn query_flow_run_detail(conn: &Connection, params_json: &str) -> Result<String, String> {
@@ -181,27 +136,6 @@ fn query_logs(conn: &Connection, params_json: &str) -> Result<String, String> {
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?;
     page_with_cursor(items, limit)
-}
-
-fn query_flows(conn: &Connection, params_json: &str) -> Result<String, String> {
-    let limit = parse_limit(params_json, 200);
-    let mut stmt = conn
-        .prepare(
-            "SELECT name,MAX(updated_at) AS updated_at,COUNT(*) AS run_count FROM flow_runs GROUP BY name ORDER BY updated_at DESC LIMIT ?1",
-        )
-        .map_err(|e| e.to_string())?;
-    let items = stmt
-        .query_map(params![limit], |row| {
-            Ok(json!({
-                "name": row.get::<_, String>(0)?,
-                "updated_at": row.get::<_, String>(1)?,
-                "run_count": row.get::<_, i64>(2)?
-            }))
-        })
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
-    serde_json::to_string(&json!({"items": items, "next_cursor": null})).map_err(|e| e.to_string())
 }
 
 fn query_tasks(conn: &Connection, params_json: &str) -> Result<String, String> {

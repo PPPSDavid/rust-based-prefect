@@ -55,6 +55,16 @@ See [Secure a self-hosted server](../how-to/secure-self-hosted.md).
 
 See [Runners](../concepts/runners.md) for behavior details and **[How to choose a task runner](../how-to/choose-task-runners.md)** for workload-based selection.
 
+## Flow catalog
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `IRONFLOW_CATALOG_HIDE_ARCHIVED` | `1` | Default `/api/flows` and `/api/flow-runs` hide archived/deleted catalog identities. Set `0` to include archived. |
+| `IRONFLOW_RUN_RETENTION_DAYS` | `90` | Delete terminal flow-run history older than this many days on maintenance ticks. `0` disables. Live states are never deleted. |
+| `IRONFLOW_ORPHAN_FLOW_GC` | `1` | After TTL, drop archived/deleted catalog rows that have no runs and no undeleted deployments. |
+
+See **[How to rename, archive, and delete flows](../how-to/rename-archive-flows.md)**. Echoed on `GET /api/server-info`.
+
 ## Development and packaging (contributors)
 
 | Variable | Default | Description |

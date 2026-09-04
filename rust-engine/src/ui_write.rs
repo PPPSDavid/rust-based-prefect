@@ -38,6 +38,11 @@ pub fn persist_flow_create_with_conn(
         ],
     )
     .map_err(|e| e.to_string())?;
+    crate::flow_catalog_ops::attach_flow_run_to_catalog(
+        conn,
+        &run.id.to_string(),
+        run.name.as_str(),
+    )?;
     Ok(())
 }
 

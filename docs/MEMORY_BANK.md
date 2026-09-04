@@ -37,7 +37,7 @@ Last updated: 2026-08-30.
   - JSONL append history for durable event replay
   - SQLite read model for query/API/UI reads via `prefect_compat.persistence` (`SqliteStore` / `ControlPlaneStore`; B0 extract)
 - **Postgres** via `IRONFLOW_DATABASE_URL` (`PostgresStore`); Rust `bind_db` for claim/lease on both backends. Schedule ticks / most CRUD on Postgres may still fall back to Python until follow-ups.
-- Query / schedule / claim / GCL hot paths prefer Rust when the native bridge is loaded.
+- Query / schedule / claim / GCL / **flow-catalog list+TTL** hot paths prefer Rust when the native bridge is loaded.
 - Production compose uses Postgres + HTTP workers (no shared worker filesystem).
 - Schema owners: Python store DDL + Rust `ensure_schema` for GCL/`bind_db`. Do not add a fourth copy. Alembic is a follow-up.
 

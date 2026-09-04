@@ -148,6 +148,7 @@ fn dispatch_control(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<V
         | "deployment_attach_flow_run"
         | "deployment_mark_run_finished"
         | "deployment_maintenance"
+        | "catalog_retention_sweep"
         | "task_tick_gate_tasks" => control_deployment::handle(ctx, op, body),
         op if op.starts_with("gcl_") => control_gcl::handle(ctx, op, body),
         "resolve_flow_terminal_state" | "list_contributing_children" => {

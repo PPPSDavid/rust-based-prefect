@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 import threading
@@ -22,6 +23,7 @@ from ..runtime import InMemoryControlPlane
 from ..services import run_services_loop
 from ..worker import resolve_worker_mode, run_http_worker_loop, run_worker_loop
 from ..worker_client import WorkerHttpClient
+from .flows import add_flow_parser
 from .gcl import add_gcl_parser
 
 DEFAULT_API_URL = "http://127.0.0.1:8000"
@@ -127,6 +129,10 @@ def cmd_init(args: argparse.Namespace) -> int:
 
 
 def cmd_deploy(args: argparse.Namespace) -> int:
+    if getattr(args, "prune", False) and not args.all:
+        print("Error: --prune requires --all", file=sys.stderr)
+        return 1
+
     manifest_path = Path(args.file).resolve()
     if not manifest_path.is_file():
         print(
@@ -149,6 +155,14 @@ def cmd_deploy(args: argparse.Namespace) -> int:
 
     api_url = args.api_url or _default_api_url()
     client = DeployClient(api_url)
+    if args.prune:
+        if not args.all:
+            print("Error: --prune requires --all", file=sys.stderr)
+            return 1
+        try:
+            return _cmd_deploy_prune(client, specs, dry_run=args.dry_run)
+        finally:
+            client.close()
     exit_code = 0
     try:
         for spec in specs:
@@ -161,6 +175,44 @@ def cmd_deploy(args: argparse.Namespace) -> int:
     finally:
         client.close()
     return exit_code
+
+
+def _cmd_deploy_prune(
+    client: DeployClient, specs: list[DeploymentSpec], *, dry_run: bool
+) -> int:
+    items: list[dict[str, Any]] = []
+    for spec in specs:
+        pool_name = spec.work_pool_name or DEFAULT_WORK_POOL_NAME
+        if dry_run:
+            items.append(spec.to_api_body(pool_name))
+            continue
+        pool = client.ensure_work_pool(pool_name)
+        items.append(spec.to_api_body(str(pool["id"])))
+    try:
+        result = client.apply_deployments(items, prune=True, dry_run=dry_run)
+    except Exception as exc:
+        print(f"Error applying deployments: {exc}", file=sys.stderr)
+        return 1
+    print(json.dumps(result, indent=2, default=str) if dry_run else _format_apply(result))
+    return 0
+
+
+def _format_apply(result: dict[str, Any]) -> str:
+    pruned = result.get("pruned") or []
+    archived = result.get("archived") or []
+    deployments = result.get("deployments") or []
+    renamed = result.get("renamed") or []
+    lines = [
+        f"apply: {len(deployments)} deployments, {len(pruned)} pruned, "
+        f"{len(archived)} archived, {len(renamed)} renamed"
+    ]
+    for item in renamed:
+        lines.append(f"renamed: {item.get('name')} ({item.get('id')})")
+    for item in pruned:
+        lines.append(f"pruned: {item.get('name')} ({item.get('id')})")
+    for item in archived:
+        lines.append(f"archived: {item.get('name')} ({item.get('id')})")
+    return "\n".join(lines)
 
 
 def _build_flow_registry(spec: DeploymentSpec) -> dict[str, Callable[..., Any]]:
@@ -387,7 +439,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     parser = argparse.ArgumentParser(
         prog="ironflow",
-        description="IronFlow CLI (init, deploy, serve, worker, gcl, server).",
+        description="IronFlow CLI (init, deploy, serve, worker, gcl, flow, server).",
     )
     parser.add_argument(
         "--version",
@@ -431,6 +483,7 @@ def _build_parser() -> argparse.ArgumentParser:
                 "ironflow deploy --file ironflow.yaml --name my-deployment",
                 "ironflow deploy --file ironflow.yaml --all",
                 "ironflow deploy --file ironflow.yaml --all --dry-run",
+                "ironflow deploy --all --prune",
                 "ironflow deploy --all --api-url http://127.0.0.1:8000",
             ]
         ),
@@ -453,6 +506,12 @@ def _build_parser() -> argparse.ArgumentParser:
         "--api-url",
         default=None,
         help=f"API base URL (default: IRONFLOW_API_URL or {DEFAULT_API_URL}).",
+    )
+    deploy_parser.add_argument(
+        "--prune",
+        action="store_true",
+        help="With --all, apply the manifest as a set: soft-delete deployments "
+        "not in the file, then rename via formerly= and auto-archive orphans.",
     )
     deploy_parser.add_argument(
         "--dry-run",
@@ -597,6 +656,7 @@ def _build_parser() -> argparse.ArgumentParser:
     services_start.set_defaults(func=cmd_server_services_start)
 
     add_gcl_parser(subparsers)
+    add_flow_parser(subparsers)
 
     return parser
 

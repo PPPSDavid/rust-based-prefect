@@ -9,6 +9,7 @@ from uuid import UUID
 from .control_plane.dag import DagMixin
 from .control_plane.deployment_runs import DeploymentRunsMixin
 from .control_plane.deployments import DeploymentsMixin
+from .control_plane.flow_catalog import FlowCatalogMixin
 from .control_plane.gates import GatesMixin
 from .control_plane.gcl import GclMixin
 from .control_plane.lifecycle import LifecycleMixin
@@ -69,6 +70,7 @@ class InMemoryControlPlane(
     RustDispatchMixin,
     GclMixin,
     ResumeMixin,
+    FlowCatalogMixin,
     RunsMixin,
     RunEventsMixin,
     QueriesMixin,

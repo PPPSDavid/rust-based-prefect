@@ -35,7 +35,10 @@ pub fn create_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
         .ok_or_else(|| "missing string field flow_name".to_string())?;
     let existing: Option<Value> = conn
         .query_row(
-            &format!("{DEPLOYMENT_SELECT} WHERE name = ?1 LIMIT 1"),
+            &format!(
+                "{DEPLOYMENT_SELECT} WHERE name = ?1{} LIMIT 1",
+                crate::flow_catalog_ops::deployments_not_deleted_sql(conn)
+            ),
             params![name],
             deployment_row_to_json,
         )
@@ -51,39 +54,78 @@ pub fn create_deployment(conn: &Connection, body: &Value) -> Result<Value, Strin
 
     let deployment_id = Uuid::new_v4().to_string();
     let now = now_iso();
-    conn.execute(
-        "INSERT INTO deployments \
-         (id,name,flow_name,entrypoint,path,default_parameters,paused,\
-          concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,\
-          schedule_next_run_at,schedule_enabled,work_pool_id,created_at,updated_at) \
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)",
-        params![
-            deployment_id,
-            name,
-            flow_name,
-            body.get("entrypoint").and_then(|v| v.as_str()),
-            body.get("path").and_then(|v| v.as_str()),
-            serde_json::to_string(body.get("default_parameters").unwrap_or(&json!({})))
-                .map_err(|e| e.to_string())?,
-            body.get("paused").and_then(|v| v.as_bool()).unwrap_or(false) as i64,
-            body.get("concurrency_limit")
-                .and_then(|v| v.as_i64().or_else(|| v.as_u64().map(|u| u as i64))),
-            body.get("collision_strategy")
-                .and_then(|v| v.as_str())
-                .unwrap_or("ENQUEUE"),
-            schedule.interval,
-            schedule.cron,
-            schedule.rrule,
-            schedule.next_run_at,
-            i64::from(schedule.enabled),
-            body.get("work_pool_id")
-                .and_then(|v| v.as_str())
-                .unwrap_or(DEFAULT_WORK_POOL_ID),
-            now,
-            now,
-        ],
-    )
-    .map_err(|e| e.to_string())?;
+    let flow_id = body.get("flow_id").and_then(|v| v.as_str());
+    let has_flow_id = crate::flow_catalog_ops::column_exists(conn, "deployments", "flow_id");
+    if has_flow_id {
+        conn.execute(
+            "INSERT INTO deployments \
+             (id,name,flow_name,entrypoint,path,default_parameters,paused,\
+              concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,\
+              schedule_next_run_at,schedule_enabled,work_pool_id,created_at,updated_at,flow_id) \
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18)",
+            params![
+                deployment_id,
+                name,
+                flow_name,
+                body.get("entrypoint").and_then(|v| v.as_str()),
+                body.get("path").and_then(|v| v.as_str()),
+                serde_json::to_string(body.get("default_parameters").unwrap_or(&json!({})))
+                    .map_err(|e| e.to_string())?,
+                body.get("paused").and_then(|v| v.as_bool()).unwrap_or(false) as i64,
+                body.get("concurrency_limit")
+                    .and_then(|v| v.as_i64().or_else(|| v.as_u64().map(|u| u as i64))),
+                body.get("collision_strategy")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("ENQUEUE"),
+                schedule.interval,
+                schedule.cron,
+                schedule.rrule,
+                schedule.next_run_at,
+                i64::from(schedule.enabled),
+                body.get("work_pool_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(DEFAULT_WORK_POOL_ID),
+                now,
+                now,
+                flow_id,
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+    } else {
+        conn.execute(
+            "INSERT INTO deployments \
+             (id,name,flow_name,entrypoint,path,default_parameters,paused,\
+              concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,\
+              schedule_next_run_at,schedule_enabled,work_pool_id,created_at,updated_at) \
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)",
+            params![
+                deployment_id,
+                name,
+                flow_name,
+                body.get("entrypoint").and_then(|v| v.as_str()),
+                body.get("path").and_then(|v| v.as_str()),
+                serde_json::to_string(body.get("default_parameters").unwrap_or(&json!({})))
+                    .map_err(|e| e.to_string())?,
+                body.get("paused").and_then(|v| v.as_bool()).unwrap_or(false) as i64,
+                body.get("concurrency_limit")
+                    .and_then(|v| v.as_i64().or_else(|| v.as_u64().map(|u| u as i64))),
+                body.get("collision_strategy")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("ENQUEUE"),
+                schedule.interval,
+                schedule.cron,
+                schedule.rrule,
+                schedule.next_run_at,
+                i64::from(schedule.enabled),
+                body.get("work_pool_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(DEFAULT_WORK_POOL_ID),
+                now,
+                now,
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+    }
 
     conn.query_row(
         &format!("{DEPLOYMENT_SELECT} WHERE id = ?1"),

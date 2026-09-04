@@ -118,6 +118,7 @@ class RustDispatchMixin:
             "work_pool_id": d.get("work_pool_id") or DEFAULT_WORK_POOL_ID,
             "created_at": d["created_at"],
             "updated_at": d["updated_at"],
+            "flow_id": d.get("flow_id"),
         }
 
     def start_rust_deployment_scheduler(

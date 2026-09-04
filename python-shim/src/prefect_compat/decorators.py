@@ -957,6 +957,7 @@ def flow(
     fn: Callable[..., T] | None = None,
     *,
     name: str | None = None,
+    formerly: Sequence[str] | None = None,
     task_runner: MapTaskRunner | ProcessPoolTaskRunner | None = None,
     transition_hooks: Sequence[TransitionHookSpec] | None = None,
     final_state: str = "wait_all",
@@ -964,6 +965,7 @@ def flow(
 ) -> Callable[..., Any]:
     def decorate(f: Callable[..., T]) -> Callable[..., T]:
         flow_name = name or getattr(f, "__name__", "<flow>")
+        former_names = tuple(str(item) for item in (formerly or ()) if item)
         declared_graph_mode = normalize_declared_graph_mode(graph_mode)
         resolved_runner = (
             task_runner if task_runner is not None else default_task_runner_from_env()
@@ -1044,6 +1046,7 @@ def flow(
                     execution_mode=execution_mode,
                     resume_from_flow_run_id=resume_from,
                     parameters_fingerprint=parameters_fingerprint,
+                    formerly=former_names,
                 )
                 _ACTIVE_FLOW_RUN.set(record.run_id)
                 flow_params = bound_flow_parameters(f, args, kwargs)
@@ -1191,6 +1194,8 @@ def flow(
                 _ACTIVE_FLOW_RUN.reset(flow_token)
                 _ACTIVE_TASK_RUNNER.reset(token)
 
+        wrapped._ironflow_flow_name = flow_name
+        wrapped._ironflow_formerly = former_names
         return wrapped
 
     if fn is None:
