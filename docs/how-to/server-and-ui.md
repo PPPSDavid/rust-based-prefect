@@ -27,7 +27,7 @@ The helper runs **`npm install`** and **`npm run dev`** in `frontend/` when the 
 
 Open the UI at **`http://localhost:4173`** (Vite binds to IPv6 `localhost`). The API defaults to **`http://127.0.0.1:8000`**.
 
-For run **DAG** visualization (zoom, search, wide/long graphs), see **[DAG and forecast](../concepts/dag-and-forecast.md)** and **[Optional: verify the web UI](../ui_e2e_visual_check.md)**.
+For run **DAG** visualization (zoom, search, wide/long graphs), see **[DAG and forecast](../concepts/dag-and-forecast.md)** and **[Optional: verify the web UI](../ui_e2e_visual_check.md)**. Flow **Rename** / **Archive** / **Delete** in the UI are catalog-only; if you still have the `@flow` file, rename in source instead — **[How to rename, archive, and delete flows](rename-archive-flows.md)**.
 
 ## Deployments and schedules
 

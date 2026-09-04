@@ -53,6 +53,7 @@ class DeploymentSpec(BaseModel):
     schedule_cron: str | None = None
     schedule_rrule: str | None = None
     schedule_enabled: bool = False
+    formerly: list[str] = Field(default_factory=list)
 
     @classmethod
     def from_entrypoint(
@@ -101,6 +102,7 @@ class DeploymentSpec(BaseModel):
             "schedule_rrule": self.schedule_rrule,
             "schedule_enabled": self.schedule_enabled,
             "work_pool_id": work_pool_id,
+            "formerly": list(self.formerly),
         }
 
 

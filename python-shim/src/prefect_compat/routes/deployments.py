@@ -6,6 +6,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query
 
+from ..errors import FlowCatalogConflict
 from ..plane import control_plane
 from .schemas import (
     CursorPage,
@@ -43,6 +44,7 @@ def create_deployment(req: DeploymentCreateRequest) -> dict:
         schedule_next_run_at=req.schedule_next_run_at,
         schedule_enabled=req.schedule_enabled,
         work_pool_id=req.work_pool_id,
+        formerly=req.formerly,
     )
 
 
@@ -99,3 +101,13 @@ def trigger_deployment_run(
         detail = str(exc)
         status_code = 404 if "not found" in detail else 400
         raise HTTPException(status_code=status_code, detail=detail) from exc
+
+
+@router.delete("/api/deployments/{deployment_id}")
+def delete_deployment(deployment_id: UUID) -> dict:
+    try:
+        return control_plane.delete_deployment(deployment_id)
+    except FlowCatalogConflict as exc:
+        raise HTTPException(status_code=409, detail=exc.http_detail()) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc

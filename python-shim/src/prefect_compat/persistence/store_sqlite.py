@@ -7,6 +7,7 @@ from pathlib import Path
 
 from ..concurrency_store import ensure_schema as ensure_gcl_schema
 from .constants import DEFAULT_WORK_POOL_ID
+from .flow_catalog_schema import upgrade_flow_catalog_sqlite
 
 
 class SqliteStore:
@@ -335,3 +336,4 @@ class SqliteStore:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_deployments_work_pool ON deployments(work_pool_id)"
         )
+        upgrade_flow_catalog_sqlite(conn)

@@ -158,3 +158,19 @@ class DeployClient:
         response = self._session.post("/api/deployments", json=body)
         response.raise_for_status()
         return {"action": "create", "dry_run": False, "deployment": response.json()}
+
+    def apply_deployments(
+        self,
+        items: list[dict[str, Any]],
+        *,
+        prune: bool = False,
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        if dry_run:
+            return {"dry_run": True, "prune": prune, "deployments": items}
+        response = self._session.post(
+            "/api/deployments/apply", json={"deployments": items, "prune": prune}
+        )
+        response.raise_for_status()
+        payload = response.json()
+        return payload if isinstance(payload, dict) else {"ok": True}

@@ -15,7 +15,7 @@ the short handoff; link the active plan from the task brief.
 | [airtight-concurrency.md](airtight-concurrency.md) | Concurrent-state invariants (`pytest -m airtight`); P4.0 lease-on-cancel |
 | [north-stars-later.md](north-stars-later.md) | Parked: scale, GHCR e2e, planning chrome; GCL CLI/UI shipped (#68) |
 | [flow-run-lifecycle-control.md](flow-run-lifecycle-control.md) | Implemented — cancel / drain|terminate pause / resume |
-| [prefect-gap-canvas.md](prefect-gap-canvas.md) | Backlog index (P0–P7); not a ship checklist |
+| [flow-catalog-lifecycle.md](flow-catalog-lifecycle.md) | Implementing — UUID-stable catalog, aliases, archive/delete, run TTL |
 | 0.3.0 maintainer cleanup | Quality gates, god-module splits, hosted-docs hygiene — this series |
 
 When starting a large compatibility feature, add a plan before coding and name it

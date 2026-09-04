@@ -375,6 +375,43 @@ pub(crate) fn handle(ctx: &mut EngineContext, op: &str, body: &Value) -> Result<
             }
             Ok(json!({"ok": true, "summary": summary}))
         }
+        "ensure_flow_canonical" => {
+            if ctx.pg_client.is_some() {
+                return Ok(pg_fallback("ensure_flow_canonical"));
+            }
+            let conn = ctx
+                .db_conn
+                .as_ref()
+                .ok_or_else(|| "ensure_flow_canonical requires bind_db".to_string())?;
+            let name = body
+                .get("name")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| "ensure_flow_canonical requires name".to_string())?;
+            match crate::flow_catalog_ops::ensure_flow_canonical(conn, name) {
+                Ok(summary) => Ok(summary),
+                Err(e) => Ok(json!({"ok": false, "error": {"code": "catalog", "message": e}})),
+            }
+        }
+        "catalog_retention_sweep" => {
+            if ctx.pg_client.is_some() {
+                return Ok(pg_fallback("catalog_retention_sweep"));
+            }
+            let conn = ctx
+                .db_conn
+                .as_ref()
+                .ok_or_else(|| "catalog_retention_sweep requires bind_db".to_string())?;
+            let cutoff = body.get("cutoff").and_then(|v| v.as_str());
+            let gc_orphans = body
+                .get("gc_orphans")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true);
+            match crate::flow_catalog_ops::catalog_retention_sweep(conn, cutoff, gc_orphans) {
+                Ok(summary) => Ok(
+                    json!({"ok": true, "deleted_runs": summary.get("deleted_runs").cloned().unwrap_or(json!(0)), "gc_flows": summary.get("gc_flows").cloned().unwrap_or(json!(0)), "summary": summary}),
+                ),
+                Err(e) => Ok(json!({"ok": false, "error": {"code": "catalog", "message": e}})),
+            }
+        }
         "task_tick_gate_tasks" => {
             if ctx.pg_client.is_some() {
                 return Ok(pg_fallback("task_tick_gate_tasks"));

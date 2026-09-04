@@ -6,6 +6,7 @@ from typing import Any
 
 from .constants import DEFAULT_WORK_POOL_ID
 from .dialect import PostgresConnectionAdapter
+from .flow_catalog_schema import upgrade_flow_catalog_postgres
 
 _SCHEMA_SQL = f"""
 CREATE TABLE IF NOT EXISTS flow_runs (
@@ -253,6 +254,7 @@ class PostgresStore:
                 "ALTER TABLE task_result_cache ADD COLUMN IF NOT EXISTS "
                 "input_fingerprint TEXT NOT NULL DEFAULT ''"
             )
+        upgrade_flow_catalog_postgres(self._adapter)
 
     def close(self) -> None:
         try:

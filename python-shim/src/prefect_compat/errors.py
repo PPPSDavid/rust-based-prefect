@@ -24,6 +24,32 @@ class FlowChildrenFailed(RuntimeError):
         self.details = details or {}
 
 
+class FlowCatalogConflict(ValueError):
+    """Raised when rename/archive/delete is blocked (HTTP 409)."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str,
+        deployments: list[dict[str, Any]] | None = None,
+        extra: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.deployments = deployments or []
+        self.extra = extra or {}
+
+    def http_detail(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "code": self.code,
+            "message": str(self),
+            "deployments": self.deployments,
+        }
+        payload.update(self.extra)
+        return payload
+
+
 class TransitionRewriteFailed(RuntimeError):
     """Raised when a rewrite handler demotes a successful terminal to FAILED."""
 

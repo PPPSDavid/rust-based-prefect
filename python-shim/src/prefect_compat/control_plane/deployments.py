@@ -100,6 +100,7 @@ class DeploymentsMixin:
         if rust is not None and rust.get("ok"):
             summary = dict(rust.get("summary") or {})
             summary.setdefault("gates_promoted", 0)
+            summary.update(self.retention_sweep())
             return summary
         with self._lock:
             reclaimed = self._reclaim_expired_claims_python()
@@ -114,19 +115,21 @@ class DeploymentsMixin:
                 [now, cutoff],
             )
             reaped = int(cur.rowcount or 0)
-        return {
+        summary = {
             "reclaimed": reclaimed,
             "triggered": n_tick,
             "reaped": reaped,
             "gates_promoted": gates,
         }
+        summary.update(self.retention_sweep())
+        return summary
 
     def _tick_deployment_schedules_python(self) -> int:
         now = self._now()
         due = self._query_rows(
             """
             SELECT id, schedule_interval_seconds FROM deployments
-            WHERE schedule_enabled = 1 AND paused = 0
+            WHERE schedule_enabled = 1 AND paused = 0 AND deleted_at IS NULL
               AND schedule_interval_seconds IS NOT NULL AND schedule_interval_seconds > 0
               AND schedule_next_run_at IS NOT NULL AND schedule_next_run_at <= ?
             """,
@@ -150,7 +153,7 @@ class DeploymentsMixin:
         due_rrule = self._query_rows(
             """
             SELECT id, schedule_rrule FROM deployments
-            WHERE schedule_enabled = 1 AND paused = 0
+            WHERE schedule_enabled = 1 AND paused = 0 AND deleted_at IS NULL
               AND schedule_rrule IS NOT NULL AND trim(schedule_rrule) != ''
               AND schedule_next_run_at IS NOT NULL AND schedule_next_run_at <= ?
             """,
@@ -213,11 +216,14 @@ class DeploymentsMixin:
         schedule_next_run_at: str | None = None,
         schedule_enabled: bool = False,
         work_pool_id: str | None = None,
+        formerly: list[str] | tuple[str, ...] | None = None,
     ) -> dict[str, Any]:
         pool_id = work_pool_id or DEFAULT_WORK_POOL_ID
+        catalog = self.ensure_flow(flow_name, formerly=formerly)
         body: dict[str, Any] = {
             "name": name,
             "flow_name": flow_name,
+            "flow_id": catalog["id"],
             "entrypoint": entrypoint,
             "path": path,
             "default_parameters": default_parameters or {},
@@ -239,6 +245,11 @@ class DeploymentsMixin:
         )
         if rust is not None and rust.get("ok") and rust.get("deployment") is not None:
             deployment = self._deployment_from_rust_json(rust["deployment"])
+            self._sqlite_conn.execute(
+                "UPDATE deployments SET flow_id = ? WHERE id = ?",
+                [catalog["id"], deployment["id"]],
+            )
+            deployment["flow_id"] = catalog["id"]
             return deployment
         if rust is not None and rust.get("ok") is False:
             err = rust.get("error") or {}
@@ -251,7 +262,7 @@ class DeploymentsMixin:
                        concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,
                        schedule_next_run_at,schedule_enabled,work_pool_id,created_at,updated_at
                 FROM deployments
-                WHERE name = ?
+                WHERE name = ? AND deleted_at IS NULL
                 LIMIT 1
                 """,
                 [name],
@@ -290,8 +301,8 @@ class DeploymentsMixin:
                 INSERT INTO deployments
                 (id,name,flow_name,entrypoint,path,default_parameters,paused,
                  concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,
-                 schedule_next_run_at,schedule_enabled,work_pool_id,created_at,updated_at)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                 schedule_next_run_at,schedule_enabled,work_pool_id,created_at,updated_at,flow_id)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 [
                     deployment_id,
@@ -311,13 +322,14 @@ class DeploymentsMixin:
                     pool_id,
                     now,
                     now,
+                    catalog["id"],
                 ],
             )
             row = self._query_rows(
                 """
                 SELECT id,name,flow_name,entrypoint,path,default_parameters,paused,
                        concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,
-                       schedule_next_run_at,schedule_enabled,work_pool_id,created_at,updated_at
+                       schedule_next_run_at,schedule_enabled,work_pool_id,created_at,updated_at,flow_id
                 FROM deployments
                 WHERE id = ?
                 LIMIT 1
@@ -489,12 +501,12 @@ class DeploymentsMixin:
         query = (
             "SELECT seq,id,name,flow_name,entrypoint,path,default_parameters,paused,"
             " concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,"
-            " schedule_next_run_at,schedule_enabled,created_at,updated_at "
-            "FROM deployments"
+            " schedule_next_run_at,schedule_enabled,created_at,updated_at,flow_id "
+            "FROM deployments WHERE deleted_at IS NULL"
         )
         params: list[Any] = []
         if cursor:
-            query += " WHERE seq < ?"
+            query += " AND seq < ?"
             params.append(int(cursor))
         query += " ORDER BY seq DESC LIMIT ?"
         params.append(limit)
@@ -510,7 +522,7 @@ class DeploymentsMixin:
                    concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,
                    schedule_next_run_at,schedule_enabled,created_at,updated_at
             FROM deployments
-            WHERE id = ?
+            WHERE id = ? AND deleted_at IS NULL
             LIMIT 1
             """,
             [str(deployment_id)],
@@ -526,7 +538,7 @@ class DeploymentsMixin:
                    concurrency_limit,collision_strategy,schedule_interval_seconds,schedule_cron,schedule_rrule,
                    schedule_next_run_at,schedule_enabled,work_pool_id,created_at,updated_at
             FROM deployments
-            WHERE name = ?
+            WHERE name = ? AND deleted_at IS NULL
             LIMIT 1
             """,
             [name],

@@ -29,7 +29,9 @@ class RunsMixin:
         execution_mode: str | None = None,
         resume_from_flow_run_id: UUID | None = None,
         parameters_fingerprint: str | None = None,
+        formerly: list[str] | tuple[str, ...] | None = None,
     ) -> FlowRunRecord:
+        catalog = self.ensure_flow(name, formerly=formerly)
         run_id = uuid4()
         root_flow_run_id: UUID | None = run_id
         depth = 0
@@ -158,6 +160,9 @@ class RunsMixin:
             )
             if (not self._rust_native_persistence) and self._rust_fsm_active():
                 self._rust_register_flow(record)
+            # Always stamp the catalog UUID returned by ensure_flow so Python and
+            # Rust connections cannot diverge on flow_id.
+            self.attach_run_to_flow(record.run_id, str(catalog["id"]))
         return record
 
     def create_task_run(

@@ -432,6 +432,7 @@ class StoreMixin:
             if "execution_mode" in keys
             else None,
             "depth": row["depth"] if "depth" in keys else 0,
+            "flow_id": row["flow_id"] if "flow_id" in keys else None,
         }
 
     def _task_row_to_dict(self, row: sqlite3.Row) -> dict[str, Any]:
@@ -513,6 +514,8 @@ class StoreMixin:
             "schedule_next_run_at": col("schedule_next_run_at"),
             "schedule_enabled": bool(col("schedule_enabled", 0)),
             "work_pool_id": col("work_pool_id") or DEFAULT_WORK_POOL_ID,
+            "flow_id": col("flow_id"),
+            "deleted_at": col("deleted_at"),
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
         }

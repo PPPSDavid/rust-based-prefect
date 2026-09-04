@@ -99,6 +99,11 @@ PAGES: list[tuple[str, str, str]] = [
         "ironflow.yaml and ironflow CLI.",
     ),
     (
+        "How to rename, archive, and delete flows",
+        "how-to/rename-archive-flows/",
+        "Primary: formerly= in source plus deploy --prune. UI is catalog-only.",
+    ),
+    (
         "How to create deployments",
         "how-to/deployments/",
         "HTTP API deployment recipes.",
@@ -181,6 +186,7 @@ with gen_open("llms.txt", "w") as f:
             "how-to/worker-http-mode/": "how-to/worker-http-mode.md",
             "how-to/secure-self-hosted/": "how-to/secure-self-hosted.md",
             "how-to/deploy-with-cli/": "how-to/deploy-with-cli.md",
+            "how-to/rename-archive-flows/": "how-to/rename-archive-flows.md",
             "how-to/deployments/": "how-to/deployments.md",
             "how-to/subflows/": "how-to/subflows.md",
             "how-to/choose-task-runners/": "how-to/choose-task-runners.md",

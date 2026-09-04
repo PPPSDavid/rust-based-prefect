@@ -162,8 +162,16 @@ export type DeploymentRun = {
 };
 
 export type FlowDetail = {
+  id: string;
   name: string;
+  status?: string;
+  aliases?: string[];
+  canonical_name?: string;
+  resolved_from_alias?: boolean;
+  requested_name?: string;
   tasks: Array<{ task_name: string; run_count: number; updated_at: string }>;
+  deployments?: Deployment[];
+  recent_runs?: FlowRun[];
 };
 
 export type WorkPool = {

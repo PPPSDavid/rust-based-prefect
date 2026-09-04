@@ -75,6 +75,7 @@ nav:
       - "How to run workers in HTTP mode": how-to/worker-http-mode.md
       - "How to secure a self-hosted server": how-to/secure-self-hosted.md
       - "How to deploy with the CLI and ironflow.yaml": how-to/deploy-with-cli.md
+      - "How to rename, archive, and delete flows": how-to/rename-archive-flows.md
       - "How to create and update deployments": how-to/deployments.md
       - "How to compose flows with subflows": how-to/subflows.md
       - "How to choose a task runner": how-to/choose-task-runners.md

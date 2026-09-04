@@ -25,14 +25,14 @@ Monotonic `seq` in storage backs cursors.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/health` | Liveness check |
+| `GET` | `/api/server-info` | Liveness plus catalog env flags (`catalog_hide_archived`, `run_retention_days`, `orphan_flow_gc`) |
 | `GET` | `/history/summary` | History file stats |
 
 ## Flow runs
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/api/flow-runs` | List flow runs (`state`, `limit`, `cursor`) |
+| `GET` | `/api/flow-runs` | List flow runs (`state`, `limit`, `cursor`, `include_archived`) |
 | `GET` | `/api/flow-runs/{flow_run_id}` | Flow run detail |
 | `GET` | `/api/flow-runs/{flow_run_id}/task-runs` | Task runs under a flow |
 | `GET` | `/api/flow-runs/{flow_run_id}/logs` | Logs (`task_run_id`, `level`, `limit`, `cursor`) |
@@ -47,8 +47,12 @@ Monotonic `seq` in storage backs cursors.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/api/flows` | Registered flow catalog |
-| `GET` | `/api/flows/{flow_name}` | Flow metadata |
+| `GET` | `/api/flows` | Flow catalog (`status=active\|archived`) |
+| `GET` | `/api/flows/{flow_name}` | Flow metadata (aliases resolve) |
+| `POST` | `/api/flows/{flow_id}/rename` | Catalog-only rename (409 if undeleted deployments). Prefer `formerly=` + `POST /api/deployments/apply` when source still exists — **[rename how-to](../how-to/rename-archive-flows.md)**. |
+| `POST` | `/api/flows/{flow_id}/archive` | Archive (409 if undeleted deployments) |
+| `POST` | `/api/flows/{flow_id}/restore` | Restore archived/deleted |
+| `DELETE` | `/api/flows/{flow_id}` | Soft-delete (409 if undeleted deployments or live runs) |
 | `GET` | `/api/tasks` | Task catalog |
 
 ## Deployments
@@ -60,7 +64,8 @@ Monotonic `seq` in storage backs cursors.
 | `GET` | `/api/deployments/{deployment_id}` | Deployment detail |
 | `GET` | `/api/deployments/by-name/{name}` | Lookup by unique name |
 | `PATCH` | `/api/deployments/{deployment_id}` | Update schedule, pause, parameters |
-| `POST` | `/api/deployments/{deployment_id}/run` | Enqueue a deployment run |
+| `POST` | `/api/deployments/apply` | Primary source rename: upsert + optional prune/`formerly=` (`prune=true`) |
+| `DELETE` | `/api/deployments/{deployment_id}` | Soft-delete (409 if live runs or schedule enabled) |
 | `GET` | `/api/deployment-runs` | List deployment runs |
 
 ## Work pools and workers

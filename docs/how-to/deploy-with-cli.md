@@ -24,7 +24,7 @@ Each deployment entry supports:
 | `parameters` | no | Default run parameters (maps to `default_parameters` in the API). |
 | `work_pool` | no | `{ name: <pool-name> }` — defaults to `default-process-pool`. |
 | `schedule` | no | `{ cron, interval, rrule, enabled }` — interval/cron/RRule are mutually exclusive (same rules as the HTTP API). |
-| `paused` | no | When `true`, the deployment does not enqueue scheduled runs. |
+| `formerly` | no | Previous flow names for the **primary** in-place catalog rename (`ironflow deploy --all --prune`). Prefer this over UI rename when the flow source still exists. See **[How to rename, archive, and delete flows](rename-archive-flows.md)**. |
 | `concurrency_limit` | no | Max concurrent deployment runs (optional). |
 | `collision_strategy` | no | `ENQUEUE` or `CANCEL_NEW` when a concurrency limit is set. |
 
@@ -84,6 +84,9 @@ ironflow deploy --file ironflow.yaml --all
 
 # Preview without mutating the API
 ironflow deploy --file ironflow.yaml --all --dry-run
+
+# Rename + replace deployments in one shot (requires --all)
+ironflow deploy --file ironflow.yaml --all --prune
 
 # Remote API
 ironflow deploy --all --api-url http://127.0.0.1:8000
