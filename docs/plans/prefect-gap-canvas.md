@@ -98,7 +98,7 @@ Prefect concept pages from https://docs.prefect.io/v3/concepts (plus adjacent ge
 | Assets / SLAs / telemetry | None | park | Cloud-leaning / advanced |
 | Server / self-hosted scale | Compose shipped; HA/Redis deferred | partial | See Tier B follow-ups |
 | UI | Runs/Flows/Deployments/Work pools + DAG | partial | Checklist stale; concurrency admin missing |
-| MCP / AI assistants | Phase 0 CLI (`api` / `flow-run` / `deployment`) + `llms.txt`; MCP server planned | gap (planned) | Roadmap: [`agent-native-roadmap.md`](agent-native-roadmap.md). Borrow Prefect read-only MCP + CLI-for-writes; differentiate with static planner (Phase 2). |
+| MCP / AI assistants | Phase 0 CLI + Phase 1 read-only `ironflow-mcp` (FastMCP 4) + `llms.txt` | partial | Roadmap: [`agent-native-roadmap.md`](agent-native-roadmap.md). Mutations stay CLI-first; planner tools = Phase 2. |
 | Integrations gallery | None | park | |
 
 ---

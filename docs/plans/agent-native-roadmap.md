@@ -1,7 +1,7 @@
 # Agent-native IronFlow roadmap
 
-**Status:** Living plan — **Phase 0 in progress / shipping**  
-**Date:** 2026-09-07  
+**Status:** Living plan — **Phase 0 shipped**; **Phase 1 shipping**  
+**Date:** 2026-09-07 (rev: Phase 1 MCP)  
 **Audience:** Maintainers choosing agent-facing surfaces (CLI, MCP, skills, docs)  
 **Related:** [`prefect-gap-canvas.md`](prefect-gap-canvas.md), Prefect
 [`prefect-mcp-server`](https://github.com/PrefectHQ/prefect-mcp-server),
@@ -84,20 +84,20 @@ static_planner        →  Phase 2 MCP/CLI exposure
 
 **Ownership:** `python-shim` CLI + docs. **No new deps.**
 
-### Phase 1 — Read-only `ironflow-mcp` + plugin
+### Phase 1 — Read-only `ironflow-mcp` (shipping)
 
 **Gets you:** “IronFlow has an MCP server” with Prefect-compatible tool names.
 
-- Package `ironflow-mcp/` with console script `ironflow-mcp` (stdio default).
-- Tools: `orientation`, `get_server_info`, `get_dashboard`, `get_flows`,
-  `get_deployments`, `get_flow_runs`, `get_flow_run`, `get_task_runs`,
-  `get_flow_run_logs`, `read_events`, `get_work_pools`,
-  `get_concurrency_limits`, `get_object_schema`, plus differentiator
-  `get_flow_run_dag`. All `readOnlyHint=True`.
-- Resource `ironflow://docs/llms.txt`.
-- Plugin: Claude Code / Codex marketplace skeleton + `skills/workflows` +
-  `skills/cli` (mutations → Phase 0 CLI). Cursor `mcp.json` snippet in docs.
-- Tests: FastMCP in-memory client + scripted scenario evals (no LLM).
+| Deliverable | Notes |
+| --- | --- |
+| Package `ironflow-mcp/` | FastMCP 4; console script `ironflow-mcp` (stdio default, optional `--transport http`) |
+| Tools | `orientation`, `get_server_info`, `get_dashboard`, `get_flows`, `get_deployments`, `get_flow_runs`, `get_flow_run`, `get_task_runs`, `get_flow_run_logs`, `read_events`, `get_work_pools`, `get_concurrency_limits`, `get_object_schema`, `get_flow_run_dag` — all `read_only_hint=True` (MCP SDK v2) |
+| Config | `IRONFLOW_API_URL` / `IRONFLOW_API_AUTH_STRING` |
+| Skill | `.cursor/skills/ironflow-ops/` (mutations → Phase 0 CLI) |
+| Docs | Cursor / Claude Code snippets in `docs/how-to/ai-assistants.md` |
+| Tests | FastMCP in-memory `Client(server)` + scripted diagnose scenario |
+
+**Deliberately deferred (keep lean):** hosted marketplace plugin, docs MCP proxy mount, `ironflow://` resources, OAuth.
 
 ### Phase 2 — Static planner as an agent tool
 
