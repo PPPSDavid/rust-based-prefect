@@ -4,6 +4,8 @@ Side-by-side comparison notes for IronFlow UI vs Prefect OSS 3.x.
 
 **Last audited:** 2026-08-15 against `frontend/src/App.tsx` routes and page implementations.
 
+**Roadmap:** aesthetics / performance / UX gaps and the phased plan to close them live in [`plans/ui-parity-roadmap.md`](plans/ui-parity-roadmap.md) (Tailwind + shadcn/ui foundation, U0–U6, B1–B5). Tick rows here as each phase lands.
+
 ## Navigation
 
 | Area | Prefect | IronFlow today |

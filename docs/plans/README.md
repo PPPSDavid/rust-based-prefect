@@ -16,6 +16,7 @@ the short handoff; link the active plan from the task brief.
 | [north-stars-later.md](north-stars-later.md) | Parked: scale, GHCR e2e, planning chrome; GCL CLI/UI shipped (#68) |
 | [flow-run-lifecycle-control.md](flow-run-lifecycle-control.md) | Implemented — cancel / drain|terminate pause / resume |
 | [flow-catalog-lifecycle.md](flow-catalog-lifecycle.md) | Implementing — UUID-stable catalog, aliases, archive/delete, run TTL |
+| [ui-parity-roadmap.md](ui-parity-roadmap.md) | Accepted — Tailwind + shadcn/ui foundation; phases U0–U6 + backend enablers B1–B5 vs Prefect 3.8 UI v2 |
 | 0.3.0 maintainer cleanup | Quality gates, god-module splits, hosted-docs hygiene — this series |
 
 When starting a large compatibility feature, add a plan before coding and name it
