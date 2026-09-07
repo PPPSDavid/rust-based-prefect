@@ -82,6 +82,7 @@ nav:
       - "How to use concurrency limits": how-to/concurrency-limits.md
       - "How to resume tasks and persist results": how-to/task-resume-and-persist.md
       - "How to cancel, pause, and resume": how-to/cancel-pause-resume.md
+      - "How to use IronFlow with AI coding agents": how-to/ai-assistants.md
       - "How to port a flow from Prefect": how-to/port-from-prefect.md
   - Reference:
       - "Compatibility matrix": compatibility.md

@@ -23,6 +23,9 @@ from ..runtime import InMemoryControlPlane
 from ..services import run_services_loop
 from ..worker import resolve_worker_mode, run_http_worker_loop, run_worker_loop
 from ..worker_client import WorkerHttpClient
+from .api import add_api_parser
+from .deployments import add_deployment_parser
+from .flow_runs import add_flow_run_parser
 from .flows import add_flow_parser
 from .gcl import add_gcl_parser
 
@@ -441,7 +444,10 @@ def _build_parser() -> argparse.ArgumentParser:
 
     parser = argparse.ArgumentParser(
         prog="ironflow",
-        description="IronFlow CLI (init, deploy, serve, worker, gcl, flow, server).",
+        description=(
+            "IronFlow CLI (init, deploy, serve, worker, gcl, flow, "
+            "flow-run, deployment, api, server)."
+        ),
     )
     parser.add_argument(
         "--version",
@@ -659,6 +665,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
     add_gcl_parser(subparsers)
     add_flow_parser(subparsers)
+    add_flow_run_parser(subparsers)
+    add_deployment_parser(subparsers)
+    add_api_parser(subparsers)
 
     return parser
 
