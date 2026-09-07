@@ -70,7 +70,10 @@ async def _run_mcp_checks() -> tuple[list[str], dict[str, Any]]:
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             init = await session.initialize()
-            server_name = getattr(init.serverInfo, "name", None)
+            server_info = getattr(init, "server_info", None) or getattr(
+                init, "serverInfo", None
+            )
+            server_name = getattr(server_info, "name", None) if server_info else None
             _ok(f"MCP initialize server={server_name!r}")
             if server_name != "code-review-graph":
                 issues.append(f"unexpected server name: {server_name!r}")

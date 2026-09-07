@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ironflow-mcp"
+version = "0.3.0"
+description = "Read-only MCP server for IronFlow control-plane inspection (FastMCP)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [{ name = "IronFlow contributors" }]
+dependencies = [
+  "fastmcp>=4,<5",
+  "ironflow-prefect-compat",
+]
+
+[project.scripts]
+ironflow-mcp = "ironflow_mcp.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/PPPSDavid/rust-based-prefect"
+Documentation = "https://pppsdavid.github.io/rust-based-prefect/how-to/ai-assistants/"
+Repository = "https://github.com/PPPSDavid/rust-based-prefect"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.uv.sources]
+ironflow-prefect-compat = { workspace = true }
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "../python-shim/src"]
+testpaths = ["tests"]

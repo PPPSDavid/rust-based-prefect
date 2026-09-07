@@ -21,5 +21,9 @@ path = "static-planner/src"
 suffixes = [".py"]
 
 [[roots]]
+path = "ironflow-mcp/src"
+suffixes = [".py"]
+
+[[roots]]
 path = "frontend/src"
 suffixes = [".ts", ".tsx"]
