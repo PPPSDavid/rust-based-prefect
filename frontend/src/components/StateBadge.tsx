@@ -35,7 +35,7 @@ export function StateBadge({ state, className }: StateBadgeProps) {
         | "online")
     : "default";
   return (
-    <Badge variant={variant} className={cn(className)}>
+    <Badge variant={variant} className={cn(`badge badge-${normalized}`, className)}>
       {state}
     </Badge>
   );

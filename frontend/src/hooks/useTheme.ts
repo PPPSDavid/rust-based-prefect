@@ -47,8 +47,17 @@ export function useTheme() {
   const setMode = useCallback((next: ThemeMode) => setModeState(next), []);
 
   const cycle = useCallback(() => {
-    setModeState((prev) => (prev === "system" ? "light" : prev === "light" ? "dark" : "system"));
+    // One click always flips the visible theme (system resolves first).
+    setModeState((prev) => {
+      const current = prev === "system" ? resolveTheme("system") : prev;
+      return current === "dark" ? "light" : "dark";
+    });
   }, []);
 
-  return { mode, setMode, cycle, resolved: typeof window === "undefined" ? "dark" : resolveTheme(mode) };
+  return {
+    mode,
+    setMode,
+    cycle,
+    resolved: typeof window === "undefined" ? "dark" : resolveTheme(mode === "system" ? "system" : mode)
+  };
 }

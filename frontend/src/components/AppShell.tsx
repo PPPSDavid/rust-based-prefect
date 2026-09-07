@@ -181,11 +181,20 @@ export function AppShell({ children }: AppShellProps) {
               </span>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" onClick={cycle} aria-label={`Theme: ${themeLabel}`}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      cycle();
+                    }}
+                    aria-label={`Theme: ${themeLabel}`}
+                  >
                     {resolved === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Theme: {themeLabel} (click to cycle)</TooltipContent>
+                <TooltipContent>Theme: {themeLabel} (click to toggle)</TooltipContent>
               </Tooltip>
             </div>
           </header>
