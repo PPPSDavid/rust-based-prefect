@@ -62,7 +62,7 @@ def poll_jobs(job_ids: list[str]) -> list[dict]:
 
 **Tuning:** pass `max_workers` on the runner, or set **`IRONFLOW_TASK_RUNNER_THREAD_POOL_MAX_WORKERS`** globally. When unset, the pool size defaults to `min(32, cpu_count + 4)`.
 
-**When thread pool does *not* help:** CPU-bound pure Python in every mapped task (GIL-bound). Prefer a process runner or move hot paths to Rust/native code.
+**When thread pool does *not* help:** CPU-bound pure Python in every mapped task (GIL-bound). Prefer a process runner or move hot paths to Rust/native code. **Experimental:** on free-threaded CPython **3.14t**, the same thread pool can overlap CPU-bound Python; this is not a supported production ABI yet ([Installation](../INSTALL.md)). Hard cancel still requires a process runner.
 
 ## Mechanism 2 — Process pool (CPU-bound local Python)
 

@@ -43,7 +43,7 @@ python -m venv .venv
 python -m pip install -r requirements-ci.txt
 ```
 
-Use **Python 3.11+** (`.python-version` / `environment.yml` may pin 3.12).
+Use **Python 3.11+** (published wheels cover **3.11–3.14**; `.python-version` / `environment.yml` pin **3.12**).
 
 ## 3. Build the Rust engine
 

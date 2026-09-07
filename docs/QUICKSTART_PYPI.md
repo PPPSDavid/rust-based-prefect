@@ -2,7 +2,7 @@
 
 Run a minimal `@flow` / `@task` example after **`pip install ironflow-prefect-compat`** — no repository clone, no `PYTHONPATH`, and no API server.
 
-**Prerequisites:** Python **3.11** or **3.12** (see [Installation](INSTALL.md) for wheel platform notes).
+**Prerequisites:** Python **3.11–3.14** (see [Installation](INSTALL.md) for wheel platform notes).
 
 ## 1. Install
 
