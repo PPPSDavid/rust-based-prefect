@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { Button } from "./ui/button";
 
 type ActionButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: "primary" | "secondary" | "danger";
@@ -6,9 +7,10 @@ type ActionButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 export function ActionButton({ variant = "secondary", className = "", children, ...rest }: ActionButtonProps) {
+  const mapped = variant === "primary" ? "default" : variant === "danger" ? "danger" : "secondary";
   return (
-    <button className={`btn btn-${variant} ${className}`.trim()} type="button" {...rest}>
+    <Button variant={mapped} className={className} type="button" {...rest}>
       {children}
-    </button>
+    </Button>
   );
 }

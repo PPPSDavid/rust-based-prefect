@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { EmptyState } from "./EmptyState";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 
 export type Column<T> = {
   key: string;
@@ -15,27 +17,27 @@ type DataTableProps<T> = {
 
 export function DataTable<T>({ columns, rows, rowKey, emptyMessage = "No items found." }: DataTableProps<T>) {
   if (rows.length === 0) {
-    return <p className="muted">{emptyMessage}</p>;
+    return <EmptyState title="Nothing here" message={emptyMessage} />;
   }
 
   return (
-    <table className="grid">
-      <thead>
-        <tr>
+    <Table className="grid-table">
+      <TableHeader>
+        <TableRow>
           {columns.map((col) => (
-            <th key={col.key}>{col.header}</th>
+            <TableHead key={col.key}>{col.header}</TableHead>
           ))}
-        </tr>
-      </thead>
-      <tbody>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
         {rows.map((row) => (
-          <tr key={rowKey(row)}>
+          <TableRow key={rowKey(row)}>
             {columns.map((col) => (
-              <td key={col.key}>{col.render(row)}</td>
+              <TableCell key={col.key}>{col.render(row)}</TableCell>
             ))}
-          </tr>
+          </TableRow>
         ))}
-      </tbody>
-    </table>
+      </TableBody>
+    </Table>
   );
 }

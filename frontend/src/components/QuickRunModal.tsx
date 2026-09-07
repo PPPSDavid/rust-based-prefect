@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { ActionButton } from "./ActionButton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
+import { Input } from "./ui/input";
 
 type QuickRunModalProps = {
   deploymentName: string;
@@ -34,28 +36,26 @@ export function QuickRunModal({
   };
 
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true">
-      <div className="modal">
-        <h3>Quick Run: {deploymentName}</h3>
-        <label className="field-label">
+    <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
+      <DialogContent aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle>Quick Run: {deploymentName}</DialogTitle>
+        </DialogHeader>
+        <label className="mb-3 block text-sm">
           Parameters (JSON)
           <textarea
-            className="field-input mono-list"
+            className="field-input mono-list mt-1 w-full rounded-md border border-border bg-surface p-2 font-mono text-sm"
             rows={8}
             value={parametersJson}
             onChange={(e) => setParametersJson(e.target.value)}
           />
         </label>
-        <label className="field-label">
+        <label className="mb-3 block text-sm">
           Idempotency key (optional)
-          <input
-            className="field-input"
-            value={idempotencyKey}
-            onChange={(e) => setIdempotencyKey(e.target.value)}
-          />
+          <Input className="mt-1" value={idempotencyKey} onChange={(e) => setIdempotencyKey(e.target.value)} />
         </label>
-        {error ? <p className="form-error">{error}</p> : null}
-        <div className="modal-actions">
+        {error ? <p className="form-error text-sm text-warning">{error}</p> : null}
+        <div className="mt-3 flex justify-end gap-2">
           <ActionButton onClick={onClose} disabled={isPending}>
             Cancel
           </ActionButton>
@@ -63,7 +63,7 @@ export function QuickRunModal({
             {isPending ? "Starting..." : "Run"}
           </ActionButton>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

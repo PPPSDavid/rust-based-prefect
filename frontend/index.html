@@ -4,6 +4,18 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IronFlow UI</title>
+    <link rel="preload" href="/fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin />
+    <script>
+      (function () {
+        try {
+          var mode = localStorage.getItem("ironflow-theme") || "system";
+          var dark =
+            mode === "dark" ||
+            (mode !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          if (dark) document.documentElement.classList.add("dark");
+        } catch (_) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

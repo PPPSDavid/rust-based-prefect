@@ -16,8 +16,10 @@ vi.mock("./api", () => ({
 }));
 
 describe("App navigation", () => {
-  it("renders primary nav links", () => {
-    const queryClient = new QueryClient();
+  it("renders primary nav links", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } }
+    });
     render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter initialEntries={["/runs"]}>
@@ -25,9 +27,10 @@ describe("App navigation", () => {
         </MemoryRouter>
       </QueryClientProvider>
     );
-    expect(screen.getByRole("link", { name: "Flow Runs" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Flow Runs" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Deployments" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Work Pools" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Concurrency" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Dashboard" })).toBeInTheDocument();
   });
 });
