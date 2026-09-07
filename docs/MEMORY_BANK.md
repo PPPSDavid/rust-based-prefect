@@ -88,6 +88,7 @@ Last updated: 2026-09-04.
 ## Next High-Value Work
 
 Gap canvas: `docs/plans/prefect-gap-canvas.md` (from PR #60 lineage).
+UI roadmap: `docs/plans/ui-parity-roadmap.md` — approved foundation is **Tailwind + shadcn/ui (Radix) + lucide** (same stack as Prefect 3.8 UI v2); frontend phases U0–U6, backend enablers B1–B5 (new query shapes go to `rust-engine`). Custom SVG DAG stays; pixel-perfect clone remains parked.
 
 1. **P4.1** — async `concurrency` / `rate_limit` (thin over the same Rust acquire). See `docs/plans/north-stars-later.md`.
 2. Postgres Rust schedule/gate + HA follow-ups (P2) — later plan.
