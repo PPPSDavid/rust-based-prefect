@@ -6,16 +6,18 @@ Normative limits: **[Compatibility matrix](../compatibility.md)**. Design notes:
 
 ## Quick reference
 
-| Action | API | Effect |
-| --- | --- | --- |
-| **Cancel** | `POST /api/flow-runs/{id}/cancel` | Terminal `CANCELLED`. Always **terminate** semantics. |
-| **Pause (drain)** | `POST …/pause` `{"mode":"drain"}` | Block new task starts; let in-flight finish; settle `PAUSED`. |
-| **Pause (terminate)** | `POST …/pause` `{"mode":"terminate"}` | Cancel RUNNING tasks, kill registered process workers, hold `PAUSED`. |
-| **Resume** | `POST …/resume` | Operator pauses only (not gate-only `PAUSED`). |
+| Action | API | CLI | Effect |
+| --- | --- | --- | --- |
+| **Cancel** | `POST /api/flow-runs/{id}/cancel` | `ironflow flow-run cancel <id>` | Terminal `CANCELLED`. Always **terminate** semantics. |
+| **Pause (drain)** | `POST …/pause` `{"mode":"drain"}` | `ironflow flow-run pause <id> --mode drain` | Block new task starts; let in-flight finish; settle `PAUSED`. |
+| **Pause (terminate)** | `POST …/pause` `{"mode":"terminate"}` | `ironflow flow-run pause <id> --mode terminate` | Cancel RUNNING tasks, kill registered process workers, hold `PAUSED`. |
+| **Resume** | `POST …/resume` | `ironflow flow-run resume <id>` | Operator pauses only (not gate-only `PAUSED`). |
 
 `mode` is **required** on pause — there is no ambiguous default.
 
 Python plane helpers mirror the HTTP API: `plane.cancel_flow_run(id)`, `plane.pause_flow_run(id, mode="drain"|"terminate")`, `plane.resume_flow_run(id)`. Enum: `InterruptMode.DRAIN` / `InterruptMode.TERMINATE`.
+
+Raw JSON alternative: `ironflow api POST /api/flow-runs/<id>/pause --data '{"mode":"drain"}'`. Agent cheat sheet: **[How to use IronFlow with AI coding agents](ai-assistants.md)**.
 
 ## Cancel
 

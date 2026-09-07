@@ -98,7 +98,7 @@ Prefect concept pages from https://docs.prefect.io/v3/concepts (plus adjacent ge
 | Assets / SLAs / telemetry | None | park | Cloud-leaning / advanced |
 | Server / self-hosted scale | Compose shipped; HA/Redis deferred | partial | See Tier B follow-ups |
 | UI | Runs/Flows/Deployments/Work pools + DAG | partial | Checklist stale; concurrency admin missing |
-| MCP / AI assistants | IronFlow `llms.txt` only | docs / park | Prefect MCP is Cloud/OSS ops tooling |
+| MCP / AI assistants | Phase 0 CLI (`api` / `flow-run` / `deployment`) + `llms.txt`; MCP server planned | gap (planned) | Roadmap: [`agent-native-roadmap.md`](agent-native-roadmap.md). Borrow Prefect read-only MCP + CLI-for-writes; differentiate with static planner (Phase 2). |
 | Integrations gallery | None | park | |
 
 ---
@@ -219,7 +219,7 @@ Do **not** open sessions unless product direction changes:
 - Kubernetes/Docker/push work pools
 - Work-queue priority & concurrency
 - Assets, SLAs, webhooks product surface
-- Prefect MCP server clone
+- Horizon-style hosted MCP gateway / registry / OAuth (see agent-native roadmap Phase 5)
 - Pixel-perfect Prefect UI clone
 - Full `prefect deploy` / `prefect.yaml` recipe parity
 

@@ -129,6 +129,16 @@ PAGES: list[tuple[str, str, str]] = [
         "DAG resume on retry, persist_result, JSON allowlist.",
     ),
     (
+        "How to cancel, pause, and resume",
+        "how-to/cancel-pause-resume/",
+        "Drain vs terminate pause; process-kill cancel; CLI helpers.",
+    ),
+    (
+        "How to use IronFlow with AI coding agents",
+        "how-to/ai-assistants/",
+        "JSON CLI, OpenAPI, llms.txt, and agent safety notes.",
+    ),
+    (
         "How to port from Prefect",
         "how-to/port-from-prefect/",
         "Import swap and subset limits.",
@@ -192,6 +202,8 @@ with gen_open("llms.txt", "w") as f:
             "how-to/choose-task-runners/": "how-to/choose-task-runners.md",
             "how-to/concurrency-limits/": "how-to/concurrency-limits.md",
             "how-to/task-resume-and-persist/": "how-to/task-resume-and-persist.md",
+            "how-to/cancel-pause-resume/": "how-to/cancel-pause-resume.md",
+            "how-to/ai-assistants/": "how-to/ai-assistants.md",
             "how-to/port-from-prefect/": "how-to/port-from-prefect.md",
             "compatibility/": "compatibility.md",
             "reference/env-vars/": "reference/env-vars.md",

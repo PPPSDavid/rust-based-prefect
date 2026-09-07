@@ -89,11 +89,12 @@ Last updated: 2026-09-04.
 
 Gap canvas: `docs/plans/prefect-gap-canvas.md` (from PR #60 lineage).
 
-1. **P4.1** — async `concurrency` / `rate_limit` (thin over the same Rust acquire). See `docs/plans/north-stars-later.md`.
-2. Postgres Rust schedule/gate + HA follow-ups (P2) — later plan.
-3. Keep CI + `perf_matrix` lite gate healthy (including `--preset gcl`) **and** `pytest -m airtight`.
-4. P1 resume follow-ups: native Rust `resume_from`, subflow/gate policies.
-5. Move remaining projection write hot paths from Python into Rust-backed implementation.
-6. Optional: Cloud embeddings path if NL `semantic_search` becomes important; keep decision log current (`docs/agent/DECISION_LOG.md`).
-7. Cheap hosted e2e (GHCR pull-and-smoke) — later plan, not always-on cloud.
-8. Split `decorators.py` / `perf_matrix.py` (parked from 0.3.0 hard-cap).
+1. **Agent-native Phase 0** — `ironflow api` / `flow-run` / `deployment` JSON CLI + AI-assistants how-to (roadmap: `docs/plans/agent-native-roadmap.md`). Then Phase 1 read-only `ironflow-mcp` (FastMCP 4).
+2. **P4.1** — async `concurrency` / `rate_limit` (thin over the same Rust acquire). See `docs/plans/north-stars-later.md`.
+3. Postgres Rust schedule/gate + HA follow-ups (P2) — later plan.
+4. Keep CI + `perf_matrix` lite gate healthy (including `--preset gcl`) **and** `pytest -m airtight`.
+5. P1 resume follow-ups: native Rust `resume_from`, subflow/gate policies.
+6. Move remaining projection write hot paths from Python into Rust-backed implementation.
+7. Optional: Cloud embeddings path if NL `semantic_search` becomes important; keep decision log current (`docs/agent/DECISION_LOG.md`).
+8. Cheap hosted e2e (GHCR pull-and-smoke) — later plan, not always-on cloud.
+9. Split `decorators.py` / `perf_matrix.py` (parked from 0.3.0 hard-cap).
