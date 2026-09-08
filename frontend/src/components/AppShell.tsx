@@ -179,23 +179,16 @@ export function AppShell({ children }: AppShellProps) {
                 <span className="sr-only">Server status:</span>
                 {health.data === "ok" ? "API online" : health.isLoading ? "Checking…" : "API offline"}
               </span>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      cycle();
-                    }}
-                    aria-label={`Theme: ${themeLabel}`}
-                  >
-                    {resolved === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Theme: {themeLabel} (click to toggle)</TooltipContent>
-              </Tooltip>
+              <Button
+                variant="ghost"
+                size="icon"
+                type="button"
+                onClick={() => cycle()}
+                aria-label={`Theme: ${themeLabel}`}
+                title={`Theme: ${themeLabel} (click to toggle)`}
+              >
+                {resolved === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+              </Button>
             </div>
           </header>
           <main className="mx-auto w-full max-w-screen-2xl flex-1 p-4 md:p-6">{children}</main>
