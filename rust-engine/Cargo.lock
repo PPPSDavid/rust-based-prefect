@@ -347,6 +347,7 @@ dependencies = [
 name = "ironflow-engine"
 version = "0.3.0"
 dependencies = [
+ "base64",
  "chrono",
  "cron",
  "once_cell",

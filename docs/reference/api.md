@@ -32,7 +32,7 @@ Monotonic `seq` in storage backs cursors.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/api/flow-runs` | List flow runs (`state`, `limit`, `cursor`, `include_archived`) |
+| `GET` | `/api/flow-runs` | List flow runs (`state`, `limit`, `cursor`, `include_archived`, `flow_name`, `deployment_id`, `created_after`/`created_before`, `q`, `sort`, `order`) |
 | `GET` | `/api/flow-runs/{flow_run_id}` | Flow run detail |
 | `GET` | `/api/flow-runs/{flow_run_id}/task-runs` | Task runs under a flow |
 | `GET` | `/api/flow-runs/{flow_run_id}/logs` | Logs (`task_run_id`, `level`, `limit`, `cursor`) |

@@ -221,6 +221,14 @@ class SqliteStore:
                 ON deployment_runs(status, created_at ASC);
             CREATE INDEX IF NOT EXISTS idx_deployment_runs_deployment_created
                 ON deployment_runs(deployment_id, created_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_flow_runs_name_seq
+                ON flow_runs(name, seq DESC);
+            CREATE INDEX IF NOT EXISTS idx_flow_runs_created_seq
+                ON flow_runs(created_at DESC, seq DESC);
+            CREATE INDEX IF NOT EXISTS idx_flow_runs_state_seq
+                ON flow_runs(state, seq DESC);
+            CREATE INDEX IF NOT EXISTS idx_deployment_runs_flow_run_id
+                ON deployment_runs(flow_run_id);
             """
         )
 
@@ -232,6 +240,18 @@ class SqliteStore:
             conn.execute("ALTER TABLE task_runs ADD COLUMN planned_node_id TEXT")
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_task_runs_flow_planned ON task_runs(flow_run_id, planned_node_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_flow_runs_name_seq ON flow_runs(name, seq DESC)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_flow_runs_created_seq ON flow_runs(created_at DESC, seq DESC)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_flow_runs_state_seq ON flow_runs(state, seq DESC)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_deployment_runs_flow_run_id ON deployment_runs(flow_run_id)"
         )
         dep_cols = {
             c["name"] for c in conn.execute("PRAGMA table_info(deployments)").fetchall()

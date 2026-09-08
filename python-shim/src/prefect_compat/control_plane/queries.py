@@ -5,6 +5,12 @@ from typing import Any
 from uuid import UUID
 
 from ..flow_catalog_settings import catalog_hide_archived
+from .flow_run_list import (
+    build_flow_run_list_sql,
+    next_cursor_for_page,
+    normalize_order,
+    normalize_sort,
+)
 from .types import (
     PageResult,
 )
@@ -17,48 +23,70 @@ class QueriesMixin:
         limit: int = 50,
         cursor: str | None = None,
         include_archived: bool = False,
+        flow_name: str | None = None,
+        deployment_id: str | None = None,
+        created_after: str | None = None,
+        created_before: str | None = None,
+        q: str | None = None,
+        sort: str | None = None,
+        order: str | None = None,
     ) -> PageResult:
+        sort_n = normalize_sort(sort)
+        order_n = normalize_order(order)
         hide = catalog_hide_archived() and not include_archived
-        rust_result = self._query_rust(
-            "flow_runs",
-            {
-                "state": state,
-                "limit": limit,
-                "cursor": cursor,
-                "hide_archived": hide,
-            },
-        )
+        rust_params = {
+            "state": state,
+            "limit": limit,
+            "cursor": cursor,
+            "hide_archived": hide,
+            "flow_name": flow_name,
+            "deployment_id": deployment_id,
+            "created_after": created_after,
+            "created_before": created_before,
+            "q": q,
+            "sort": sort_n,
+            "order": order_n,
+        }
+        # Validate cursor before Rust so client errors are not swallowed as fallback.
+        if cursor:
+            build_flow_run_list_sql(
+                state=state,
+                flow_name=flow_name,
+                deployment_id=deployment_id,
+                created_after=created_after,
+                created_before=created_before,
+                q=q,
+                sort=sort_n,
+                order=order_n,
+                cursor=cursor,
+                limit=limit,
+                hide_archived=hide,
+            )
+        rust_result = self._query_rust("flow_runs", rust_params)
         if rust_result is not None:
+            if isinstance(rust_result, dict) and rust_result.get("error"):
+                raise ValueError(str(rust_result["error"]))
             return PageResult(
                 items=rust_result["items"], next_cursor=rust_result["next_cursor"]
             )
-        query = (
-            "SELECT fr.seq,fr.id,fr.name,fr.state,fr.version,fr.created_at,fr.updated_at,"
-            "fr.parent_flow_run_id,fr.parent_task_run_id,fr.root_flow_run_id,"
-            "fr.execution_mode,fr.depth,fr.flow_id FROM flow_runs fr "
-            "LEFT JOIN flows catalog ON catalog.id = fr.flow_id"
+        query, params, _token = build_flow_run_list_sql(
+            state=state,
+            flow_name=flow_name,
+            deployment_id=deployment_id,
+            created_after=created_after,
+            created_before=created_before,
+            q=q,
+            sort=sort_n,
+            order=order_n,
+            cursor=cursor,
+            limit=limit,
+            hide_archived=hide,
         )
-        conditions: list[str] = []
-        params: list[Any] = []
-        if state:
-            conditions.append("fr.state = ?")
-            params.append(state)
-        if hide:
-            conditions.append("(catalog.id IS NULL OR catalog.status = 'active')")
-        else:
-            conditions.append(
-                "(catalog.id IS NULL OR catalog.status IN ('active','archived'))"
-            )
-        if cursor:
-            conditions.append("fr.seq < ?")
-            params.append(int(cursor))
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
-        query += " ORDER BY fr.seq DESC LIMIT ?"
-        params.append(limit)
         rows = self._query_rows(query, params)
         items = [self._flow_row_to_dict(r) for r in rows]
-        next_cursor = str(rows[-1]["seq"]) if len(rows) == limit else None
+        next_cursor = next_cursor_for_page(
+            rows, limit=limit, sort=sort_n, order=order_n
+        )
         return PageResult(items=items, next_cursor=next_cursor)
 
     def _attach_graph_mode_fields_to_detail(

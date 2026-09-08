@@ -19,10 +19,32 @@ def list_flow_runs(
     limit: int = Query(default=50, ge=1, le=500),
     cursor: str | None = Query(default=None),
     include_archived: bool = Query(default=False),
+    flow_name: str | None = Query(default=None),
+    deployment_id: str | None = Query(default=None),
+    created_after: str | None = Query(default=None),
+    created_before: str | None = Query(default=None),
+    q: str | None = Query(default=None, description="Substring match on flow run name"),
+    sort: str | None = Query(
+        default=None, description="seq|created_at|updated_at|name|state (default seq)"
+    ),
+    order: str | None = Query(default=None, description="asc|desc (default desc)"),
 ) -> CursorPage:
-    page = control_plane.list_flow_runs(
-        state=state, limit=limit, cursor=cursor, include_archived=include_archived
-    )
+    try:
+        page = control_plane.list_flow_runs(
+            state=state,
+            limit=limit,
+            cursor=cursor,
+            include_archived=include_archived,
+            flow_name=flow_name,
+            deployment_id=deployment_id,
+            created_after=created_after,
+            created_before=created_before,
+            q=q,
+            sort=sort,
+            order=order,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return CursorPage(items=page.items, next_cursor=page.next_cursor)
 
 

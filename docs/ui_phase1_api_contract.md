@@ -23,9 +23,16 @@ List flow runs for the runs table.
 
 ### Query params
 
-- `state` (optional): one of `SCHEDULED|PENDING|RUNNING|COMPLETED|FAILED|CANCELLED`
+- `state` (optional): one of `SCHEDULED|PENDING|RUNNING|COMPLETED|FAILED|CANCELLED|PAUSED`
 - `limit` (optional, default `50`, max `500`)
-- `cursor` (optional)
+- `cursor` (optional): opaque keyset cursor. Default sort emits a plain `seq` string (backward compatible). Non-default `sort` emits a `v1.`-prefixed cursor; changing sort/order requires clearing the cursor (`400` if mismatched).
+- `include_archived` (optional, default `false`)
+- `flow_name` (optional): exact match on flow run `name`
+- `deployment_id` (optional): runs linked via `deployment_runs`
+- `created_after` / `created_before` (optional): ISO-8601 bounds on `created_at` (inclusive)
+- `q` (optional): case-sensitive substring match on flow run `name` (`LIKE`, `%`/`_` escaped)
+- `sort` (optional, default `seq`): `seq|created_at|updated_at|name|state`
+- `order` (optional, default `desc`): `asc|desc`
 
 ### Item shape
 

@@ -23,7 +23,7 @@ fn parse_opt_string(params_json: &str, key: &str) -> Option<String> {
 
 pub fn query(db_path: &str, kind: &str, params_json: &str) -> Result<String, String> {
     ui_read_pool::with_read_connection(db_path, |conn| match kind {
-        "flow_runs" => crate::flow_catalog_ops::query_flow_runs(conn, params_json),
+        "flow_runs" => crate::flow_run_list::query_flow_runs(conn, params_json),
         "flow_run_detail" => query_flow_run_detail(conn, params_json),
         "task_runs" => query_task_runs(conn, params_json),
         "logs" => query_logs(conn, params_json),

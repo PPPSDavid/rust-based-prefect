@@ -34,16 +34,42 @@ function pageUrl(path: string, params: Record<string, string | undefined>) {
   return `${base}${path}${qs ? `?${qs}` : ""}`;
 }
 
+export type FlowRunListParams = {
+  cursor?: string;
+  state?: string;
+  includeArchived?: boolean;
+  flowName?: string;
+  deploymentId?: string;
+  createdAfter?: string;
+  createdBefore?: string;
+  q?: string;
+  sort?: "seq" | "created_at" | "updated_at" | "name" | "state";
+  order?: "asc" | "desc";
+  limit?: number;
+};
+
 export const api = {
-  listFlowRuns: (cursor?: string, state?: string, includeArchived?: boolean) =>
-    readJson<CursorPage<FlowRun>>(
+  listFlowRuns: (cursorOrParams?: string | FlowRunListParams, state?: string, includeArchived?: boolean) => {
+    const params: FlowRunListParams =
+      typeof cursorOrParams === "object" && cursorOrParams !== null
+        ? cursorOrParams
+        : { cursor: cursorOrParams, state, includeArchived };
+    return readJson<CursorPage<FlowRun>>(
       pageUrl("/api/flow-runs", {
-        limit: "50",
-        cursor,
-        state,
-        include_archived: includeArchived ? "true" : undefined
+        limit: String(params.limit ?? 50),
+        cursor: params.cursor,
+        state: params.state,
+        include_archived: params.includeArchived ? "true" : undefined,
+        flow_name: params.flowName,
+        deployment_id: params.deploymentId,
+        created_after: params.createdAfter,
+        created_before: params.createdBefore,
+        q: params.q,
+        sort: params.sort,
+        order: params.order
       })
-    ),
+    );
+  },
   getFlowRun: (id: string) => readJson<FlowRun>(`${base}/api/flow-runs/${id}`),
   cancelFlowRun: (id: string) =>
     readJson<FlowRun>(`${base}/api/flow-runs/${id}/cancel`, { method: "POST" }),

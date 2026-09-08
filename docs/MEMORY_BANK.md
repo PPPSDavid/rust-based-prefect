@@ -88,7 +88,7 @@ Last updated: 2026-09-04.
 ## Next High-Value Work
 
 Gap canvas: `docs/plans/prefect-gap-canvas.md` (from PR #60 lineage).
-UI roadmap: `docs/plans/ui-parity-roadmap.md` — approved foundation is **Tailwind + shadcn/ui (Radix) + lucide** (same stack as Prefect 3.8 UI v2); frontend phases U0–U6, backend enablers B1–B5 (new query shapes go to `rust-engine`). Custom SVG DAG stays; pixel-perfect clone remains parked.
+UI roadmap: `docs/plans/ui-parity-roadmap.md` — approved foundation is **Tailwind + shadcn/ui (Radix) + lucide** (same stack as Prefect 3.8 UI v2); frontend phases U0–U6, backend enablers B1–B5 (new query shapes go to `rust-engine`). Custom SVG DAG stays; pixel-perfect clone remains parked. **U0 landed** (#77). **B1** (server-side `/api/flow-runs` filters/sort + keyset cursors) is the next backend enabler for U1.
 
 1. **Agent-native Phase 0** — `ironflow api` / `flow-run` / `deployment` JSON CLI + AI-assistants how-to (roadmap: `docs/plans/agent-native-roadmap.md`). Then Phase 1 read-only `ironflow-mcp` (FastMCP 4).
 2. **P4.1** — async `concurrency` / `rate_limit` (thin over the same Rust acquire). See `docs/plans/north-stars-later.md`.

@@ -4,6 +4,7 @@ pub mod deployment_ops_pg;
 pub mod engine;
 pub mod ffi;
 pub mod flow_catalog_ops;
+pub mod flow_run_list;
 pub mod flow_terminal_ops;
 pub mod gate_ops;
 pub mod ui_read;
