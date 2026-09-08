@@ -49,6 +49,10 @@ def upgrade_flow_catalog_sqlite(conn: Any) -> None:
         CREATE INDEX IF NOT EXISTS idx_deployments_flow_id ON deployments(flow_id);
         CREATE INDEX IF NOT EXISTS idx_flow_runs_updated_state ON flow_runs(updated_at, state);
         CREATE INDEX IF NOT EXISTS idx_flows_status_updated ON flows(status, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_flow_runs_name_seq ON flow_runs(name, seq DESC);
+        CREATE INDEX IF NOT EXISTS idx_flow_runs_created_seq ON flow_runs(created_at DESC, seq DESC);
+        CREATE INDEX IF NOT EXISTS idx_flow_runs_state_seq ON flow_runs(state, seq DESC);
+        CREATE INDEX IF NOT EXISTS idx_deployment_runs_flow_run_id ON deployment_runs(flow_run_id);
         """
     )
     backfill_flow_catalog(conn)
@@ -95,6 +99,18 @@ def upgrade_flow_catalog_postgres(cur: Any) -> None:
     )
     cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_flows_status_updated ON flows(status, updated_at)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_flow_runs_name_seq ON flow_runs(name, seq DESC)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_flow_runs_created_seq ON flow_runs(created_at DESC, seq DESC)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_flow_runs_state_seq ON flow_runs(state, seq DESC)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_deployment_runs_flow_run_id ON deployment_runs(flow_run_id)"
     )
     backfill_flow_catalog(cur)
 

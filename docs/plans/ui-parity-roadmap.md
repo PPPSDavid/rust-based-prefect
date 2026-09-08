@@ -1,7 +1,7 @@
 # UI parity roadmap (Prefect 3.8 UI v2 → IronFlow)
 
-**Status:** U0 foundation implementing / review — Tailwind + shadcn/ui + sidebar shell; U1–U6 and B1–B5 not started  
-**Date:** 2026-09-07  
+**Status:** U0 landed; **B1** (flow-run list filters/sort) implementing / review; U1–U6 and B2–B5 not started  
+**Date:** 2026-09-07 (rev: 2026-09-08 B1)  
 **Audience:** Maintainers picking the next frontend / shim sessions  
 **Foundation decision (approved):** adopt **Tailwind CSS + shadcn/ui (Radix primitives) + lucide icons**, the same stack Prefect UI v2 uses. This replaces the ad-hoc `frontend/src/styles.css` with a token-based design system; it is a *new major dependency* under `AGENTS.md` → **Ask first**, and that approval is recorded here.
 
