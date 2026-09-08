@@ -35,21 +35,31 @@ export function RunsPage() {
 
   useEffect(() => {
     if (!data) return;
-    setAllItems((prev) => (cursor ? [...prev, ...data.items] : data.items));
+    setAllItems((prev) => {
+      if (!cursor) return data.items;
+      const seen = new Set(prev.map((r) => r.id));
+      const appended = data.items.filter((r) => !seen.has(r.id));
+      return appended.length ? [...prev, ...appended] : prev;
+    });
   }, [data, cursor]);
 
-  useEffect(() => {
+  const selectFilter = (state: (typeof STATE_FILTERS)[number]) => {
+    setStateFilter(state);
     setCursor(undefined);
     setAllItems([]);
-  }, [stateFilter]);
+  };
+
+  // Prefer live query data for the first page so remounts with a warm cache
+  // never render an empty table while allItems is still catching up.
+  const sourceItems = !cursor && data?.items ? data.items : allItems;
 
   const filtered = useMemo(() => {
     const q = nameQuery.trim().toLowerCase();
-    if (!q) return allItems;
-    return allItems.filter((run) => run.name.toLowerCase().includes(q));
-  }, [allItems, nameQuery]);
+    if (!q) return sourceItems;
+    return sourceItems.filter((run) => run.name.toLowerCase().includes(q));
+  }, [sourceItems, nameQuery]);
 
-  if (isLoading && allItems.length === 0) return <p>Loading runs...</p>;
+  if (isLoading && sourceItems.length === 0) return <p>Loading runs...</p>;
 
   return (
     <section>
@@ -68,7 +78,7 @@ export function RunsPage() {
               key={state}
               type="button"
               className={stateFilter === state ? "chip chip-active" : "chip"}
-              onClick={() => setStateFilter(state)}
+              onClick={() => selectFilter(state)}
             >
               {state}
             </button>
