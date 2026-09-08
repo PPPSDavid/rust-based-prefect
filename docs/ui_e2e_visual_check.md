@@ -46,10 +46,21 @@ curl -X POST http://127.0.0.1:8000/benchmark/run \
 
 Open `http://localhost:4173/runs` and verify:
 
-- Top navigation shows **Flow Runs**, **Flows**, **Deployments**, and **Work Pools**
+- Left **sidebar** navigation shows **Dashboard** (U2 placeholder → Flow Runs), **Flow Runs**, **Flows**, **Deployments**, **Work Pools**, and **Concurrency** (labels visible at ≥1024px; icon rail on tablet)
+- Top bar shows API health pill and a **theme toggle** (cycles system → light → dark; preference in `localStorage` key `ironflow-theme`)
 - Runs table shows recent runs with state filter chips
 - State badges are visible (`COMPLETED` expected for benchmark runs)
 - Clicking a run opens run detail page with Cancel/Retry actions when applicable
+
+### Light / dark screenshots (U0)
+
+After seeding, capture and attach to the PR or keep locally under `/opt/cursor/artifacts/`:
+
+1. `/runs` in **dark** theme (default when system prefers dark)
+2. `/runs` in **light** theme (cycle the theme button until Light)
+3. One run detail page in each theme (Tasks or DAG tab)
+
+Confirm Inter loads (no flash to a generic system sans for body text) and that state badge colours match across themes.
 
 ### Deployments
 

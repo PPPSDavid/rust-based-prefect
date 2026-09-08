@@ -1,4 +1,6 @@
 import { useSearchParams } from "react-router-dom";
+import { cn } from "../lib/utils";
+import { Button } from "./ui/button";
 
 export type TabItem<T extends string> = {
   id: T;
@@ -28,18 +30,20 @@ export function TabBar<T extends string>({ tabs, activeTab, onChange, paramKey =
   };
 
   return (
-    <div className="tabs" role="tablist">
+    <div className="mb-3 flex flex-wrap gap-2" role="tablist">
       {tabs.map((tab) => (
-        <button
+        <Button
           key={tab.id}
           role="tab"
           aria-selected={activeTab === tab.id}
-          className={activeTab === tab.id ? "tab-active" : ""}
+          variant={activeTab === tab.id ? "default" : "secondary"}
+          size="sm"
+          className={cn(activeTab === tab.id && "tab-active")}
           onClick={() => select(tab.id)}
           type="button"
         >
           {tab.label}
-        </button>
+        </Button>
       ))}
     </div>
   );

@@ -1,0 +1,4 @@
+{
+  "initialJsGzipBytes": 200000,
+  "notes": "U0 baseline after Tailwind + Radix + lazy routes (~128 KiB gzip measured). Total gzipped JS under dist/assets must stay under this ceiling."
+}

@@ -1,8 +1,42 @@
+import { cn } from "../lib/utils";
+import { Badge } from "./ui/badge";
+
 type StateBadgeProps = {
   state: string;
+  className?: string;
 };
 
-export function StateBadge({ state }: StateBadgeProps) {
+const STATE_VARIANTS = new Set([
+  "running",
+  "completed",
+  "failed",
+  "cancelled",
+  "pending",
+  "scheduled",
+  "paused",
+  "crashed",
+  "claimed",
+  "online"
+]);
+
+export function StateBadge({ state, className }: StateBadgeProps) {
   const normalized = state.toLowerCase().replace(/_/g, "-");
-  return <span className={`badge badge-${normalized}`}>{state}</span>;
+  const variant = STATE_VARIANTS.has(normalized)
+    ? (normalized as
+        | "running"
+        | "completed"
+        | "failed"
+        | "cancelled"
+        | "pending"
+        | "scheduled"
+        | "paused"
+        | "crashed"
+        | "claimed"
+        | "online")
+    : "default";
+  return (
+    <Badge variant={variant} className={cn(`badge badge-${normalized}`, className)}>
+      {state}
+    </Badge>
+  );
 }

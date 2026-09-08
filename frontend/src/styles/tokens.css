@@ -1,0 +1,71 @@
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/InterVariable.woff2") format("woff2");
+}
+
+:root {
+  --background: 210 20% 98%;
+  --foreground: 222 47% 11%;
+  --surface: 0 0% 100%;
+  --surface-muted: 210 25% 96%;
+  --border: 214 20% 88%;
+  --muted: 215 16% 42%;
+  --accent: 217 91% 50%;
+  --accent-foreground: 0 0% 100%;
+  --ring: 217 91% 50%;
+  --danger: 0 72% 45%;
+  --danger-foreground: 0 0% 100%;
+  --warning: 38 92% 45%;
+  --sidebar: 210 25% 97%;
+  --sidebar-foreground: 222 30% 25%;
+  --sidebar-active: 217 91% 95%;
+  --sidebar-border: 214 20% 90%;
+
+  --state-running: 217 84% 52%;
+  --state-completed: 142 52% 38%;
+  --state-failed: 0 58% 45%;
+  --state-cancelled: 271 35% 42%;
+  --state-pending: 215 14% 48%;
+  --state-scheduled: 215 14% 48%;
+  --state-paused: 38 70% 42%;
+  --state-crashed: 0 65% 38%;
+  --state-claimed: 217 84% 52%;
+  --state-online: 142 52% 38%;
+
+  --radius: 0.5rem;
+  --font-sans: Inter, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.dark {
+  --background: 230 32% 9%;
+  --foreground: 220 60% 95%;
+  --surface: 230 28% 14%;
+  --surface-muted: 230 26% 12%;
+  --border: 230 18% 24%;
+  --muted: 218 28% 68%;
+  --accent: 217 78% 55%;
+  --accent-foreground: 0 0% 100%;
+  --ring: 217 78% 55%;
+  --danger: 0 55% 45%;
+  --danger-foreground: 0 0% 100%;
+  --warning: 42 80% 68%;
+  --sidebar: 230 30% 11%;
+  --sidebar-foreground: 218 28% 72%;
+  --sidebar-active: 230 35% 18%;
+  --sidebar-border: 230 18% 22%;
+
+  --state-running: 217 78% 55%;
+  --state-completed: 142 45% 40%;
+  --state-failed: 0 52% 44%;
+  --state-cancelled: 271 30% 45%;
+  --state-pending: 218 12% 42%;
+  --state-scheduled: 218 12% 42%;
+  --state-paused: 38 70% 42%;
+  --state-crashed: 0 55% 38%;
+  --state-claimed: 217 78% 55%;
+  --state-online: 142 45% 40%;
+}
