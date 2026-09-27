@@ -5,6 +5,7 @@ from typing import Any
 from uuid import UUID
 
 from ..flow_catalog_settings import catalog_hide_archived
+from .flow_run_list import prepare_flow_run_list_filters, query_flow_runs_page
 from .types import (
     PageResult,
 )
@@ -17,48 +18,38 @@ class QueriesMixin:
         limit: int = 50,
         cursor: str | None = None,
         include_archived: bool = False,
+        q: str | None = None,
+        created_after: str | None = None,
+        created_before: str | None = None,
     ) -> PageResult:
+        filters = prepare_flow_run_list_filters(
+            state=state,
+            q=q,
+            created_after=created_after,
+            created_before=created_before,
+            limit=limit,
+            cursor=cursor,
+        )
         hide = catalog_hide_archived() and not include_archived
         rust_result = self._query_rust(
             "flow_runs",
             {
-                "state": state,
-                "limit": limit,
-                "cursor": cursor,
+                "state": filters.state,
+                "limit": filters.limit,
+                "cursor": filters.cursor,
                 "hide_archived": hide,
+                "q": filters.q,
+                "created_after": filters.created_after,
+                "created_before": filters.created_before,
             },
         )
         if rust_result is not None:
             return PageResult(
                 items=rust_result["items"], next_cursor=rust_result["next_cursor"]
             )
-        query = (
-            "SELECT fr.seq,fr.id,fr.name,fr.state,fr.version,fr.created_at,fr.updated_at,"
-            "fr.parent_flow_run_id,fr.parent_task_run_id,fr.root_flow_run_id,"
-            "fr.execution_mode,fr.depth,fr.flow_id FROM flow_runs fr "
-            "LEFT JOIN flows catalog ON catalog.id = fr.flow_id"
+        items, next_cursor = query_flow_runs_page(
+            self._query_rows, filters, hide_archived=hide
         )
-        conditions: list[str] = []
-        params: list[Any] = []
-        if state:
-            conditions.append("fr.state = ?")
-            params.append(state)
-        if hide:
-            conditions.append("(catalog.id IS NULL OR catalog.status = 'active')")
-        else:
-            conditions.append(
-                "(catalog.id IS NULL OR catalog.status IN ('active','archived'))"
-            )
-        if cursor:
-            conditions.append("fr.seq < ?")
-            params.append(int(cursor))
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
-        query += " ORDER BY fr.seq DESC LIMIT ?"
-        params.append(limit)
-        rows = self._query_rows(query, params)
-        items = [self._flow_row_to_dict(r) for r in rows]
-        next_cursor = str(rows[-1]["seq"]) if len(rows) == limit else None
         return PageResult(items=items, next_cursor=next_cursor)
 
     def _attach_graph_mode_fields_to_detail(

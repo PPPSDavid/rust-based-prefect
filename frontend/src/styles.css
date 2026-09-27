@@ -170,6 +170,17 @@ a {
   align-items: center;
 }
 
+.run-search {
+  min-width: 16rem;
+  flex: 1 1 16rem;
+}
+
+.run-filters-note {
+  margin: -8px 0 16px;
+  color: hsl(var(--muted));
+  font-size: 13px;
+}
+
 .chip-row {
   display: flex;
   flex-wrap: wrap;

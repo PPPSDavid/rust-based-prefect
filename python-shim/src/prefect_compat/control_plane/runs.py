@@ -6,6 +6,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from ..graph_mode import StaticGraphContractViolation
+from .flow_run_list import stamp_flow_run_tags
 from .types import (
     SUBFLOW_MAX_DEPTH,
     FlowRunRecord,
@@ -30,6 +31,7 @@ class RunsMixin:
         resume_from_flow_run_id: UUID | None = None,
         parameters_fingerprint: str | None = None,
         formerly: list[str] | tuple[str, ...] | None = None,
+        tags: Sequence[str] | None = None,
     ) -> FlowRunRecord:
         catalog = self.ensure_flow(name, formerly=formerly)
         run_id = uuid4()
@@ -72,6 +74,7 @@ class RunsMixin:
             parameters_fingerprint=parameters_fingerprint,
             resume_skips_enabled=False,
             flow_attempt_number=flow_attempt_number,
+            tags=tuple(str(item) for item in (tags or ()) if str(item).strip()),
         )
         with self._lock:
             persisted_by_rust = False
@@ -138,6 +141,7 @@ class RunsMixin:
                             str(record.run_id),
                         ],
                     )
+                stamp_flow_run_tags(self._sqlite_conn, str(record.run_id), record.tags)
             self._persist_record(
                 {
                     "record_type": "flow_create",
@@ -156,6 +160,7 @@ class RunsMixin:
                     else None,
                     "execution_mode": execution_mode,
                     "depth": depth,
+                    "tags": list(record.tags),
                 }
             )
             if (not self._rust_native_persistence) and self._rust_fsm_active():

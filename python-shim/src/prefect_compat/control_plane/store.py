@@ -7,6 +7,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from ..persistence import DEFAULT_WORK_POOL_ID
+from .flow_run_list import stamp_flow_run_tags
 from .types import (
     FlowRunRecord,
     RunState,
@@ -52,6 +53,7 @@ class StoreMixin:
                 else run_id,
                 execution_mode=rec.get("execution_mode"),
                 depth=int(rec.get("depth", 0)),
+                tags=tuple(str(item) for item in (rec.get("tags") or ())),
             )
             self._flows[run_id] = flow
             self._latest_flow_run_id = run_id
@@ -283,6 +285,7 @@ class StoreMixin:
                 record.depth,
             ],
         )
+        stamp_flow_run_tags(self._sqlite_conn, str(record.run_id), record.tags)
         if (
             record.resume_from_flow_run_id is not None
             or record.resume_lineage_id is not None

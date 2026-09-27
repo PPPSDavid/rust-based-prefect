@@ -962,6 +962,7 @@ def flow(
     transition_hooks: Sequence[TransitionHookSpec] | None = None,
     final_state: str = "wait_all",
     graph_mode: str = "auto",
+    tags: Sequence[str] | None = None,
 ) -> Callable[..., Any]:
     def decorate(f: Callable[..., T]) -> Callable[..., T]:
         flow_name = name or getattr(f, "__name__", "<flow>")
@@ -1047,6 +1048,7 @@ def flow(
                     resume_from_flow_run_id=resume_from,
                     parameters_fingerprint=parameters_fingerprint,
                     formerly=former_names,
+                    tags=tags,
                 )
                 _ACTIVE_FLOW_RUN.set(record.run_id)
                 flow_params = bound_flow_parameters(f, args, kwargs)
