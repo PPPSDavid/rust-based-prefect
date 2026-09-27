@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 import { ActionButton } from "../components/ActionButton";
 import { DataTable } from "../components/DataTable";
+import { DeploymentSchedulePanel } from "../components/DeploymentSchedulePanel";
 import { PageHeader } from "../components/PageHeader";
 import { QuickRunModal } from "../components/QuickRunModal";
 import { StateBadge } from "../components/StateBadge";
@@ -61,6 +62,7 @@ export function DeploymentDetailPage() {
           </>
         }
       />
+      <DeploymentSchedulePanel deployment={dep} />
       <dl className="detail-grid">
         <dt>Status</dt>
         <dd>{dep.paused ? "Paused" : "Active"}</dd>

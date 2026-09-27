@@ -6,15 +6,8 @@ import { ActionButton } from "../components/ActionButton";
 import { DataTable } from "../components/DataTable";
 import { PageHeader } from "../components/PageHeader";
 import { QuickRunModal } from "../components/QuickRunModal";
+import { describeDeploymentSchedule } from "../schedule/format";
 import type { Deployment } from "../types";
-
-function formatSchedule(dep: Deployment): string {
-  if (!dep.schedule_enabled) return "Manual";
-  if (dep.schedule_cron?.trim()) return `cron ${dep.schedule_cron}`;
-  if (dep.schedule_rrule?.trim()) return `rrule ${dep.schedule_rrule}`;
-  if (dep.schedule_interval_seconds != null) return `every ${dep.schedule_interval_seconds}s`;
-  return "Scheduled";
-}
 
 export function DeploymentsPage() {
   const queryClient = useQueryClient();
@@ -48,7 +41,27 @@ export function DeploymentsPage() {
             render: (dep) => <Link to={`/deployments/${dep.id}`}>{dep.name}</Link>
           },
           { key: "flow", header: "Flow", render: (dep) => dep.flow_name },
-          { key: "schedule", header: "Schedule", render: (dep) => formatSchedule(dep) },
+          {
+            key: "schedule",
+            header: "Schedule",
+            render: (dep) => {
+              const schedule = describeDeploymentSchedule(dep);
+              return (
+                <div>
+                  <div>{schedule.summary}</div>
+                  {schedule.kind === "manual" ? (
+                    <Link to={`/deployments/${dep.id}?schedule=edit`}>Add schedule</Link>
+                  ) : null}
+                  {schedule.warning ? <div className="schedule-warning">{schedule.warning}</div> : null}
+                </div>
+              );
+            }
+          },
+          {
+            key: "next",
+            header: "Next run",
+            render: (dep) => describeDeploymentSchedule(dep).nextRunLabel
+          },
           {
             key: "status",
             header: "Status",
