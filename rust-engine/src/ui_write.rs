@@ -9,6 +9,29 @@ fn now_iso() -> String {
     Utc::now().to_rfc3339()
 }
 
+fn task_event_log_message(task_key: &str, event_type: &str, data: Option<&Value>) -> String {
+    let mut message = format!("{task_key}: {event_type}");
+    if event_type != "task_failed" {
+        return message;
+    }
+    let Some(data) = data else {
+        return message;
+    };
+    if let Some(error) = data.get("error").and_then(Value::as_str) {
+        if !error.is_empty() {
+            message.push_str(": ");
+            message.push_str(error);
+        }
+    }
+    if let Some(traceback) = data.get("traceback").and_then(Value::as_str) {
+        if !traceback.is_empty() {
+            message.push('\n');
+            message.push_str(traceback);
+        }
+    }
+    message
+}
+
 pub fn persist_flow_create(db_path: &str, run: &crate::engine::FlowRun) -> Result<(), String> {
     let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
     persist_flow_create_with_conn(&conn, run)
@@ -317,7 +340,7 @@ pub fn persist_task_transition_with_conn(
             task.flow_run_id.to_string(),
             task_run_id.to_string(),
             lvl,
-            format!("{}: {}", task.task_key, event_type),
+            task_event_log_message(&task.task_key, event_type, data),
             now_iso()
         ],
     )
@@ -343,7 +366,8 @@ pub fn persist_task_transition_with_conn(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::engine::{Engine, RunState};
+    use crate::engine::{Engine, RunState, SetTaskStateRequest};
+    use serde_json::json;
 
     #[test]
     fn persist_flow_create_inserts_row() {
@@ -372,5 +396,87 @@ mod tests {
             .expect("count");
         assert_eq!(n, 1);
         assert_eq!(run.state, RunState::Scheduled);
+    }
+
+    #[test]
+    fn task_failed_log_includes_error_and_traceback() {
+        let data = json!({
+            "error": "intentional failure",
+            "traceback": "Traceback (most recent call last):\n  boom"
+        });
+        assert_eq!(
+            task_event_log_message("explode", "task_failed", Some(&data)),
+            "explode: task_failed: intentional failure\nTraceback (most recent call last):\n  boom"
+        );
+        assert_eq!(
+            task_event_log_message("inc", "task_completed", None),
+            "inc: task_completed"
+        );
+
+        let conn = Connection::open_in_memory().expect("db");
+        conn.execute_batch(
+            "CREATE TABLE task_runs (
+                id TEXT PRIMARY KEY,
+                state TEXT,
+                version INTEGER,
+                updated_at TEXT
+            );
+            CREATE TABLE events (
+                event_id TEXT PRIMARY KEY,
+                run_id TEXT,
+                task_run_id TEXT,
+                from_state TEXT,
+                to_state TEXT,
+                event_type TEXT,
+                kind TEXT,
+                data TEXT,
+                timestamp TEXT
+            );
+            CREATE TABLE logs (
+                id TEXT PRIMARY KEY,
+                flow_run_id TEXT,
+                task_run_id TEXT,
+                level TEXT,
+                message TEXT,
+                timestamp TEXT
+            );",
+        )
+        .expect("schema");
+        let mut engine = Engine::new();
+        let flow = engine.create_flow_run("failing_flow");
+        let task = engine.create_task_run(flow.id, "explode");
+        engine
+            .apply_task_checkpoint(task.id, RunState::Running, 2)
+            .expect("checkpoint");
+        conn.execute(
+            "INSERT INTO task_runs(id, state, version, updated_at) VALUES(?1, 'RUNNING', 2, 't')",
+            params![task.id.to_string()],
+        )
+        .expect("task row");
+        let status = engine
+            .set_task_state(SetTaskStateRequest {
+                task_run_id: task.id,
+                to_state: RunState::Failed,
+                expected_version: Some(2),
+                transition_token: Uuid::new_v4(),
+                transition_kind: "task_failed".into(),
+            })
+            .expect("transition");
+        persist_task_transition_with_conn(
+            &conn,
+            &engine,
+            task.id,
+            "task_failed",
+            Some(&data),
+            status.status,
+        )
+        .expect("persist");
+        let message: String = conn
+            .query_row("SELECT message FROM logs", [], |row| row.get(0))
+            .expect("log");
+        assert_eq!(
+            message,
+            "explode: task_failed: intentional failure\nTraceback (most recent call last):\n  boom"
+        );
     }
 }

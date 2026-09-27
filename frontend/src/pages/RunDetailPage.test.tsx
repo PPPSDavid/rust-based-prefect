@@ -160,4 +160,69 @@ describe("RunDetailPage", () => {
     expect(await screen.findByText(/inc - COMPLETED · skipped/i)).toBeInTheDocument();
     expect(screen.getByText(/Resumed from/i)).toBeInTheDocument();
   });
+
+  it("shows the exception and traceback on a failed task and its log line", async () => {
+    const { api } = await import("../api");
+    const traceback = [
+      "Traceback (most recent call last):",
+      '  File "explode.py", line 1, in explode',
+      "RuntimeError: intentional failure for DAG/state testing"
+    ].join("\n");
+    vi.mocked(api.getFlowRun).mockResolvedValueOnce({
+      id: "run-fail",
+      name: "failing_flow",
+      state: "FAILED",
+      version: 2,
+      created_at: "2026-04-15T21:00:00+00:00",
+      updated_at: "2026-04-15T21:00:01+00:00"
+    });
+    vi.mocked(api.listTaskRuns).mockResolvedValueOnce({
+      items: [
+        {
+          id: "task-fail",
+          flow_run_id: "run-fail",
+          task_name: "explode",
+          state: "FAILED",
+          version: 2,
+          created_at: "2026-04-15T21:00:00+00:00",
+          updated_at: "2026-04-15T21:00:01+00:00",
+          error: "intentional failure for DAG/state testing",
+          traceback
+        }
+      ],
+      next_cursor: null
+    });
+    vi.mocked(api.listFlowArtifacts).mockResolvedValueOnce([]);
+    vi.mocked(api.listLogs).mockResolvedValueOnce({
+      items: [
+        {
+          id: "log-1",
+          flow_run_id: "run-fail",
+          task_run_id: "task-fail",
+          level: "ERROR",
+          message: `explode: task_failed: intentional failure for DAG/state testing\n${traceback}`,
+          timestamp: "2026-04-15T21:00:01+00:00"
+        }
+      ],
+      next_cursor: null
+    });
+    const queryClient = new QueryClient();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/runs/run-fail"]}>
+          <Routes>
+            <Route path="/runs/:id" element={<RunDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+    expect(await screen.findByText(/explode - FAILED/)).toBeInTheDocument();
+    expect(screen.getByText("intentional failure for DAG/state testing")).toBeInTheDocument();
+    expect(screen.getByText(/Traceback \(most recent call last\)/)).toBeInTheDocument();
+    screen.getByRole("tab", { name: "Logs" }).click();
+    expect(
+      await screen.findByText(/explode: task_failed: intentional failure for DAG\/state testing/)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/File "explode.py"/)).toBeInTheDocument();
+  });
 });

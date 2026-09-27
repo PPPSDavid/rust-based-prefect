@@ -162,6 +162,11 @@ a {
   max-width: 100%;
 }
 
+.task-failure {
+  margin: 6px 0 0 12px;
+  color: hsl(var(--danger));
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;
