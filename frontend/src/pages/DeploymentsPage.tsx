@@ -1,25 +1,57 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { ActionButton } from "../components/ActionButton";
-import { DataTable } from "../components/DataTable";
+import { ErrorBanner } from "../components/ErrorBanner";
+import { DeploymentGroupTable } from "../components/list/DeploymentGroupTable";
+import { collectPages } from "../components/list/collectPages";
+import {
+  filterDeployments,
+  groupDeployments,
+  type DeploymentStatusFilter
+} from "../components/list/deploymentGroups";
+import { ListControls, type ListSortOption } from "../components/list/ListControls";
+import {
+  decodeSort,
+  encodeSort,
+  readChoice,
+  readQuery,
+  readSort,
+  writeChoice,
+  writeQuery,
+  writeSort,
+  type SortSpec
+} from "../components/list/listQuery";
 import { PageHeader } from "../components/PageHeader";
 import { QuickRunModal } from "../components/QuickRunModal";
 import type { Deployment } from "../types";
 
-function formatSchedule(dep: Deployment): string {
-  if (!dep.schedule_enabled) return "Manual";
-  if (dep.schedule_cron?.trim()) return `cron ${dep.schedule_cron}`;
-  if (dep.schedule_rrule?.trim()) return `rrule ${dep.schedule_rrule}`;
-  if (dep.schedule_interval_seconds != null) return `every ${dep.schedule_interval_seconds}s`;
-  return "Scheduled";
-}
+const STATUS_VALUES = ["all", "active", "paused"] as const;
+const SORT_KEYS = ["recent", "name", "flow", "updated"] as const;
+const DEFAULT_SORT: SortSpec = { key: "recent", dir: "desc" };
+const SORT_OPTIONS: ListSortOption[] = [
+  { value: "recent:desc", label: "Recent" },
+  { value: "name:asc", label: "Name (A-Z)" },
+  { value: "name:desc", label: "Name (Z-A)" },
+  { value: "flow:asc", label: "Flow (A-Z)" },
+  { value: "flow:desc", label: "Flow (Z-A)" },
+  { value: "updated:desc", label: "Updated (newest)" },
+  { value: "updated:asc", label: "Updated (oldest)" }
+];
 
 export function DeploymentsPage() {
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [quickRun, setQuickRun] = useState<Deployment | null>(null);
-  const deployments = useQuery({ queryKey: ["deployments"], queryFn: () => api.listDeployments() });
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
+  const status = readChoice(searchParams, "status", STATUS_VALUES, "all") as DeploymentStatusFilter;
+  const query = readQuery(searchParams);
+  const sort = readSort(searchParams, SORT_KEYS, DEFAULT_SORT);
+  const deployments = useQuery({
+    queryKey: ["deployments"],
+    queryFn: () => collectPages((cursor) => api.listDeployments(cursor))
+  });
   const trigger = useMutation({
     mutationFn: ({
       deploymentId,
@@ -35,41 +67,60 @@ export function DeploymentsPage() {
     }
   });
 
+  const groups = useMemo(
+    () => groupDeployments(filterDeployments(deployments.data ?? [], query, status), sort),
+    [deployments.data, query, status, sort]
+  );
+
+  const commit = (mutate: (params: URLSearchParams) => void) => {
+    const next = new URLSearchParams(searchParams);
+    mutate(next);
+    setSearchParams(next, { replace: true });
+  };
+
+  const toggleGroup = (flowName: string) => {
+    setCollapsed((current) => {
+      const next = new Set(current);
+      if (next.has(flowName)) next.delete(flowName);
+      else next.add(flowName);
+      return next;
+    });
+  };
+
   if (deployments.isLoading) return <p>Loading deployments...</p>;
 
   return (
     <section>
       <PageHeader title="Deployments" subtitle="Schedule and trigger flow deployments." />
-      <DataTable
-        columns={[
-          {
-            key: "name",
-            header: "Name",
-            render: (dep) => <Link to={`/deployments/${dep.id}`}>{dep.name}</Link>
-          },
-          { key: "flow", header: "Flow", render: (dep) => dep.flow_name },
-          { key: "schedule", header: "Schedule", render: (dep) => formatSchedule(dep) },
-          {
-            key: "status",
-            header: "Status",
-            render: (dep) => (dep.paused ? "Paused" : "Active")
-          },
-          {
-            key: "actions",
-            header: "Actions",
-            render: (dep) => (
-              <ActionButton
-                variant="primary"
-                disabled={dep.paused || trigger.isPending}
-                onClick={() => setQuickRun(dep)}
-              >
-                Quick Run
-              </ActionButton>
-            )
-          }
+      {deployments.isError ? <ErrorBanner message="Failed to load deployments." /> : null}
+      <ListControls
+        chipGroupLabel="Deployment status"
+        chips={[
+          { id: "all", label: "All" },
+          { id: "active", label: "Active" },
+          { id: "paused", label: "Paused" }
         ]}
-        rows={deployments.data?.items ?? []}
-        rowKey={(dep) => dep.id}
+        chip={status}
+        onChip={(next) => commit((params) => writeChoice(params, "status", next, "all"))}
+        searchLabel="Search deployments"
+        searchPlaceholder="Search flow or deployment"
+        query={query}
+        onQuery={(next) => commit((params) => writeQuery(params, next))}
+        sort={encodeSort(sort)}
+        sortOptions={SORT_OPTIONS}
+        onSort={(next) => commit((params) => writeSort(params, decodeSort(next, SORT_KEYS, DEFAULT_SORT), DEFAULT_SORT))}
+        note="Deployments that share a flow stay together. Each row keeps its name, schedule, and status."
+      />
+      <DeploymentGroupTable
+        groups={groups}
+        collapsed={collapsed}
+        onToggle={toggleGroup}
+        emptyMessage={query.trim() || status !== "all" ? "No deployments match this view." : "No deployments yet."}
+        renderActions={(dep) => (
+          <ActionButton variant="primary" disabled={dep.paused || trigger.isPending} onClick={() => setQuickRun(dep)}>
+            Quick Run
+          </ActionButton>
+        )}
       />
       {quickRun ? (
         <QuickRunModal
