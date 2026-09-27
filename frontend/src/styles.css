@@ -175,6 +175,41 @@ a {
   align-items: center;
 }
 
+.run-search {
+  min-width: 16rem;
+  flex: 1 1 16rem;
+}
+
+.run-filters-note {
+  margin: -8px 0 16px;
+  color: hsl(var(--muted));
+  font-size: 13px;
+}
+
+.flow-group-row {
+  background: hsl(var(--surface-muted));
+}
+
+.flow-group-toggle {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  margin-right: 6px;
+  padding: 0;
+}
+
+.flow-group-count {
+  color: hsl(var(--muted));
+  font-size: 13px;
+  margin-left: 8px;
+}
+
+.list-group-child {
+  padding-left: 1.75rem;
+}
+
 .chip-row {
   display: flex;
   flex-wrap: wrap;
