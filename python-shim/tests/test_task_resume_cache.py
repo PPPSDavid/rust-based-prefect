@@ -369,11 +369,59 @@ def test_deployment_cancel_mid_run_then_retry_skips(tmp_path: Path) -> None:
     assert calls["setup"] == 1
     assert calls["expensive"] == 1
 
-    retry_dep = plane.retry_flow_run(flow_run_id)
-    assert retry_dep.get("resume_from_flow_run_id") == str(flow_run_id)
+    completed_before = {
+        task.task_name: task.task_run_id
+        for task in plane._tasks.values()
+        if task.flow_run_id == flow_run_id and task.state == RunState.COMPLETED
+    }
+    retry_detail = plane.retry_flow_run(flow_run_id)
+    assert retry_detail["id"] == str(flow_run_id)
+    assert retry_detail["state"] == "PENDING"
     second = _run_claimed(plane, registry)
-    second_flow_id = UUID(str(second["flow_run_id"]))
-    assert second_flow_id != flow_run_id
+    assert UUID(str(second["flow_run_id"])) == flow_run_id
     assert calls["setup"] == 1
     assert calls["expensive"] == 1
     assert calls["slow"] >= 2  # cancelled attempt + retry recompute
+    completed_after = {
+        task.task_name: task.task_run_id
+        for task in plane._tasks.values()
+        if task.flow_run_id == flow_run_id and task.state == RunState.COMPLETED
+    }
+    assert completed_after["setup"] == completed_before["setup"]
+    assert completed_after["expensive"] == completed_before["expensive"]
+
+
+def test_quick_run_creates_a_different_flow_run(tmp_path: Path) -> None:
+    """Deployment trigger (Quick Run) mints a new flow run id."""
+    plane = _plane(tmp_path, "quick-run-new-id")
+    calls = {"work": 0}
+
+    @task
+    def work() -> int:
+        calls["work"] += 1
+        return 1
+
+    @flow(name="quick_run_pipeline")
+    def pipeline() -> int:
+        return work.submit().result()
+
+    registry = {"quick_run_pipeline": pipeline}
+    dep = plane.create_deployment(
+        name="quick-run-dep",
+        flow_name="quick_run_pipeline",
+        default_parameters={},
+        paused=False,
+    )
+    first_dep = plane.trigger_deployment_run(UUID(dep["id"]))
+    assert first_dep.get("flow_run_id") in (None, "")
+    assert first_dep.get("resume_from_flow_run_id") in (None, "")
+    first = _run_claimed(plane, registry)
+    first_id = str(first["flow_run_id"])
+
+    second_dep = plane.trigger_deployment_run(UUID(dep["id"]))
+    assert second_dep["id"] != first_dep["id"]
+    assert second_dep.get("flow_run_id") in (None, "")
+    assert second_dep.get("resume_from_flow_run_id") in (None, "")
+    second = _run_claimed(plane, registry)
+    assert str(second["flow_run_id"]) != first_id
+    assert calls["work"] == 2

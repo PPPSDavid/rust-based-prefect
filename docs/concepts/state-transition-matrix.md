@@ -19,16 +19,17 @@ Shared by flow runs and task runs. Source: `validate_transition` in `rust-engine
 **IronFlow invariants:**
 
 - Self-transitions are invalid.
-- Terminals are **strict** — no `COMPLETED→RUNNING`. Flow retry creates a **new** flow run instead of re-opening terminals.
+- Terminals are **strict** for ordinary transitions — no unscoped `COMPLETED→RUNNING`.
+- Deployment **Retry** is the one exception: kind `retry_reopen` moves `COMPLETED` / `FAILED` / `CANCELLED` → `PENDING` on the **same** `flow_run_id`.
 - Duplicate transition tokens are idempotent (`TransitionStatus::Duplicate`).
 
 ### Unsupported transitions (by design)
 
 | Transition | Recovery path |
 | --- | --- |
-| `COMPLETED→RUNNING` | New flow run + resume skip (effective-static only) |
-| `FAILED→RUNNING` in-place | Deployment retry API → new flow run |
-| `CANCELLED→*` | Terminal — use retry for a new attempt |
+| `COMPLETED→RUNNING` | Not allowed. Deployment retry uses `retry_reopen` to `PENDING` on the same flow run, then `start` to `RUNNING` |
+| `FAILED→RUNNING` in-place | Not allowed. Deployment retry reopens that run to `PENDING` |
+| `CANCELLED→*` except `retry_reopen`→`PENDING` | Terminal for ordinary callers — deployment retry reopens the same flow run |
 | Task `PAUSED` | Not used; gate/operator pause is flow-level |
 
 ## Flow transition kinds
@@ -45,12 +46,13 @@ Shared by flow runs and task runs. Source: `validate_transition` in `rust-engine
 | `gate_wait` | `RUNNING→PAUSED` | Temporal gate |
 | `gate_open` | `PAUSED→RUNNING` | Gate promotion |
 | `superseded_by_terminate_resume` | `*→CANCELLED` | Prior in-process attempt terminalized |
+| `retry_reopen` | `COMPLETED\|FAILED\|CANCELLED→PENDING` | Deployment retry of this flow run only. `PAUSED→RUNNING` uses the base FSM |
 
 ### API guards (above FSM)
 
 - `pause_flow_run`: only from `SCHEDULED|PENDING|RUNNING`; rejects gate-only `PAUSED`.
-- `resume_flow_run`: operator pause only.
-- `retry_flow_run`: deployment-backed; creates new flow run with `resume_from_flow_run_id`.
+- `resume_flow_run`: operator pause only. Deployment-backed terminate resume calls retry and stays on this flow run id.
+- `retry_flow_run`: deployment-backed `FAILED` / `CANCELLED` / `COMPLETED` / `PAUSED` only. Reopens **this** flow run and queues a deployment run bound to the same id. `409` when the run has no deployment. `SCHEDULED` / `PENDING` / `RUNNING` are rejected.
 
 ## Task transition kinds
 

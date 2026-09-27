@@ -45,7 +45,7 @@ Comparison for flow/task lifecycle and retry semantics (Prefect 3.x reference: [
 | --- | --- | --- | --- |
 | Happy path | `Scheduled→Pending→Running→Completed` | Same 7-state subset | Low |
 | Task auto-retry | Same `task_run_id`, `run_count++` | **Unsupported** (spec: `docs/plans/task-auto-retry.md`) | N/A until implemented |
-| Flow / deployment retry | Same or new `flow_run_id` depending on path | **Always new** `flow_run_id` + `resume_from_flow_run_id` | **Low** — explicit lineage |
+| Flow / deployment retry | Same or new `flow_run_id` depending on path | Deployment Retry keeps **this** `flow_run_id`. Quick Run creates a new one | **Low** — two explicit actions |
 | Skip completed on retry | Cache / persist policies | Static contract + logical slot key | Low when **effective=static**; none when dynamic |
 | Code/manifest change on retry | Re-execute; cache may skip | Manifest fingerprint mismatch → disable skips | Addressed via execution contract |
 | Total attempt count | Split across `flow_run.run_count` vs `task_run.run_count` | **`flow_attempt_number`**, **`task_run_attempt`** (API) | Low — separate fields |
@@ -53,10 +53,10 @@ Comparison for flow/task lifecycle and retry semantics (Prefect 3.x reference: [
 
 **IronFlow identity invariants (normative):**
 
-- **Execution identity** — `flow_run_id` / `task_run_id`: one row per execution attempt; never reused across flow retries.
+- **Execution identity** — deployment Retry keeps the `flow_run_id` and completed `task_run_id`s. Tasks that must run again get a new `task_run_id`. Quick Run and `prepare_resume` allocate a new `flow_run_id`.
 - **Logical identity** — `planned_node_id` + `map_index` + `input_fingerprint`: skip/recompute correlation within a lineage.
 - **Lineage identity** — `resume_lineage_id` + `resume_from_flow_run_id`: chains deployment retries.
-- **Non-goals** — Prefect `dynamic_key` task correlation; terminal→non-terminal FSM edges; Prefect `CRASHED` / `AwaitingRetry` state names.
+- **Non-goals** — Prefect `dynamic_key` task correlation; unscoped terminal→non-terminal FSM edges (deployment retry uses kind `retry_reopen` → `PENDING` only); Prefect `CRASHED` / `AwaitingRetry` state names. Not full Prefect retry parity.
 
 Deep dive: **[State transition matrix](concepts/state-transition-matrix.md)**, **[Execution contract](concepts/execution-contract.md)**.
 

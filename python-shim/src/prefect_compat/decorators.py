@@ -15,15 +15,12 @@ from .cancellation import FlowRunCancelled
 from .context import bind_flow_metadata, bind_task_run, bound_flow_parameters
 from .control_plane_registry import _require_control_plane, set_control_plane
 from .errors import FlowChildrenFailed, TransitionRewriteFailed
-from .forecast_compile import _compile_forecast_for_flow, clear_forecast_cache
-from .graph_mode import (
-    normalize_declared_graph_mode,
-    resolve_graph_mode,
-)
+from .flow_start import start_fresh_flow_attempt
+from .forecast_compile import clear_forecast_cache
+from .graph_mode import normalize_declared_graph_mode
 from .hooks import (
     TransitionHookSpec,
     compile_transition_hooks,
-    emit_flow_hooks_for_batch,
     emit_flow_transition,
     emit_task_single_hook_edge,
     emit_task_transition_edges,
@@ -35,6 +32,12 @@ from .runtime import (
     FlowRunSchedulingHeld,
     RunState,
     TaskRunRecord,
+)
+from .same_run_retry import (
+    begin_same_run_reentry,
+    remember_task_value_for_retry,
+    reused_same_run_value,
+    same_run_reenter_id,
 )
 from .task_runners import (
     MapTaskRunner,
@@ -260,6 +263,17 @@ class TaskWrapper:
             planned_node_id = _require_control_plane().next_planned_node_id(
                 flow_run_id, self.name
             )
+            reused = reused_same_run_value(
+                _require_control_plane(),
+                flow_run_id,
+                planned_node_id,
+                input_fp,
+            )
+            if reused is not None:
+                task_id, node_id, value = reused
+                return TaskFuture(
+                    cast(T, value), task_run_id=task_id, planned_node_id=node_id
+                )
             hit, cached = _require_control_plane().lookup_resumed_task_result(
                 flow_run_id,
                 planned_node_id,
@@ -490,6 +504,17 @@ class TaskWrapper:
             map_index=map_index,
             input_fingerprint=input_fingerprint,
         )
+        remember_task_value_for_retry(
+            _require_control_plane(),
+            task_run.flow_run_id,
+            task_run.task_run_id,
+            self.name,
+            task_run.planned_node_id,
+            result,
+            persist_result=self.persist_result,
+            map_index=map_index,
+            input_fingerprint=input_fingerprint,
+        )
         data: dict[str, Any] = {"task_name": self.name, **extra}
         if cache_hit:
             data["cache_hit"] = True
@@ -608,6 +633,19 @@ class TaskWrapper:
                     planned_node_id = _require_control_plane().next_planned_node_id(
                         flow_run_id, self.name
                     )
+                reused = reused_same_run_value(
+                    _require_control_plane(),
+                    flow_run_id,
+                    planned_node_id,
+                    input_fp,
+                    map_index=index,
+                )
+                if reused is not None:
+                    task_id, node_id, value = reused
+                    futures[index] = TaskFuture(
+                        cast(T, value), task_run_id=task_id, planned_node_id=node_id
+                    )
+                    continue
                 hit, cached = _require_control_plane().lookup_resumed_task_result(
                     flow_run_id,
                     planned_node_id,
@@ -1039,70 +1077,32 @@ def flow(
                     if args:
                         params_obj = {**params_obj, "__args__": list(args)}
                 parameters_fingerprint = fingerprint_parameters(params_obj)
-                record = _require_control_plane().create_flow_run(
-                    flow_name,
-                    parent_flow_run_id=parent_flow_run_id,
-                    parent_task_run_id=parent_task_run_id,
-                    execution_mode=execution_mode,
-                    resume_from_flow_run_id=resume_from,
-                    parameters_fingerprint=parameters_fingerprint,
-                    formerly=former_names,
-                )
+                reenter_id = same_run_reenter_id(dep_run)
+                if reenter_id is not None:
+                    record = begin_same_run_reentry(
+                        _require_control_plane(), reenter_id
+                    )
+                else:
+                    record = _require_control_plane().create_flow_run(
+                        flow_name,
+                        parent_flow_run_id=parent_flow_run_id,
+                        parent_task_run_id=parent_task_run_id,
+                        execution_mode=execution_mode,
+                        resume_from_flow_run_id=resume_from,
+                        parameters_fingerprint=parameters_fingerprint,
+                        formerly=former_names,
+                    )
                 _ACTIVE_FLOW_RUN.set(record.run_id)
                 flow_params = bound_flow_parameters(f, args, kwargs)
                 with bind_flow_metadata(flow_name, flow_params):
-                    if dep_run_id is not None:
-                        _require_control_plane().attach_flow_run_to_deployment_run(
-                            dep_run_id, record.run_id
-                        )
-                    manifest_info = _compile_forecast_for_flow(f, flow_name)
-                    resolution = resolve_graph_mode(
-                        declared_graph_mode,
-                        fallback_required=bool(manifest_info["fallback_required"]),
-                        manifest=manifest_info["manifest"],
-                    )
-                    _require_control_plane().save_flow_manifest(
-                        run_id=record.run_id,
-                        manifest=manifest_info["manifest"],
-                        forecast=manifest_info["forecast"],
-                        warnings=manifest_info["warnings"],
-                        fallback_required=manifest_info["fallback_required"],
-                        source=manifest_info["source"],
-                    )
-                    _require_control_plane().configure_flow_graph_mode(
-                        record.run_id, resolution
-                    )
-                    start_transitions: list[tuple[RunState, UUID, str, int | None]] = [
-                        (RunState.PENDING, uuid4(), "propose", 0),
-                        (RunState.RUNNING, uuid4(), "start", 1),
-                    ]
-                    # Parent cancel can land after create_flow_run but before this
-                    # optimistic PENDING→RUNNING batch; treat that as cancellation
-                    # instead of surfacing a raw version-conflict ValueError.
-                    pre_start = _require_control_plane().get_flow(record.run_id)
-                    if pre_start.state == RunState.CANCELLED:
-                        raise FlowRunCancelled(
-                            f"flow run {record.run_id} was cancelled"
-                        )
-                    try:
-                        batch_results = _require_control_plane().set_flow_states_batch(
-                            record.run_id, start_transitions
-                        )
-                    except ValueError as exc:
-                        if "version conflict" in str(exc):
-                            current = _require_control_plane().get_flow(record.run_id)
-                            if current.state == RunState.CANCELLED:
-                                raise FlowRunCancelled(
-                                    f"flow run {record.run_id} was cancelled"
-                                ) from exc
-                        raise
-                    if fh:
-                        emit_flow_hooks_for_batch(
-                            fh,
-                            record.run_id,
-                            RunState.SCHEDULED,
-                            start_transitions,
-                            batch_results,
+                    if reenter_id is None:
+                        start_fresh_flow_attempt(
+                            dep_run_id=dep_run_id,
+                            record=record,
+                            flow_fn=f,
+                            flow_name=flow_name,
+                            declared_graph_mode=declared_graph_mode,
+                            hooks=fh,
                         )
                     try:
                         result = f(*args, **kwargs)

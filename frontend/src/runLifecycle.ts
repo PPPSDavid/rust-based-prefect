@@ -1,6 +1,10 @@
 import type { FlowRun } from "./types";
 
 const PAUSEABLE = new Set(["SCHEDULED", "PENDING", "RUNNING"]);
+const RETRYABLE = new Set(["FAILED", "CANCELLED", "COMPLETED"]);
+
+export const RETRY_UNAVAILABLE_NOTE =
+  "This run was not started from a deployment, so it cannot be retried.";
 
 export function isOperatorPause(run: FlowRun): boolean {
   return run.lifecycle_action === "pause";
@@ -12,6 +16,14 @@ export function isGatePaused(run: FlowRun): boolean {
 
 export function canPauseRun(run: FlowRun): boolean {
   return PAUSEABLE.has(run.state) && !run.pause_drain_pending;
+}
+
+export function canRetryRun(run: FlowRun): boolean {
+  return Boolean(run.deployment_id) && RETRYABLE.has(run.state);
+}
+
+export function showRetryUnavailableNote(run: FlowRun): boolean {
+  return !run.deployment_id && RETRYABLE.has(run.state);
 }
 
 export function canResumeRun(run: FlowRun): boolean {

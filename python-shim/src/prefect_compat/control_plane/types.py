@@ -40,6 +40,7 @@ class FlowRunRecord:
     manifest_fingerprint: str | None = None
     contract_mismatch: bool = False
     flow_attempt_number: int = 1
+    same_run_retry: bool = False
 
 
 @dataclass
@@ -103,3 +104,16 @@ def legacy_is_valid_transition(from_state: RunState, to_state: RunState) -> bool
         RunState.CANCELLED: set(),
     }
     return to_state in allowed[from_state]
+
+
+def flow_transition_allowed(
+    from_state: RunState, to_state: RunState, transition_kind: str
+) -> bool:
+    """Base FSM plus the deployment-retry reopen edge."""
+    if (
+        transition_kind == "retry_reopen"
+        and to_state == RunState.PENDING
+        and from_state in {RunState.COMPLETED, RunState.FAILED, RunState.CANCELLED}
+    ):
+        return True
+    return legacy_is_valid_transition(from_state, to_state)

@@ -213,7 +213,7 @@ impl Engine {
             }
         }
 
-        validate_transition(run.state, req.to_state)?;
+        validate_flow_transition(run.state, req.to_state, &req.transition_kind)?;
 
         let event = EventRecord {
             event_id: Uuid::new_v4(),
@@ -308,6 +308,25 @@ impl Engine {
     pub fn get_task_run(&self, task_run_id: Uuid) -> Option<&TaskRun> {
         self.task_runs.get(&task_run_id)
     }
+}
+
+fn validate_flow_transition(
+    from: RunState,
+    to: RunState,
+    kind: &str,
+) -> Result<(), EngineError> {
+    // Deployment retry reopens this flow run. The edge is kind-scoped so
+    // ordinary callers still cannot leave a terminal state.
+    if kind == "retry_reopen"
+        && to == RunState::Pending
+        && matches!(
+            from,
+            RunState::Completed | RunState::Failed | RunState::Cancelled
+        )
+    {
+        return Ok(());
+    }
+    validate_transition(from, to)
 }
 
 pub fn validate_transition(from: RunState, to: RunState) -> Result<(), EngineError> {
@@ -414,6 +433,49 @@ mod tests {
             transition_kind: "bad".to_string(),
         });
         assert!(matches!(err, Err(EngineError::InvalidTransition { .. })));
+    }
+
+    #[test]
+    fn retry_reopen_moves_terminal_flow_to_pending() {
+        let mut engine = Engine::new();
+        let run = engine.create_flow_run("flow");
+        for (to_state, kind) in [
+            (RunState::Pending, "propose"),
+            (RunState::Running, "start"),
+            (RunState::Completed, "complete"),
+        ] {
+            engine
+                .set_flow_state(SetStateRequest {
+                    run_id: run.id,
+                    to_state,
+                    expected_version: None,
+                    transition_token: Uuid::new_v4(),
+                    transition_kind: kind.to_string(),
+                })
+                .unwrap();
+        }
+        let rejected = engine.set_flow_state(SetStateRequest {
+            run_id: run.id,
+            to_state: RunState::Running,
+            expected_version: None,
+            transition_token: Uuid::new_v4(),
+            transition_kind: "retry_reopen".to_string(),
+        });
+        assert!(matches!(
+            rejected,
+            Err(EngineError::InvalidTransition { .. })
+        ));
+
+        let reopened = engine
+            .set_flow_state(SetStateRequest {
+                run_id: run.id,
+                to_state: RunState::Pending,
+                expected_version: None,
+                transition_token: Uuid::new_v4(),
+                transition_kind: "retry_reopen".to_string(),
+            })
+            .unwrap();
+        assert_eq!(reopened.current_state, RunState::Pending);
     }
 
     #[test]

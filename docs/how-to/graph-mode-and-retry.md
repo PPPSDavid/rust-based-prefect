@@ -62,19 +62,18 @@ Use when runtime behavior differs from static analysis (hidden branches, externa
 
 ```mermaid
 flowchart TD
-  run1[First flow run]
-  fail[FAILED or CANCELLED]
-  retry[Deployment retry or prepare_resume]
-  run2[New flow_run_id same lineage]
+  run1[This flow run]
+  fail[FAILED, CANCELLED, or COMPLETED]
+  retry[Deployment Retry on this id]
   contract{Static contract matches?}
-  skip[Skip eligible COMPLETED nodes]
-  full[Re-execute all tasks]
-  run1 --> fail --> retry --> run2 --> contract
+  skip[Skip completed tasks on this id]
+  full[Re-execute tasks that must run]
+  run1 --> fail --> retry --> contract
   contract -->|yes| skip
   contract -->|no| full
 ```
 
-Identity for skips: `(resume_lineage_id, planned_node_id, map_index, input_fingerprint)` — not `task_run_id`.
+Deployment Retry stays on the same `flow_run_id`. In-process `prepare_resume` still starts a successor flow run. Identity for skips: `(resume_lineage_id, planned_node_id, map_index, input_fingerprint)`. Completed task-run ids are kept; work that must run gets a new task-run row.
 
 ## Attempt counters
 
@@ -89,7 +88,7 @@ Expose via `GET /api/flow-runs/{id}` and task run listings.
 
 | Topic | Prefect 3.x | IronFlow |
 | --- | --- | --- |
-| Flow retry identity | Often **same** `flow_run_id`, new task rows | **New** `flow_run_id`, lineage via `resume_from_flow_run_id` |
+| Flow retry identity | Often **same** `flow_run_id`, new task rows | Deployment Retry keeps **this** `flow_run_id`. Quick Run and in-process `prepare_resume` create a new one |
 | Task retry identity | **Same** `task_run_id`, `run_count++` | **Not implemented** — see `docs/plans/task-auto-retry.md` |
 | Skip on retry | Cache / persist policies | Static contract + logical DAG slot only |
 | Dynamic flows | All flows potentially dynamic | **`auto`** detects; **`dynamic`** forces fresh retry |

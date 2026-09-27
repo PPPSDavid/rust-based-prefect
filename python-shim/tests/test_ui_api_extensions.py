@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
+from prefect_compat.runtime import RunState
 from prefect_compat.decorators import set_control_plane
 from prefect_compat.runtime import InMemoryControlPlane
 from prefect_compat.server import app, control_plane, mapped_flow
@@ -83,9 +85,17 @@ def test_retry_flow_run_from_deployment(tmp_path: Path) -> None:
         "UPDATE deployment_runs SET flow_run_id = ? WHERE id = ?",
         [str(flow_run.run_id), dep_run["id"]],
     )
+    control_plane.set_flow_state(
+        flow_run.run_id, RunState.PENDING, uuid4(), "propose", expected_version=0
+    )
+    control_plane.set_flow_state(flow_run.run_id, RunState.RUNNING, uuid4(), "start")
+    control_plane.set_flow_state(flow_run.run_id, RunState.FAILED, uuid4(), "fail")
     retry = client.post(f"/api/flow-runs/{flow_run.run_id}/retry")
     assert retry.status_code == 200
-    assert retry.json()["deployment_id"] == dep_id
+    body = retry.json()
+    assert body["id"] == str(flow_run.run_id)
+    assert body["state"] == "PENDING"
+    assert body["deployment_id"] == dep_id
 
 
 def test_work_pools_and_workers_endpoints(tmp_path: Path) -> None:
