@@ -84,6 +84,7 @@ test.describe("lifecycle pause chooser", () => {
     await expect(page.getByRole("combobox", { name: /Task/i })).toBeVisible();
 
     await page.getByRole("button", { name: "Resume" }).click();
-    await expect(page.getByText(/Resume scheduled a new deployment attempt|Run resumed/)).toBeVisible();
+    await expect(page.getByText("Resuming this run.")).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`/runs/${running.flowRunId}`));
   });
 });
