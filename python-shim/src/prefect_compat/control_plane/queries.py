@@ -5,6 +5,7 @@ from typing import Any
 from uuid import UUID
 
 from ..flow_catalog_settings import catalog_hide_archived
+from ..task_failure_message import failure_fields_from_payload
 from .flow_run_list import prepare_flow_run_list_filters, query_flow_runs_page
 from .types import (
     PageResult,
@@ -167,6 +168,7 @@ class QueriesMixin:
             items = rust_result["items"]
             for item in items:
                 item.setdefault("task_run_attempt", 1)
+            self._attach_task_failure_details(flow_run_id, items)
             return PageResult(items=items, next_cursor=rust_result["next_cursor"])
         query = (
             "SELECT seq,id,flow_run_id,task_name,planned_node_id,state,version,created_at,updated_at,"
@@ -181,8 +183,32 @@ class QueriesMixin:
         params.append(limit)
         rows = self._query_rows(query, params)
         items = [self._task_row_to_dict(r) for r in rows]
+        self._attach_task_failure_details(flow_run_id, items)
         next_cursor = str(rows[-1]["seq"]) if len(rows) == limit else None
         return PageResult(items=items, next_cursor=next_cursor)
+
+    def _attach_task_failure_details(
+        self, flow_run_id: UUID, items: list[dict[str, Any]]
+    ) -> None:
+        """Copy ``data.error`` / ``data.traceback`` from the latest task_failed event."""
+        failed = [item for item in items if item.get("state") == "FAILED"]
+        if not failed:
+            return
+        rows = self._query_rows(
+            "SELECT task_run_id, data FROM events "
+            "WHERE run_id = ? AND event_type = 'task_failed' "
+            "ORDER BY seq ASC",
+            [str(flow_run_id)],
+        )
+        by_task: dict[str, Any] = {}
+        for row in rows:
+            task_id = row["task_run_id"]
+            if task_id:
+                by_task[str(task_id)] = row["data"]
+        for item in failed:
+            error, stack = failure_fields_from_payload(by_task.get(str(item["id"])))
+            item["error"] = error
+            item["traceback"] = stack
 
     def list_logs(
         self,

@@ -67,6 +67,8 @@ export type TaskRun = {
   kind?: string;
   child_flow_run_id?: string | null;
   child_deployment_run_id?: string | null;
+  error?: string | null;
+  traceback?: string | null;
 };
 
 export type LogRecord = {

@@ -4,6 +4,7 @@ import json
 from typing import Any
 from uuid import UUID, uuid4
 
+from ..task_failure_message import task_event_log_message
 from .types import RunState
 
 
@@ -126,7 +127,9 @@ class RunEventsMixin:
                             "flow_run_id": str(task.flow_run_id),
                             "task_run_id": str(task_run_id),
                             "level": log_level,
-                            "message": f"{task.task_name}: {event_type}",
+                            "message": task_event_log_message(
+                                task.task_name, event_type, data
+                            ),
                         }
                     )
                     if event_type == "task_completed":
