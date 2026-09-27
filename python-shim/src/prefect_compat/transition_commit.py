@@ -18,6 +18,7 @@ from .hooks import (
     resolve_terminal_rewrite,
 )
 from .runtime import RunState, TaskRunRecord
+from .task_failure_message import merge_failure_details
 
 _TASK_EVENT_FOR_STATE: dict[RunState, str] = {
     RunState.COMPLETED: "task_completed",
@@ -205,6 +206,7 @@ def commit_task_terminal(
     if committed == RunState.COMPLETED and persist_completed is not None:
         extra = persist_completed(result)
         data = {**(data or {}), **extra}
+    data = merge_failure_details(data, exception, failed=committed == RunState.FAILED)
     data = _rewrite_audit_metadata(data, proposed=proposed, committed=committed)
     _require_control_plane().record_task_event(
         task_run.task_run_id, applied_event, data
