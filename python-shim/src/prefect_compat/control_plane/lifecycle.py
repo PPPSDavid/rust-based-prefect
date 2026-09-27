@@ -361,6 +361,17 @@ class LifecycleMixin:
         key = str(flow_run_id)
         if lifecycle_action is None and interrupt_mode is None:
             self._lifecycle_by_flow.pop(key, None)
+            # Persist the clear so a later replay does not restore a cancel/pause hold.
+            self._persist_record(
+                {
+                    "record_type": "flow_lifecycle",
+                    "flow_run_id": key,
+                    "lifecycle_action": None,
+                    "interrupt_mode": None,
+                    "pause_drain_pending": False,
+                    "lifecycle_summary": None,
+                }
+            )
             return
         entry = {
             "lifecycle_action": lifecycle_action,

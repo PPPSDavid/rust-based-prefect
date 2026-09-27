@@ -310,11 +310,7 @@ impl Engine {
     }
 }
 
-fn validate_flow_transition(
-    from: RunState,
-    to: RunState,
-    kind: &str,
-) -> Result<(), EngineError> {
+fn validate_flow_transition(from: RunState, to: RunState, kind: &str) -> Result<(), EngineError> {
     // Deployment retry reopens this flow run. The edge is kind-scoped so
     // ordinary callers still cannot leave a terminal state.
     if kind == "retry_reopen"

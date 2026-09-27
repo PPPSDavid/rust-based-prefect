@@ -4,9 +4,8 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
-from prefect_compat.runtime import RunState
 from prefect_compat.decorators import set_control_plane
-from prefect_compat.runtime import InMemoryControlPlane
+from prefect_compat.runtime import InMemoryControlPlane, RunState
 from prefect_compat.server import app, control_plane, mapped_flow
 
 

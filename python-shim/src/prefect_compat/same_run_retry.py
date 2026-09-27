@@ -10,9 +10,8 @@ import json
 from typing import Any
 from uuid import UUID, uuid4
 
-from .cancellation import FlowRunCancelled
+from .control_plane.types import RunState
 from .result_codec import ResultEncodeError, decode_task_result, encode_task_result
-from .runtime import RunState
 
 _RETRYABLE = {
     RunState.FAILED,
@@ -61,6 +60,10 @@ def begin_same_run_reentry(plane: Any, flow_run_id: UUID) -> Any:
     """Mark ``flow_run_id`` running and ready to skip completed tasks."""
     record = plane.get_flow(flow_run_id)
     if record.state == RunState.CANCELLED:
+        # Imported here: cancellation → runtime, and runtime loads lifecycle
+        # which imports this module.
+        from .cancellation import FlowRunCancelled
+
         raise FlowRunCancelled(f"flow run {flow_run_id} was cancelled")
     _arm_same_run_skips(plane, record)
     if record.state == RunState.PENDING:
@@ -150,7 +153,9 @@ def reused_same_run_value(
     )
 
 
-def _deployment_for_flow_run(plane: Any, flow_run_id: UUID) -> tuple[UUID, dict[str, Any]]:
+def _deployment_for_flow_run(
+    plane: Any, flow_run_id: UUID
+) -> tuple[UUID, dict[str, Any]]:
     rows = plane._query_rows(
         """
         SELECT deployment_id, requested_parameters
@@ -257,7 +262,34 @@ def _reopen_flow_run(plane: Any, flow_run_id: UUID, state: RunState) -> None:
             "retry_reopen",
             expected_version=record.version,
         )
+    # Cancel and terminate-pause hold new task starts. A new attempt of this
+    # same run must be allowed to schedule the tasks that still have to run.
+    plane._set_lifecycle(
+        flow_run_id,
+        lifecycle_action=None,
+        interrupt_mode=None,
+    )
+    _retire_incomplete_tasks(plane, flow_run_id)
     _arm_same_run_skips(plane, plane.get_flow(flow_run_id))
+
+
+def _retire_incomplete_tasks(plane: Any, flow_run_id: UUID) -> None:
+    """Keep prior incomplete rows, but do not let them fail the new attempt."""
+    with plane._lock:
+        for task in plane._tasks.values():
+            if (
+                str(task.flow_run_id) == str(flow_run_id)
+                and task.state != RunState.COMPLETED
+            ):
+                task.contribute_to_flow_state = False
+        plane._sqlite_conn.execute(
+            """
+            UPDATE task_runs
+            SET contribute_to_flow_state = 0
+            WHERE flow_run_id = ? AND state != ?
+            """,
+            [str(flow_run_id), RunState.COMPLETED.value],
+        )
 
 
 def _arm_same_run_skips(plane: Any, record: Any) -> None:

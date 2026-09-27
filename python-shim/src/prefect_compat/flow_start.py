@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 from .cancellation import FlowRunCancelled
 from .control_plane_registry import _require_control_plane
 from .forecast_compile import _compile_forecast_for_flow
-from .graph_mode import resolve_graph_mode
+from .graph_mode import GraphModeLiteral, resolve_graph_mode
 from .hooks import emit_flow_hooks_for_batch
 from .runtime import FlowRunRecord, RunState
 
@@ -20,7 +20,7 @@ def start_fresh_flow_attempt(
     record: FlowRunRecord,
     flow_fn: Callable[..., Any],
     flow_name: str,
-    declared_graph_mode: str,
+    declared_graph_mode: GraphModeLiteral,
     hooks: tuple[Any, ...] | None,
 ) -> None:
     """Attach, compile, and move a new flow run from SCHEDULED to RUNNING."""
