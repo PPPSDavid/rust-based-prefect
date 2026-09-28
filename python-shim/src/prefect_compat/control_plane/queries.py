@@ -5,6 +5,8 @@ from typing import Any
 from uuid import UUID
 
 from ..flow_catalog_settings import catalog_hide_archived
+from ..task_failure_message import failure_fields_from_payload
+from .flow_run_list import prepare_flow_run_list_filters, query_flow_runs_page
 from .types import (
     PageResult,
 )
@@ -17,48 +19,38 @@ class QueriesMixin:
         limit: int = 50,
         cursor: str | None = None,
         include_archived: bool = False,
+        q: str | None = None,
+        created_after: str | None = None,
+        created_before: str | None = None,
     ) -> PageResult:
+        filters = prepare_flow_run_list_filters(
+            state=state,
+            q=q,
+            created_after=created_after,
+            created_before=created_before,
+            limit=limit,
+            cursor=cursor,
+        )
         hide = catalog_hide_archived() and not include_archived
         rust_result = self._query_rust(
             "flow_runs",
             {
-                "state": state,
-                "limit": limit,
-                "cursor": cursor,
+                "state": filters.state,
+                "limit": filters.limit,
+                "cursor": filters.cursor,
                 "hide_archived": hide,
+                "q": filters.q,
+                "created_after": filters.created_after,
+                "created_before": filters.created_before,
             },
         )
         if rust_result is not None:
             return PageResult(
                 items=rust_result["items"], next_cursor=rust_result["next_cursor"]
             )
-        query = (
-            "SELECT fr.seq,fr.id,fr.name,fr.state,fr.version,fr.created_at,fr.updated_at,"
-            "fr.parent_flow_run_id,fr.parent_task_run_id,fr.root_flow_run_id,"
-            "fr.execution_mode,fr.depth,fr.flow_id FROM flow_runs fr "
-            "LEFT JOIN flows catalog ON catalog.id = fr.flow_id"
+        items, next_cursor = query_flow_runs_page(
+            self._query_rows, filters, hide_archived=hide
         )
-        conditions: list[str] = []
-        params: list[Any] = []
-        if state:
-            conditions.append("fr.state = ?")
-            params.append(state)
-        if hide:
-            conditions.append("(catalog.id IS NULL OR catalog.status = 'active')")
-        else:
-            conditions.append(
-                "(catalog.id IS NULL OR catalog.status IN ('active','archived'))"
-            )
-        if cursor:
-            conditions.append("fr.seq < ?")
-            params.append(int(cursor))
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
-        query += " ORDER BY fr.seq DESC LIMIT ?"
-        params.append(limit)
-        rows = self._query_rows(query, params)
-        items = [self._flow_row_to_dict(r) for r in rows]
-        next_cursor = str(rows[-1]["seq"]) if len(rows) == limit else None
         return PageResult(items=items, next_cursor=next_cursor)
 
     def _attach_graph_mode_fields_to_detail(
@@ -176,6 +168,7 @@ class QueriesMixin:
             items = rust_result["items"]
             for item in items:
                 item.setdefault("task_run_attempt", 1)
+            self._attach_task_failure_details(flow_run_id, items)
             return PageResult(items=items, next_cursor=rust_result["next_cursor"])
         query = (
             "SELECT seq,id,flow_run_id,task_name,planned_node_id,state,version,created_at,updated_at,"
@@ -190,8 +183,32 @@ class QueriesMixin:
         params.append(limit)
         rows = self._query_rows(query, params)
         items = [self._task_row_to_dict(r) for r in rows]
+        self._attach_task_failure_details(flow_run_id, items)
         next_cursor = str(rows[-1]["seq"]) if len(rows) == limit else None
         return PageResult(items=items, next_cursor=next_cursor)
+
+    def _attach_task_failure_details(
+        self, flow_run_id: UUID, items: list[dict[str, Any]]
+    ) -> None:
+        """Copy ``data.error`` / ``data.traceback`` from the latest task_failed event."""
+        failed = [item for item in items if item.get("state") == "FAILED"]
+        if not failed:
+            return
+        rows = self._query_rows(
+            "SELECT task_run_id, data FROM events "
+            "WHERE run_id = ? AND event_type = 'task_failed' "
+            "ORDER BY seq ASC",
+            [str(flow_run_id)],
+        )
+        by_task: dict[str, Any] = {}
+        for row in rows:
+            task_id = row["task_run_id"]
+            if task_id:
+                by_task[str(task_id)] = row["data"]
+        for item in failed:
+            error, stack = failure_fields_from_payload(by_task.get(str(item["id"])))
+            item["error"] = error
+            item["traceback"] = stack
 
     def list_logs(
         self,

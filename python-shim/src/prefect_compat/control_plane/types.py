@@ -40,6 +40,7 @@ class FlowRunRecord:
     manifest_fingerprint: str | None = None
     contract_mismatch: bool = False
     flow_attempt_number: int = 1
+    tags: tuple[str, ...] = ()
     same_run_retry: bool = False
 
 

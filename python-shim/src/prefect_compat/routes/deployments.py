@@ -18,33 +18,41 @@ from .schemas import (
 router = APIRouter(tags=["deployments"])
 
 
+def _with_schedule_runtime(deployment: dict) -> dict:
+    deployment["schedule_cron_ticks"] = bool(control_plane.schedule_cron_will_fire())
+    return deployment
+
+
 @router.get("/api/deployments", response_model=CursorPage)
 def list_deployments(
     limit: int = Query(default=200, ge=1, le=1000),
     cursor: str | None = Query(default=None),
 ) -> CursorPage:
     page = control_plane.list_deployments(limit=limit, cursor=cursor)
-    return CursorPage(items=page.items, next_cursor=page.next_cursor)
+    items = [_with_schedule_runtime(item) for item in page.items]
+    return CursorPage(items=items, next_cursor=page.next_cursor)
 
 
 @router.post("/api/deployments")
 def create_deployment(req: DeploymentCreateRequest) -> dict:
-    return control_plane.create_deployment(
-        name=req.name,
-        flow_name=req.flow_name,
-        entrypoint=req.entrypoint,
-        path=req.path,
-        default_parameters=req.default_parameters,
-        paused=req.paused,
-        concurrency_limit=req.concurrency_limit,
-        collision_strategy=req.collision_strategy,
-        schedule_interval_seconds=req.schedule_interval_seconds,
-        schedule_cron=req.schedule_cron,
-        schedule_rrule=req.schedule_rrule,
-        schedule_next_run_at=req.schedule_next_run_at,
-        schedule_enabled=req.schedule_enabled,
-        work_pool_id=req.work_pool_id,
-        formerly=req.formerly,
+    return _with_schedule_runtime(
+        control_plane.create_deployment(
+            name=req.name,
+            flow_name=req.flow_name,
+            entrypoint=req.entrypoint,
+            path=req.path,
+            default_parameters=req.default_parameters,
+            paused=req.paused,
+            concurrency_limit=req.concurrency_limit,
+            collision_strategy=req.collision_strategy,
+            schedule_interval_seconds=req.schedule_interval_seconds,
+            schedule_cron=req.schedule_cron,
+            schedule_rrule=req.schedule_rrule,
+            schedule_next_run_at=req.schedule_next_run_at,
+            schedule_enabled=req.schedule_enabled,
+            work_pool_id=req.work_pool_id,
+            formerly=req.formerly,
+        )
     )
 
 
@@ -53,14 +61,16 @@ def get_deployment_by_name(name: str) -> dict:
     deployment = control_plane.get_deployment_by_name(name)
     if deployment is None:
         raise HTTPException(status_code=404, detail="Deployment not found")
-    return deployment
+    return _with_schedule_runtime(deployment)
 
 
 @router.patch("/api/deployments/{deployment_id}")
 def patch_deployment(deployment_id: UUID, req: DeploymentPatchRequest) -> dict:
     patch = req.model_dump(exclude_unset=True)
     try:
-        return control_plane.update_deployment(deployment_id, patch)
+        return _with_schedule_runtime(
+            control_plane.update_deployment(deployment_id, patch)
+        )
     except ValueError as exc:
         detail = str(exc)
         status_code = 404 if "not found" in detail else 400
@@ -84,7 +94,7 @@ def get_deployment(deployment_id: UUID) -> dict:
     deployment = control_plane.get_deployment(deployment_id)
     if deployment is None:
         raise HTTPException(status_code=404, detail="Deployment not found")
-    return deployment
+    return _with_schedule_runtime(deployment)
 
 
 @router.post("/api/deployments/{deployment_id}/run")

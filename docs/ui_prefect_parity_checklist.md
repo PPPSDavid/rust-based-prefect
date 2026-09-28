@@ -21,7 +21,7 @@ Side-by-side comparison notes for IronFlow UI vs Prefect OSS 3.x.
 
 ## Flow Runs
 
-- [x] List with state filters and pagination (`RunsPage`: state chips + cursor “Load more”)
+- [x] List with shareable state views, server-side search, and cursor pagination (`RunsPage`: URL filters, Running/Failed/Scheduled views, state chips including PAUSED/PENDING/SCHEDULED, `q` + created-time range, Load more)
 - [x] Run detail with live SSE updates (`useSsePulse` + `/api/stream/flow-runs/{id}`)
 - [x] Cancel active runs (`POST /api/flow-runs/{id}/cancel` when `SCHEDULED` / `PENDING` / `RUNNING`)
 - [x] Pause with explicit drain vs terminate chooser (`POST …/pause`); Resume for operator pauses only

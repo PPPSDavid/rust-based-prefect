@@ -21,7 +21,7 @@ import {
   showRetryUnavailableNote,
   taskOutcomeLabel
 } from "../runLifecycle";
-import type { ArtifactRecord, FlowRunDag } from "../types";
+import type { ArtifactRecord, FlowRunDag, LogRecord, TaskRun } from "../types";
 
 type Tab = "tasks" | "logs" | "events" | "artifacts" | "dag";
 type PauseMode = "drain" | "terminate";
@@ -35,6 +35,30 @@ const TABS = [
 ];
 
 const CANCELLABLE = new Set(["SCHEDULED", "PENDING", "RUNNING"]);
+
+function TaskFailureDetail({ task }: { task: TaskRun }) {
+  if (task.state !== "FAILED" || (!task.error && !task.traceback)) return null;
+  return (
+    <>
+      {task.error ? <p className="task-failure">{task.error}</p> : null}
+      {task.traceback ? <pre className="task-result">{task.traceback}</pre> : null}
+    </>
+  );
+}
+
+function LogLine({ log }: { log: LogRecord }) {
+  const message = log.message.includes("\n") ? (
+    <pre className="task-result">{log.message}</pre>
+  ) : (
+    log.message
+  );
+  return (
+    <li>
+      [{log.level}] {log.task_run_id ? `${log.task_run_id.slice(0, 8)} · ` : ""}
+      {message}
+    </li>
+  );
+}
 
 export function RunDetailPage() {
   const { id = "" } = useParams();
@@ -344,6 +368,7 @@ export function RunDetailPage() {
                 {parsed.hasResult ? (
                   <pre className="task-result mono-list">{formatTaskResult(parsed.result)}</pre>
                 ) : null}
+                <TaskFailureDetail task={task} />
               </li>
             );
           })}
@@ -386,10 +411,7 @@ export function RunDetailPage() {
           </div>
           <ul className="mono-list">
             {filteredLogs.map((log) => (
-              <li key={log.id}>
-                [{log.level}] {log.task_run_id ? `${log.task_run_id.slice(0, 8)} · ` : ""}
-                {log.message}
-              </li>
+              <LogLine key={log.id} log={log} />
             ))}
           </ul>
         </>

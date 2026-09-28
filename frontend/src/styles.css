@@ -162,12 +162,28 @@ a {
   max-width: 100%;
 }
 
+.task-failure {
+  margin: 6px 0 0 12px;
+  color: hsl(var(--danger));
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 16px;
   align-items: center;
+}
+
+.run-search {
+  min-width: 16rem;
+  flex: 1 1 16rem;
+}
+
+.run-filters-note {
+  margin: -8px 0 16px;
+  color: hsl(var(--muted));
+  font-size: 13px;
 }
 
 .chip-row {
@@ -483,6 +499,34 @@ a {
 .run-children-summary {
   color: hsl(var(--muted));
   font-size: 0.95rem;
+}
+
+.schedule-panel {
+  margin-bottom: 24px;
+}
+
+.schedule-note,
+.schedule-expression {
+  color: hsl(var(--muted));
+  margin: 4px 0;
+}
+
+.schedule-warning {
+  color: hsl(var(--warning));
+  margin: 8px 0;
+}
+
+.schedule-preview {
+  background: hsl(var(--surface-muted));
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 8px 0 12px;
+}
+
+.schedule-form {
+  display: grid;
+  gap: 12px;
+  max-width: 36rem;
 }
 
 /* Prefer token-backed state fills inside the DAG SVG when present */

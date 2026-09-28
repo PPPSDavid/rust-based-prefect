@@ -11,6 +11,12 @@ export type FlowRun = {
   created_at: string;
   updated_at: string;
   deployment_id?: string | null;
+  deployment_name?: string | null;
+  flow_id?: string | null;
+  flow_name?: string | null;
+  tags?: string[];
+  start_time?: string | null;
+  end_time?: string | null;
   parent_flow_run_id?: string | null;
   root_flow_run_id?: string | null;
   execution_mode?: string | null;
@@ -61,6 +67,8 @@ export type TaskRun = {
   kind?: string;
   child_flow_run_id?: string | null;
   child_deployment_run_id?: string | null;
+  error?: string | null;
+  traceback?: string | null;
 };
 
 export type LogRecord = {
@@ -139,6 +147,8 @@ export type Deployment = {
   schedule_rrule?: string | null;
   schedule_next_run_at?: string | null;
   schedule_enabled?: boolean;
+  /** True only when this server will fire cron. Absent or false means cron will not run. */
+  schedule_cron_ticks?: boolean;
   work_pool_id?: string | null;
   created_at: string;
   updated_at: string;

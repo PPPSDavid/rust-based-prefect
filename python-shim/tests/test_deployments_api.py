@@ -156,3 +156,56 @@ def test_patch_deployment_rrule_metadata(tmp_path: Path) -> None:
     assert body["schedule_rrule"] == "FREQ=HOURLY;INTERVAL=2"
     assert body["schedule_cron"] is None
     assert body["schedule_interval_seconds"] is None
+
+
+def test_deployment_payload_reports_cron_ticks(tmp_path: Path) -> None:
+    _swap_plane(tmp_path)
+    client = TestClient(app)
+    create = client.post(
+        "/api/deployments",
+        json={"name": "cron-flag", "flow_name": "simple_flow"},
+    )
+    assert create.status_code == 200
+    body = create.json()
+    assert body["schedule_cron_ticks"] is control_plane.schedule_cron_will_fire()
+    listed = client.get("/api/deployments")
+    assert listed.status_code == 200
+    match = next(item for item in listed.json()["items"] if item["id"] == body["id"])
+    assert match["schedule_cron_ticks"] is body["schedule_cron_ticks"]
+
+
+def test_patch_cron_follows_scheduler_capability(tmp_path: Path) -> None:
+    _swap_plane(tmp_path)
+    client = TestClient(app)
+    create = client.post(
+        "/api/deployments",
+        json={"name": "cron-patch", "flow_name": "simple_flow"},
+    )
+    assert create.status_code == 200
+    deployment_id = create.json()["id"]
+    payload = {
+        "schedule_enabled": True,
+        "schedule_cron": "0 */10 * * * *",
+        "schedule_interval_seconds": None,
+        "schedule_rrule": None,
+        "schedule_next_run_at": None,
+    }
+    patch = client.patch(f"/api/deployments/{deployment_id}", json=payload)
+    if control_plane.schedule_cron_will_fire():
+        assert patch.status_code == 200
+        body = patch.json()
+        assert body["schedule_cron"] == "0 */10 * * * *"
+        assert body["schedule_next_run_at"]
+        assert body["schedule_cron_ticks"] is True
+        return
+    assert patch.status_code == 400
+    assert "Rust" in patch.json()["detail"]
+    payload["schedule_next_run_at"] = (
+        datetime.now(UTC) + timedelta(minutes=10)
+    ).isoformat()
+    stored = client.patch(f"/api/deployments/{deployment_id}", json=payload)
+    assert stored.status_code == 200
+    body = stored.json()
+    assert body["schedule_cron"] == "0 */10 * * * *"
+    assert body["schedule_enabled"] is True
+    assert body["schedule_cron_ticks"] is False

@@ -34,14 +34,26 @@ function pageUrl(path: string, params: Record<string, string | undefined>) {
   return `${base}${path}${qs ? `?${qs}` : ""}`;
 }
 
+export type FlowRunListParams = {
+  cursor?: string;
+  state?: string;
+  q?: string;
+  createdAfter?: string;
+  createdBefore?: string;
+  includeArchived?: boolean;
+};
+
 export const api = {
-  listFlowRuns: (cursor?: string, state?: string, includeArchived?: boolean) =>
+  listFlowRuns: (params: FlowRunListParams = {}) =>
     readJson<CursorPage<FlowRun>>(
       pageUrl("/api/flow-runs", {
         limit: "50",
-        cursor,
-        state,
-        include_archived: includeArchived ? "true" : undefined
+        cursor: params.cursor,
+        state: params.state,
+        q: params.q,
+        created_after: params.createdAfter,
+        created_before: params.createdBefore,
+        include_archived: params.includeArchived ? "true" : undefined
       })
     ),
   getFlowRun: (id: string) => readJson<FlowRun>(`${base}/api/flow-runs/${id}`),
