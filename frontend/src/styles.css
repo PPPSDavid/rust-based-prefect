@@ -501,6 +501,34 @@ a {
   font-size: 0.95rem;
 }
 
+.schedule-panel {
+  margin-bottom: 24px;
+}
+
+.schedule-note,
+.schedule-expression {
+  color: hsl(var(--muted));
+  margin: 4px 0;
+}
+
+.schedule-warning {
+  color: hsl(var(--warning));
+  margin: 8px 0;
+}
+
+.schedule-preview {
+  background: hsl(var(--surface-muted));
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 8px 0 12px;
+}
+
+.schedule-form {
+  display: grid;
+  gap: 12px;
+  max-width: 36rem;
+}
+
 /* Prefer token-backed state fills inside the DAG SVG when present */
 .dag-node[data-state="RUNNING"] rect,
 .dag-node[data-state="CLAIMED"] rect {

@@ -13,6 +13,25 @@ from .types import (
 
 
 class DeploymentsMixin:
+    def schedule_cron_will_fire(self) -> bool:
+        """Cron ticks only on the Rust SQLite scheduler.
+
+        The Python maintenance loop and the Postgres schedule fallback do not
+        fire cron, even when ``schedule_next_run_at`` is set.
+        """
+        if os.getenv("IRONFLOW_ENABLE_SCHEDULER", "1").strip().lower() in {
+            "0",
+            "false",
+            "no",
+        }:
+            return False
+        fsm = getattr(self, "_rust_fsm_active", None)
+        rust_ready = callable(fsm) and fsm() and getattr(self, "_rust_db_bound", False)
+        if not rust_ready:
+            return False
+        store = getattr(self, "_store", None)
+        return getattr(store, "backend_kind", "sqlite") == "sqlite"
+
     def _count_exec_runs(self, deployment_id: str) -> int:
         rows = self._query_rows(
             """

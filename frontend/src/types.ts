@@ -147,6 +147,8 @@ export type Deployment = {
   schedule_rrule?: string | null;
   schedule_next_run_at?: string | null;
   schedule_enabled?: boolean;
+  /** True only when this server will fire cron. Absent or false means cron will not run. */
+  schedule_cron_ticks?: boolean;
   work_pool_id?: string | null;
   created_at: string;
   updated_at: string;

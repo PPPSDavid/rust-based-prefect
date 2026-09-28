@@ -103,6 +103,16 @@ curl -s http://127.0.0.1:8000/api/flow-runs | python -m json.tool
 
 With the default embedded worker enabled, deployment runs progress from `SCHEDULED` to execution in the same process.
 
+## View and edit a schedule in the UI
+
+Open **Deployments**. Each row shows the schedule in words and the next run. A deployment with no schedule says **Manual** and links to **Add schedule**.
+
+Open a deployment. The Schedule section shows the same words and the next run. **Add schedule** or **Edit schedule** changes an interval, a cron expression, or the supported RRule subset (`MINUTELY`, `HOURLY`, `DAILY`, `WEEKLY`, optional `INTERVAL`, optional `UNTIL`) and previews that wording before you save.
+
+Cron uses the Rust scheduler's fields: seconds, minutes, hours, day of month, month, day of week, and an optional year. Sunday is `1`. Example: `0 */10 * * * *`. A five-field expression such as `*/10 * * * *` is saved with seconds set to `0`.
+
+If the page says the cron will not run, this server is not ticking cron. The Python scheduler (and Postgres schedule fallback) still runs interval and RRule schedules. The cron expression is stored, and it starts only when the Rust scheduler is active.
+
 ## Notes
 
 - Cron and RRule scheduling are Rust-preferred when the native engine is available with DB binding.
