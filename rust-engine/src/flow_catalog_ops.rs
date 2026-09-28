@@ -193,7 +193,7 @@ fn parse_bool(params_json: &str, key: &str) -> bool {
     }
 }
 
-fn catalog_status_predicate(hide_archived: bool) -> &'static str {
+pub(crate) fn catalog_status_predicate(hide_archived: bool) -> &'static str {
     if hide_archived {
         "(catalog.id IS NULL OR catalog.status = 'active')"
     } else {
@@ -202,61 +202,7 @@ fn catalog_status_predicate(hide_archived: bool) -> &'static str {
 }
 
 pub fn query_flow_runs(conn: &Connection, params_json: &str) -> Result<String, String> {
-    let state = parse_opt_string(params_json, "state");
-    let cursor = parse_opt_string(params_json, "cursor").and_then(|v| v.parse::<i64>().ok());
-    let limit = parse_limit(params_json, 50);
-    let hide_archived = parse_bool(params_json, "hide_archived");
-    let has_catalog = table_exists(conn, "flows") && column_exists(conn, "flow_runs", "flow_id");
-    let has_flow_id = column_exists(conn, "flow_runs", "flow_id");
-
-    let mut sql = String::from(
-        "SELECT fr.seq,fr.id,fr.name,fr.state,fr.version,fr.created_at,fr.updated_at,\
-         fr.parent_flow_run_id,fr.parent_task_run_id,fr.root_flow_run_id,\
-         fr.execution_mode,fr.depth",
-    );
-    if has_flow_id {
-        sql.push_str(",fr.flow_id");
-    }
-    sql.push_str(" FROM flow_runs fr");
-    if has_catalog {
-        sql.push_str(" LEFT JOIN flows catalog ON catalog.id = fr.flow_id");
-    }
-    sql.push_str(" WHERE (?1 IS NULL OR fr.state = ?1)");
-    sql.push_str(" AND (?2 IS NULL OR fr.seq < ?2)");
-    if has_catalog {
-        sql.push_str(" AND ");
-        sql.push_str(catalog_status_predicate(hide_archived));
-    }
-    sql.push_str(" ORDER BY fr.seq DESC LIMIT ?3");
-
-    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
-    let items = stmt
-        .query_map(params![state.as_deref(), cursor, limit], |row| {
-            let mut obj = json!({
-                "id": row.get::<_, String>(1)?,
-                "name": row.get::<_, String>(2)?,
-                "state": row.get::<_, String>(3)?,
-                "version": row.get::<_, i64>(4)?,
-                "created_at": row.get::<_, String>(5)?,
-                "updated_at": row.get::<_, String>(6)?,
-                "parent_flow_run_id": row.get::<_, Option<String>>(7)?,
-                "parent_task_run_id": row.get::<_, Option<String>>(8)?,
-                "root_flow_run_id": row.get::<_, Option<String>>(9)?,
-                "execution_mode": row.get::<_, Option<String>>(10)?,
-                "depth": row.get::<_, i64>(11)?,
-                "seq": row.get::<_, i64>(0)?
-            });
-            if has_flow_id {
-                if let Ok(fid) = row.get::<_, Option<String>>(12) {
-                    obj["flow_id"] = json!(fid);
-                }
-            }
-            Ok(obj)
-        })
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
-    page_with_cursor(items, limit)
+    crate::flow_run_list::query_flow_runs(conn, params_json)
 }
 
 pub fn query_flows(conn: &Connection, params_json: &str) -> Result<String, String> {
@@ -355,28 +301,6 @@ fn next_updated_at_cursor(items: &[Value], limit: i64) -> Option<String> {
         .and_then(|it| it.get("updated_at"))
         .and_then(Value::as_str)
         .map(str::to_string)
-}
-
-fn page_with_cursor(mut items: Vec<Value>, limit: i64) -> Result<String, String> {
-    let next_cursor = if items.len() as i64 == limit {
-        items
-            .last()
-            .and_then(|it| it.get("seq"))
-            .and_then(Value::as_i64)
-            .map(|n| n.to_string())
-    } else {
-        None
-    };
-    for item in &mut items {
-        if let Some(obj) = item.as_object_mut() {
-            obj.remove("seq");
-        }
-    }
-    serde_json::to_string(&json!({
-        "items": items,
-        "next_cursor": next_cursor
-    }))
-    .map_err(|e| e.to_string())
 }
 
 /// Set-based TTL of terminal flow runs plus orphan catalog GC.

@@ -11,6 +11,12 @@ export type FlowRun = {
   created_at: string;
   updated_at: string;
   deployment_id?: string | null;
+  deployment_name?: string | null;
+  flow_id?: string | null;
+  flow_name?: string | null;
+  tags?: string[];
+  start_time?: string | null;
+  end_time?: string | null;
   parent_flow_run_id?: string | null;
   root_flow_run_id?: string | null;
   execution_mode?: string | null;

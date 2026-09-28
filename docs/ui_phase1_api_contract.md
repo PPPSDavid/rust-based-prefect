@@ -23,9 +23,14 @@ List flow runs for the runs table.
 
 ### Query params
 
-- `state` (optional): one of `SCHEDULED|PENDING|RUNNING|COMPLETED|FAILED|CANCELLED`
+- `state` (optional): one of `SCHEDULED|PENDING|RUNNING|PAUSED|COMPLETED|FAILED|CANCELLED`
+- `q` (optional): case-insensitive substring over run name, catalog flow name, deployment name, and tags. `%` and `_` are literals.
+- `created_after` / `created_before` (optional, ISO-8601): inclusive / exclusive bounds on `created_at` (when the run was recorded, not deployment start)
 - `limit` (optional, default `50`, max `500`)
 - `cursor` (optional)
+- `include_archived` (optional): include runs whose catalog flow is archived
+
+Unknown `state`, a non-ISO timestamp, or a non-integer `cursor` returns `400`. Filters apply before the cursor page, so search is not limited to rows already loaded.
 
 ### Item shape
 
@@ -36,9 +41,18 @@ List flow runs for the runs table.
   "state": "COMPLETED",
   "version": 3,
   "created_at": "2026-04-15T21:00:00+00:00",
-  "updated_at": "2026-04-15T21:00:02+00:00"
+  "updated_at": "2026-04-15T21:00:02+00:00",
+  "flow_id": "uuid-or-null",
+  "flow_name": "mapped_flow",
+  "deployment_id": "uuid-or-null",
+  "deployment_name": "name-or-null",
+  "tags": ["nightly"],
+  "start_time": "deployment started_at or null",
+  "end_time": "deployment finished_at or null"
 }
 ```
+
+`start_time` and `end_time` come from the latest `deployment_runs` row for that flow run. In-process runs leave them null. Sort is still `seq DESC` only.
 
 ## `GET /api/flow-runs/{flow_run_id}`
 

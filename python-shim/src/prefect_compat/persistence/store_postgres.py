@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS flow_runs (
     depth INTEGER NOT NULL DEFAULT 0,
     resume_from_flow_run_id TEXT,
     resume_lineage_id TEXT,
-    parameters_fingerprint TEXT
+    parameters_fingerprint TEXT,
+    tags TEXT
 );
 CREATE TABLE IF NOT EXISTS task_runs (
     seq BIGSERIAL PRIMARY KEY,
@@ -246,6 +247,7 @@ class PostgresStore:
                 "ALTER TABLE flow_runs ADD COLUMN IF NOT EXISTS "
                 "parameters_fingerprint TEXT"
             )
+            cur.execute("ALTER TABLE flow_runs ADD COLUMN IF NOT EXISTS tags TEXT")
             cur.execute(
                 "ALTER TABLE deployment_runs ADD COLUMN IF NOT EXISTS "
                 "resume_from_flow_run_id TEXT"
