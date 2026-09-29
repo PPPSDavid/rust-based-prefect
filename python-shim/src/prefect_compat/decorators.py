@@ -1125,13 +1125,28 @@ def flow(
                         current = _require_control_plane().get_flow(record.run_id)
                         if current.state != RunState.CANCELLED:
                             prev = current.state
-                            cancelled = _require_control_plane().set_flow_state(
-                                record.run_id,
-                                RunState.CANCELLED,
-                                uuid4(),
-                                "cancel",
-                                expected_version=current.version,
-                            )
+                            try:
+                                cancelled = _require_control_plane().set_flow_state(
+                                    record.run_id,
+                                    RunState.CANCELLED,
+                                    uuid4(),
+                                    "cancel",
+                                    expected_version=current.version,
+                                )
+                            except ValueError as exc:
+                                # Parent propagation can commit CANCELLED with no
+                                # expected_version after this snapshot (v2 RUNNING
+                                # vs v3). That conflict is cancellation. Leave
+                                # every other version conflict untouched.
+                                if "version conflict" in str(exc):
+                                    latest = _require_control_plane().get_flow(
+                                        record.run_id
+                                    )
+                                    if latest.state == RunState.CANCELLED:
+                                        raise FlowRunCancelled(
+                                            f"flow run {record.run_id} was cancelled"
+                                        ) from exc
+                                raise
                             if fh and cancelled.status == "applied":
                                 emit_flow_transition(
                                     fh,
