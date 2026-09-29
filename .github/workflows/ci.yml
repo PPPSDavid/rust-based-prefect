@@ -20,7 +20,7 @@ jobs:
         with:
           enable-cache: true
       - name: Sync Python deps
-        run: uv sync --frozen --group dev --python 3.11
+        run: uv sync --frozen --all-packages --group dev --python 3.11
       - name: Ruff check
         run: uv run --python 3.11 ruff check .
       - name: Ruff format
@@ -71,12 +71,12 @@ jobs:
         with:
           enable-cache: true
       - name: Sync Python deps
-        run: uv sync --frozen --group dev --python ${{ matrix.python-version }}
+        run: uv sync --frozen --all-packages --group dev --python ${{ matrix.python-version }}
       - uses: dtolnay/rust-toolchain@stable
       - name: Python tests
         # Pin interpreter explicitly: `uv run` otherwise re-creates .venv from
         # committed `.python-version` (3.12) and ignores the matrix sync.
-        run: uv run --python ${{ matrix.python-version }} pytest python-shim/tests static-planner/tests benchmarks/tests
+        run: uv run --python ${{ matrix.python-version }} pytest python-shim/tests static-planner/tests ironflow-mcp/tests benchmarks/tests
       - name: Airtight concurrency invariants
         run: uv run --python ${{ matrix.python-version }} pytest -m airtight
       - name: Rust tests
@@ -98,13 +98,13 @@ jobs:
         # psycopg-binary has GIL cp314 wheels only (no cp314t tag, no sdist).
         # This job does not run Postgres tests; skip the binary extra.
         run: >
-          uv sync --frozen --group dev --python 3.14t
+          uv sync --frozen --all-packages --group dev --python 3.14t
           --no-install-package psycopg-binary
       - uses: dtolnay/rust-toolchain@stable
       - name: Python tests
         run: >
           uv run --no-sync --python 3.14t
-          pytest python-shim/tests static-planner/tests benchmarks/tests
+          pytest python-shim/tests static-planner/tests ironflow-mcp/tests benchmarks/tests
       - name: Airtight concurrency invariants
         run: uv run --no-sync --python 3.14t pytest -m airtight
       - name: Install packaging tools

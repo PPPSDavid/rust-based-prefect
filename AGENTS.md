@@ -116,9 +116,9 @@ When ownership areas shift, new hotspots appear, or validation commands change, 
 
 Run before declaring completion:
 
-1. Prefer `uv sync --frozen --group dev` once (root workspace + committed `uv.lock`). Transitional fallback: `pip install -r requirements-ci.txt`.
+1. Prefer `uv sync --frozen --all-packages --group dev` once (root workspace + committed `uv.lock`). Transitional fallback: `pip install -r requirements-ci.txt`.
 2. `bash scripts/lint.sh` (or: `uv run ruff check .`, `uv run ruff format --check .`, `uv run ty check`, `python scripts/code_metrics.py`, `cargo fmt --manifest-path rust-engine/Cargo.toml -- --check`, `cargo clippy --manifest-path rust-engine/Cargo.toml --all-targets -- -D warnings`). Ruff/ty config is in root `pyproject.toml`. **File caps:** new production files ≤800 lines; existing files must not cross 1000 unless allowlisted in `scripts/metrics/baseline.json` (allowlisted files must not grow). Function complexity: ruff `C901` (max 20) and clippy `too_many_lines` (threshold 120). See `CONTRIBUTING.md`.
-3. `uv run pytest python-shim/tests static-planner/tests benchmarks/tests` (from repo root; `pytest.ini` adds `python-shim/src`, `static-planner/src`, and `.` to `PYTHONPATH`). `python -m pytest …` is fine once `.venv` is on `PATH`. Also `uv run pytest -m airtight` for concurrent-state invariants.
+3. `uv run pytest python-shim/tests static-planner/tests ironflow-mcp/tests benchmarks/tests` (from repo root; `pytest.ini` adds `python-shim/src`, `static-planner/src`, `ironflow-mcp/src`, and `.` to `PYTHONPATH`). Prefer `uv sync --frozen --all-packages --group dev` so workspace packages (including `ironflow-mcp`) are installed. `python -m pytest …` is fine once `.venv` is on `PATH`. Also `uv run pytest -m airtight` for concurrent-state invariants.
 4. `cargo test --manifest-path rust-engine/Cargo.toml`
 5. After any significant change/refactor/new feature, run a deterministic perf check to guard against regressions:
    - Fast local gate: `uv run python benchmarks/perf_matrix.py run --preset lite --repetitions 1 --warmups 0 --jobs 2`
@@ -254,7 +254,7 @@ This repo commits `.cursor/environment.json` with:
 
 That **update/install** script (idempotent) runs on each new agent boot:
 
-1. Ensure **uv**, then `IRONFLOW_SKIP_NATIVE_BUILD=1 uv sync --frozen --group dev` (committed `uv.lock`; puts `.venv/bin` ahead on `PATH`)
+1. Ensure **uv**, then `IRONFLOW_SKIP_NATIVE_BUILD=1 uv sync --frozen --all-packages --group dev` (committed `uv.lock`; puts `.venv/bin` ahead on `PATH`)
 2. `npm --prefix frontend ci`
 3. `cargo build --manifest-path rust-engine/Cargo.toml`
 4. `bash scripts/setup_code_review_graph.sh` (installs CRG via pip/`requirements-agent.txt`, builds `.code-review-graph/`, verifies MCP tool calls)
@@ -271,7 +271,7 @@ Standard commands live in `CONTRIBUTING.md` (checkout, tests, lint, docs) and **
 Non-obvious caveats for this environment:
 
 - **Prefer `uv run …` or the synced `.venv`** for app/test tools (`pytest`, `ruff`, `ty`, `uvicorn`).
-  `uv sync --frozen --group dev` is the primary install path. Transitional:
+  `uv sync --frozen --all-packages --group dev` is the primary install path. Transitional:
   `pip install -r requirements-ci.txt` still works. The cloud-install script tries to
   symlink `python` → `python3` when missing. There is no conda on Cloud. CRG and
   other agent extras may still use `pip` with `--break-system-packages` into

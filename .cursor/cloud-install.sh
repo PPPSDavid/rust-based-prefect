@@ -21,10 +21,11 @@ if ! command -v uv >/dev/null 2>&1; then
   export PATH="${HOME}/.local/bin:${PATH}"
 fi
 
-echo "[cloud-install] Python deps (uv sync --frozen) ..."
+echo "[cloud-install] Python deps (uv sync --frozen --all-packages) ..."
 # App/test deps come from the committed uv.lock + [dependency-groups].dev.
-# Workspace packages stay on pytest.ini pythonpath; skip native build during sync.
-IRONFLOW_SKIP_NATIVE_BUILD=1 uv sync --frozen --group dev
+# --all-packages installs workspace members (python-shim, static-planner, ironflow-mcp).
+# Skip native build during sync (Rust build is a separate step below).
+IRONFLOW_SKIP_NATIVE_BUILD=1 uv sync --frozen --all-packages --group dev
 export PATH="${ROOT}/.venv/bin:${PATH}"
 
 echo "[cloud-install] Frontend deps ..."
