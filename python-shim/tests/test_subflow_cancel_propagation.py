@@ -5,12 +5,12 @@ from __future__ import annotations
 import threading
 import time
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from prefect_compat import InMemoryControlPlane, deployment_ref, flow, set_control_plane
 from prefect_compat.cancellation import FlowRunCancelled, sleep_cancelable
-from prefect_compat.runtime import RunState
+from prefect_compat.runtime import RunState, SetStateResult
 from prefect_compat.worker import run_worker_loop
 
 
@@ -215,6 +215,86 @@ def test_cancel_during_inline_child_startup_raises_cancelled(tmp_path: Path) -> 
 
     child_run = next(f for f in plane._flows.values() if f.name == "child")
     assert child_run.state == RunState.CANCELLED
+
+
+def test_stale_cancel_version_conflict_raises_cancelled(tmp_path: Path) -> None:
+    """A cancel that loses expected_version=2 to a newer CANCELLED commit raises FlowRunCancelled."""
+    plane = _plane(tmp_path)
+    set_control_plane(plane)
+    real_set_flow_state = plane.set_flow_state
+
+    def set_flow_state(
+        run_id: UUID,
+        to_state: RunState,
+        transition_token: UUID,
+        transition_kind: str,
+        expected_version: int | None = None,
+    ) -> SetStateResult:
+        if transition_kind == "cancel" and expected_version == 2:
+            real_set_flow_state(run_id, RunState.CANCELLED, uuid4(), "parent_cancel")
+        return real_set_flow_state(
+            run_id,
+            to_state,
+            transition_token,
+            transition_kind,
+            expected_version,
+        )
+
+    plane.set_flow_state = set_flow_state  # ty: ignore[invalid-assignment]
+
+    @flow
+    def child() -> None:
+        raise FlowRunCancelled("observed parent cancel")
+
+    with pytest.raises(FlowRunCancelled):
+        child()
+
+    child_run = next(f for f in plane._flows.values() if f.name == "child")
+    assert child_run.state == RunState.CANCELLED
+    assert child_run.version == 3
+    kinds = [
+        event["kind"]
+        for event in plane._events
+        if event.get("run_id") == str(child_run.run_id)
+    ]
+    assert "parent_cancel" in kinds
+    assert kinds.count("cancel") == 0
+
+
+def test_stale_cancel_version_conflict_other_state_raises(tmp_path: Path) -> None:
+    """A version conflict that leaves any state other than CANCELLED still raises."""
+    plane = _plane(tmp_path)
+    set_control_plane(plane)
+    real_set_flow_state = plane.set_flow_state
+
+    def set_flow_state(
+        run_id: UUID,
+        to_state: RunState,
+        transition_token: UUID,
+        transition_kind: str,
+        expected_version: int | None = None,
+    ) -> SetStateResult:
+        if transition_kind == "cancel" and expected_version == 2:
+            real_set_flow_state(run_id, RunState.COMPLETED, uuid4(), "complete")
+        return real_set_flow_state(
+            run_id,
+            to_state,
+            transition_token,
+            transition_kind,
+            expected_version,
+        )
+
+    plane.set_flow_state = set_flow_state  # ty: ignore[invalid-assignment]
+
+    @flow
+    def child() -> None:
+        raise FlowRunCancelled("observed parent cancel")
+
+    with pytest.raises(ValueError, match="version conflict"):
+        child()
+
+    child_run = next(f for f in plane._flows.values() if f.name == "child")
+    assert child_run.state == RunState.COMPLETED
 
 
 def test_cancel_mirrors_surrogate_subflow_task(tmp_path: Path) -> None:
