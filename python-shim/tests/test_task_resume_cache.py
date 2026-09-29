@@ -302,7 +302,11 @@ def test_cache_hit_does_not_refire_transition_hooks(tmp_path: Path) -> None:
 
 
 def test_deployment_cancel_mid_run_then_retry_skips(tmp_path: Path) -> None:
-    """Cancel while RUNNING, then retry — eligible completed tasks skip."""
+    """Cancel a still-RUNNING flow after expensive is COMPLETED, then retry.
+
+    The body counter is not a cache entry. Cancel only once that task row is
+    COMPLETED so a remembered value skips; ``slow`` still recomputes.
+    """
     plane = _plane(tmp_path, "deploy-cancel-retry")
     calls = {"setup": 0, "expensive": 0, "slow": 0}
     entered_slow = threading.Event()
@@ -362,6 +366,21 @@ def test_deployment_cancel_mid_run_then_retry_skips(tmp_path: Path) -> None:
             break
         time.sleep(0.05)
     assert flow_run_id is not None
+    # calls["expensive"] increments before task_completed. A CANCELLED row is
+    # recomputed; wait until the row itself is COMPLETED, then cancel.
+    deadline = time.monotonic() + 5.0
+    expensive_completed = False
+    while time.monotonic() < deadline:
+        expensive_completed = any(
+            task.task_name == "expensive"
+            and task.flow_run_id == flow_run_id
+            and task.state == RunState.COMPLETED
+            for task in plane._tasks.values()
+        )
+        if expensive_completed:
+            break
+        time.sleep(0.02)
+    assert expensive_completed
     cancelled = plane.cancel_flow_run(flow_run_id)
     assert cancelled["state"] == "CANCELLED"
     t.join(timeout=5.0)
