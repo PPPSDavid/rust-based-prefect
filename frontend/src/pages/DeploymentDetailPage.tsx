@@ -8,6 +8,7 @@ import { DeploymentSchedulePanel } from "../components/DeploymentSchedulePanel";
 import { PageHeader } from "../components/PageHeader";
 import { QuickRunModal } from "../components/QuickRunModal";
 import { StateBadge } from "../components/StateBadge";
+import { useQuickRunLaunch } from "../hooks/useQuickRunLaunch";
 
 export function DeploymentDetailPage() {
   const { id = "" } = useParams();
@@ -27,15 +28,7 @@ export function DeploymentDetailPage() {
     mutationFn: (paused: boolean) => api.patchDeployment(id, { paused }),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["deployment", id] })
   });
-  const trigger = useMutation({
-    mutationFn: (payload?: { parameters?: Record<string, unknown>; idempotency_key?: string }) =>
-      api.triggerDeploymentRun(id, payload),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["deployment-runs", id] });
-      void queryClient.invalidateQueries({ queryKey: ["flow-runs"] });
-      setShowQuickRun(false);
-    }
-  });
+  const quick = useQuickRunLaunch(() => setShowQuickRun(false));
 
   if (deployment.isLoading) return <p>Loading deployment...</p>;
   if (!deployment.data) return <p>Deployment not found.</p>;
@@ -56,7 +49,7 @@ export function DeploymentDetailPage() {
             <ActionButton onClick={() => togglePause.mutate(!dep.paused)}>
               {dep.paused ? "Resume" : "Pause"}
             </ActionButton>
-            <ActionButton variant="primary" disabled={dep.paused} onClick={() => setShowQuickRun(true)}>
+            <ActionButton variant="primary" disabled={dep.paused || quick.launch.isPending} onClick={() => setShowQuickRun(true)}>
               Quick Run
             </ActionButton>
           </>
@@ -98,11 +91,13 @@ export function DeploymentDetailPage() {
         <QuickRunModal
           deploymentName={dep.name}
           defaultParameters={dep.default_parameters}
-          isPending={trigger.isPending}
+          isPending={quick.launch.isPending}
           onClose={() => setShowQuickRun(false)}
-          onSubmit={(payload) => trigger.mutate(payload)}
+          onSubmit={(payload) => quick.launch.mutate({ deploymentId: id, payload })}
         />
       ) : null}
+      {quick.notice ? <p className="form-error">{quick.notice}</p> : null}
+      {quick.launch.isError ? <p className="form-error">Failed to start deployment run.</p> : null}
     </section>
   );
 }

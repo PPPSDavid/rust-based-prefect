@@ -71,8 +71,8 @@ Last updated: 2026-09-04.
 **Current behavior:**
 
 - **Cancel** (`POST /api/flow-runs/{id}/cancel`): `CANCELLED` + in-flight task rows cancelled; records `lifecycle_action=cancel`, `interrupt_mode=terminate`. Under **`ProcessPoolTaskRunner`**, registered children get SIGTERM→grace→SIGKILL (`process_workers.py`). Thread-pool bodies remain cooperative-only. User guide: **`docs/how-to/cancel-pause-resume.md`**.
-- **Pause** (`POST …/pause` with required `mode=drain|terminate`): drain blocks new starts and settles `PAUSED`; terminate cancels RUNNING rows then kills process workers and holds `PAUSED`. Resume is operator-pause only (`POST …/resume`) — after terminate, in-process runs call `prepare_resume` (P1) and terminalize the prior attempt; deployment-backed use retry-with-`resume_from`. Plan: `docs/plans/flow-run-lifecycle-control.md`.
-- **Retry** (`POST /api/flow-runs/{id}/retry`): for deployment-backed runs, triggers a **new** deployment run → **new** flow run with **`resume_from_flow_run_id`**. Eligible completed tasks may skip (see below).
+- **Pause** (`POST …/pause` with required `mode=drain|terminate`): drain blocks new starts and settles `PAUSED`; terminate cancels RUNNING rows then kills process workers and holds `PAUSED`. Resume is operator-pause only (`POST …/resume`) — after terminate, in-process runs call `prepare_resume` (P1) and terminalize the prior attempt; deployment-backed resume retries **this** flow run. Plan: `docs/plans/flow-run-lifecycle-control.md`.
+- **Retry** (`POST /api/flow-runs/{id}/retry`): deployment-backed runs reopen **this** flow run id (`retry_reopen` → `PENDING`) and queue a deployment run bound to that id. Completed tasks may skip. Quick Run still creates a new flow run. `409` when the run has no deployment.
 
 **Task resume (Phase 1 — landed):**
 

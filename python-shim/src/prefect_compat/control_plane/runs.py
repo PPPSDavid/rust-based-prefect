@@ -16,7 +16,7 @@ from .types import (
     TaskRunRecord,
 )
 from .types import (
-    legacy_is_valid_transition as _legacy_is_valid_transition,
+    flow_transition_allowed as _flow_transition_allowed,
 )
 
 
@@ -329,13 +329,20 @@ class RunsMixin:
     def next_planned_node_id(self, flow_run_id: UUID, task_name: str) -> str | None:
         with self._lock:
             reserved = self._reserved_planned_ids.setdefault(flow_run_id, set())
-            task_run_used = {
-                str(task.planned_node_id)
-                for task in self._tasks.values()
-                if task.flow_run_id == flow_run_id and task.planned_node_id
-            }
-            taken = reserved | task_run_used
             flow = self._flows.get(flow_run_id)
+            # Same-run retry walks the manifest again; completed nodes are skipped
+            # later, so prior task rows must not consume those planned ids.
+            ignore_prior = flow is not None and flow.same_run_retry
+            task_run_used = (
+                set()
+                if ignore_prior
+                else {
+                    str(task.planned_node_id)
+                    for task in self._tasks.values()
+                    if task.flow_run_id == flow_run_id and task.planned_node_id
+                }
+            )
+            taken = reserved | task_run_used
             static_mode = flow is not None and flow.effective_graph_mode == "static"
 
             by_task = self._manifest_by_task.get(flow_run_id)
@@ -511,7 +518,7 @@ class RunsMixin:
                     f"version conflict expected={expected_version} actual={record.version}"
                 )
 
-            if not _legacy_is_valid_transition(record.state, to_state):
+            if not _flow_transition_allowed(record.state, to_state, transition_kind):
                 raise ValueError(f"invalid transition {record.state} -> {to_state}")
 
             self._tokens.add(transition_token)

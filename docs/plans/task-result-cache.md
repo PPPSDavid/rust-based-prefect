@@ -23,7 +23,7 @@ Today:
 
 - Task return values live only in-process on `TaskFuture.value`.
 - Completion writes an artifact row with event metadata (`task_name`), **not** the return value.
-- Deployment **retry** creates a **new** deployment run → **new** flow run and re-executes every task (`retry_flow_run` → `trigger_deployment_run`).
+- Deployment **retry** reopens the same flow run (see `docs/how-to/task-resume-and-persist.md`). Sections below that say retry allocates a new `flow_run_id` describe the older cross-run design; in-process `prepare_resume` still does that.
 - There is no task-result store, no cache key API, and no resume lineage between retries.
 
 Two different user goals get conflated under “caching”:

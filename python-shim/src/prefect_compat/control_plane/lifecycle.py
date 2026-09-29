@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import json
 from typing import Any
 from uuid import UUID, uuid4
 
+from ..same_run_retry import schedule_same_run_retry
 from .types import (
     LIFECYCLE_LOG as _LIFECYCLE_LOG,
 )
@@ -220,8 +220,8 @@ class LifecycleMixin:
         """Resume an operator-paused flow run (not gate-only PAUSED).
 
         After **terminate** pause:
-        - deployment-backed runs → ``retry_flow_run`` (new attempt with P1
-          ``resume_from`` so COMPLETED skips and interrupted tasks re-run)
+        - deployment-backed runs → ``retry_flow_run`` (same flow run id; COMPLETED
+          tasks skip and interrupted tasks re-run)
         - in-process → ``prepare_resume`` so the next ``@flow()`` invoke skips
           completed nodes
 
@@ -361,6 +361,17 @@ class LifecycleMixin:
         key = str(flow_run_id)
         if lifecycle_action is None and interrupt_mode is None:
             self._lifecycle_by_flow.pop(key, None)
+            # Persist the clear so a later replay does not restore a cancel/pause hold.
+            self._persist_record(
+                {
+                    "record_type": "flow_lifecycle",
+                    "flow_run_id": key,
+                    "lifecycle_action": None,
+                    "interrupt_mode": None,
+                    "pause_drain_pending": False,
+                    "lifecycle_summary": None,
+                }
+            )
             return
         entry = {
             "lifecycle_action": lifecycle_action,
@@ -491,22 +502,5 @@ class LifecycleMixin:
         return refreshed
 
     def retry_flow_run(self, flow_run_id: UUID) -> dict[str, Any]:
-        rows = self._query_rows(
-            """
-            SELECT deployment_id, requested_parameters
-            FROM deployment_runs
-            WHERE flow_run_id = ?
-            ORDER BY created_at DESC
-            LIMIT 1
-            """,
-            [str(flow_run_id)],
-        )
-        if not rows:
-            raise ValueError("flow run is not deployment-backed")
-        deployment_id = UUID(str(rows[0]["deployment_id"]))
-        requested = json.loads(rows[0]["requested_parameters"] or "{}")
-        return self.trigger_deployment_run(
-            deployment_id,
-            parameters=requested,
-            resume_from_flow_run_id=flow_run_id,
-        )
+        """Re-attempt a deployment-backed run under the same flow run id."""
+        return schedule_same_run_retry(self, flow_run_id)

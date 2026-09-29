@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { formatTaskResult, parseTaskResultSummary } from "../artifactResult";
 import { ActionButton } from "../components/ActionButton";
@@ -8,13 +8,17 @@ import { PageHeader } from "../components/PageHeader";
 import { RunDagPanel } from "../components/RunDagPanel";
 import { StateBadge } from "../components/StateBadge";
 import { TabBar } from "../components/TabBar";
+import { idempotencyReplayNote } from "../followNewFlowRun";
 import { useSsePulse } from "../hooks/useSsePulse";
 import {
   canPauseRun,
   canResumeRun,
+  canRetryRun,
   formatRunDuration,
   isGatePaused,
   isOperatorPause,
+  RETRY_UNAVAILABLE_NOTE,
+  showRetryUnavailableNote,
   taskOutcomeLabel
 } from "../runLifecycle";
 import type { ArtifactRecord, FlowRunDag, LogRecord, TaskRun } from "../types";
@@ -31,7 +35,6 @@ const TABS = [
 ];
 
 const CANCELLABLE = new Set(["SCHEDULED", "PENDING", "RUNNING"]);
-const RETRYABLE = new Set(["FAILED", "CANCELLED"]);
 
 function TaskFailureDetail({ task }: { task: TaskRun }) {
   if (task.state !== "FAILED" || (!task.error && !task.traceback)) return null;
@@ -59,6 +62,7 @@ function LogLine({ log }: { log: LogRecord }) {
 
 export function RunDetailPage() {
   const { id = "" } = useParams();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const initialTab = (searchParams.get("tab") as Tab | null) ?? "tasks";
   const [tab, setTab] = useState<Tab>(initialTab);
@@ -149,9 +153,7 @@ export function RunDetailPage() {
     onSuccess: (payload) => {
       const via = (payload as { resumed_via?: string }).resumed_via;
       setActionMessage(
-        via === "retry_after_terminate"
-          ? "Resume scheduled a new deployment attempt."
-          : "Run resumed."
+        via === "retry_after_terminate" ? "Resuming this run." : "Run resumed."
       );
       void queryClient.invalidateQueries({ queryKey: ["flow-run", id] });
       void queryClient.invalidateQueries({ queryKey: ["flow-runs"] });
@@ -160,11 +162,13 @@ export function RunDetailPage() {
   });
   const retryRun = useMutation({
     mutationFn: () => api.retryFlowRun(id),
-    onSuccess: () => {
-      setActionMessage("Retry scheduled from deployment.");
-      void queryClient.invalidateQueries({ queryKey: ["flow-runs"] });
+    onSuccess: (payload) => {
+      setActionMessage("Retrying this run.");
+      queryClient.setQueryData(["flow-run", id], payload);
+      void queryClient.invalidateQueries({ queryKey: ["flow-run", id] });
+      void queryClient.invalidateQueries({ queryKey: ["task-runs", id] });
     },
-    onError: () => setActionMessage("Retry is only available for deployment-backed runs.")
+    onError: () => setActionMessage("Could not retry this run.")
   });
 
   useEffect(() => {
@@ -218,6 +222,7 @@ export function RunDetailPage() {
     return log.message.toLowerCase().includes(q) || (log.task_run_id ?? "").toLowerCase().includes(q);
   });
   const parameters = run.data.parameters;
+  const replayNote = idempotencyReplayNote(location.state);
 
   return (
     <section>
@@ -255,14 +260,16 @@ export function RunDetailPage() {
                 Cancel
               </ActionButton>
             ) : null}
-            {RETRYABLE.has(run.data.state) ? (
+            {canRetryRun(run.data) ? (
               <ActionButton variant="primary" disabled={retryRun.isPending} onClick={() => retryRun.mutate()}>
-                Retry
+                {retryRun.isPending ? "Retrying…" : "Retry"}
               </ActionButton>
             ) : null}
           </>
         }
       />
+      {showRetryUnavailableNote(run.data) ? <p className="muted">{RETRY_UNAVAILABLE_NOTE}</p> : null}
+      {replayNote ? <p className="muted">{replayNote}</p> : null}
       <p>
         <StateBadge state={run.data.state} /> · version {run.data.version} · created{" "}
         {new Date(run.data.created_at).toLocaleString()} · updated {new Date(run.data.updated_at).toLocaleString()} ·

@@ -67,7 +67,7 @@ Resume cache hits still emit control-plane `PENDING` / `RUNNING` / `COMPLETED` e
 
 **Deployment-backed retry (UI / API):**
 
-`POST /api/flow-runs/{id}/retry` creates a new deployment run with `resume_from_flow_run_id` set to the cancelled/failed run. Eligible completed tasks skip when the worker re-executes the flow with the **same** resolved parameters.
+`POST /api/flow-runs/{id}/retry` reopens **that** flow run (`FAILED`, `CANCELLED`, or `COMPLETED`, and operator-pause resume). The response is the same flow run, moved back to `PENDING` (or `RUNNING` when resuming a pause). Completed tasks are skipped when the static contract matches. On this same-run path a JSON-safe return value can be reused even without `persist_result=True`. A run that was not created by a deployment returns `409`. Quick Run (`POST /api/deployments/{id}/run`) is a different action: it creates a new flow run.
 
 **In-process (tests / scripts):**
 

@@ -28,6 +28,25 @@ async function waitForDeploymentFlowRun(
   throw new Error(`Timed out waiting for deployment run ${deploymentRunId} to reach ${desiredState}`);
 }
 
+async function waitForFlowRunState(
+  request: import("@playwright/test").APIRequestContext,
+  flowRunId: string,
+  desiredState: string,
+  timeoutMs = 60_000
+) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const flowRes = await request.get(`${API}/api/flow-runs/${flowRunId}`);
+    expect(flowRes.ok()).toBeTruthy();
+    const flowRun = (await flowRes.json()) as { id: string; state: string };
+    if (flowRun.state === desiredState) {
+      return flowRun;
+    }
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  throw new Error(`Timed out waiting for flow run ${flowRunId} to reach ${desiredState}`);
+}
+
 test.describe("cancel and retry workflow", () => {
   test.setTimeout(120_000);
 
@@ -72,18 +91,20 @@ test.describe("cancel and retry workflow", () => {
     await retryButton.click();
     const retryResult = await retryResponse;
     expect(retryResult.ok()).toBeTruthy();
-    await expect(page.getByText("Retry scheduled from deployment.")).toBeVisible();
+    const retryBody = (await retryResult.json()) as { id: string };
+    expect(retryBody.id).toBe(running.flowRunId);
+    await expect(page.getByText("Retrying this run.")).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`/runs/${running.flowRunId}$`));
 
-    const retryDeploymentRunId = (await retryResult.json()).id as string;
-    const completed = await waitForDeploymentFlowRun(request, retryDeploymentRunId, "COMPLETED", 60_000);
-
-    await page.goto(`/runs/${completed.flowRunId}`);
+    const completed = await waitForFlowRunState(request, running.flowRunId, "COMPLETED", 60_000);
+    expect(completed.id).toBe(running.flowRunId);
     await expect(page.locator(".badge-completed")).toBeVisible({ timeout: 15_000 });
+    await expect(page).toHaveURL(new RegExp(`/runs/${running.flowRunId}$`));
 
-    const tasksAfterRetry = await request.get(`${API}/api/flow-runs/${completed.flowRunId}/task-runs?limit=20`);
+    const tasksAfterRetry = await request.get(`${API}/api/flow-runs/${running.flowRunId}/task-runs?limit=20`);
     const retryTasks = (await tasksAfterRetry.json()).items as Array<{ task_name: string; state: string }>;
-    expect(retryTasks.find((t) => t.task_name === "inc")?.state).toBe("COMPLETED");
-    expect(retryTasks.find((t) => t.task_name === "sleep_seconds")?.state).toBe("COMPLETED");
-    expect(retryTasks.find((t) => t.task_name === "dbl")?.state).toBe("COMPLETED");
+    expect(retryTasks.filter((t) => t.task_name === "inc" && t.state === "COMPLETED")).toHaveLength(1);
+    expect(retryTasks.some((t) => t.task_name === "sleep_seconds" && t.state === "COMPLETED")).toBeTruthy();
+    expect(retryTasks.some((t) => t.task_name === "dbl" && t.state === "COMPLETED")).toBeTruthy();
   });
 });

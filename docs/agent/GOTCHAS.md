@@ -13,4 +13,4 @@
 - **ruff + ty:** CI gates on `python -m ruff check .` and `python -m ty check` (see root `pyproject.toml`).
 - **Parity claims:** update `COMPATIBILITY.md` + tests; never imply full Prefect parity casually.
 - **Hotspots:** treat `server.py`, public `__init__.py`, root `pytest.ini`, Cargo/pyproject lockfiles as single-writer.
-- **Cancel/retry:** deployment retry starts a **new** flow run with **resume lineage**. Eligible completed tasks (`None` or `@task(persist_result=True)` JSON payloads) can skip; otherwise tasks recompute. Not full Prefect task-resume / `cache_policy` parity — see `docs/how-to/task-resume-and-persist.md` and MEMORY_BANK.
+- **Cancel/retry:** deployment Retry reopens **this** flow run id. Completed tasks can skip (same-run path also reuses JSON-safe values without `persist_result`). Quick Run creates a new flow run. Not full Prefect task-resume / `cache_policy` parity — see `docs/how-to/task-resume-and-persist.md` and MEMORY_BANK.

@@ -47,7 +47,7 @@ If the manifest fingerprint changes on retry (code edit), **`contract_mismatch=t
 When **`effective=dynamic`**:
 
 - `resume_skips_enabled=false` always.
-- Retry creates a new flow run and **re-executes all tasks** — no cross-attempt task reuse assumptions.
+- Deployment retry still uses the same `flow_run_id` and **re-executes all tasks** — dynamic mode does not reuse completed results.
 
 Use **`graph_mode="dynamic"`** when you know runtime branches the planner cannot see, or when you prefer simplicity over skip optimization.
 

@@ -41,7 +41,7 @@ Monotonic `seq` in storage backs cursors.
 | `POST` | `/api/flow-runs/{flow_run_id}/cancel` | Cancel (terminate semantics; process workers SIGTERM→SIGKILL when registered) |
 | `POST` | `/api/flow-runs/{flow_run_id}/pause` | Operator pause — **requires** JSON `{"mode":"drain"}` or `{"mode":"terminate"}` (`422` if missing/invalid). Not for gate-only `PAUSED`. |
 | `POST` | `/api/flow-runs/{flow_run_id}/resume` | Resume an operator pause only (`400` for gate-only pause). See **[cancel / pause / resume](../how-to/cancel-pause-resume.md)**. |
-| `POST` | `/api/flow-runs/{flow_run_id}/retry` | Retry deployment-backed runs (`409` otherwise). New run carries resume lineage so eligible completed tasks may skip — see **[task resume how-to](../how-to/task-resume-and-persist.md)**. |
+| `POST` | `/api/flow-runs/{flow_run_id}/retry` | Retry a deployment-created run in place (`409` when it has no deployment). Response is **this** flow run. Completed tasks may skip — see **[task resume how-to](../how-to/task-resume-and-persist.md)**. Quick Run is `POST /api/deployments/{id}/run` and creates a new flow run. |
 
 ## Flows and tasks (registry)
 

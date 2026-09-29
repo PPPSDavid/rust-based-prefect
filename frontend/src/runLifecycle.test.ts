@@ -3,9 +3,12 @@ import type { FlowRun } from "./types";
 import {
   canPauseRun,
   canResumeRun,
+  canRetryRun,
   formatRunDuration,
   isGatePaused,
   isOperatorPause,
+  RETRY_UNAVAILABLE_NOTE,
+  showRetryUnavailableNote,
   taskOutcomeLabel
 } from "./runLifecycle";
 
@@ -54,6 +57,20 @@ describe("runLifecycle", () => {
     expect(taskOutcomeLabel({ cacheHit: false, isResumeAttempt: false, state: "COMPLETED" })).toBe(
       null
     );
+  });
+
+  it("shows Retry only for deployment-created terminal runs", () => {
+    for (const state of ["FAILED", "CANCELLED", "COMPLETED"] as const) {
+      expect(canRetryRun(run({ state, deployment_id: "dep-1" }))).toBe(true);
+      expect(showRetryUnavailableNote(run({ state, deployment_id: "dep-1" }))).toBe(false);
+      expect(canRetryRun(run({ state }))).toBe(false);
+      expect(showRetryUnavailableNote(run({ state }))).toBe(true);
+    }
+    expect(RETRY_UNAVAILABLE_NOTE).toMatch(/not started from a deployment/);
+    const running = run({ state: "RUNNING", deployment_id: "dep-1" });
+    expect(canRetryRun(running)).toBe(false);
+    expect(showRetryUnavailableNote(running)).toBe(false);
+    expect(canPauseRun(running)).toBe(true);
   });
 
   it("formats created-to-updated duration", () => {

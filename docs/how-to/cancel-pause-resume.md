@@ -55,7 +55,7 @@ In the UI the DAG shows the in-flight node **CANCELLED** and downstream work **N
 
 | Path | Behavior |
 | --- | --- |
-| **Deployment-backed** | `resume` → `retry` with `resume_from_flow_run_id` (new attempt; P1 skip/recompute rules). |
+| **Deployment-backed** | `resume` → retry of **this** flow run (completed tasks skip; interrupted tasks re-run). |
 | **In-process** | `resume` → `prepare_resume` for the **next** `@flow()` invoke; prior attempt is terminalized `CANCELLED` (`superseded_by_terminate_resume`) so it is not left zombie `RUNNING`. |
 
 Interrupted / cancelled-in-flight tasks **re-run**. Eligible `COMPLETED` nodes skip when params + inputs still match (`None` auto or `@task(persist_result=True)`). See **[How to resume tasks and persist results](task-resume-and-persist.md)**.

@@ -118,6 +118,62 @@ describe("RunDetailPage", () => {
     expect(screen.getByRole("button", { name: "Pause (terminate)" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Resume" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+  });
+
+  it("hides Retry when the run was not created by a deployment", async () => {
+    renderPage();
+    expect(await screen.findByRole("heading", { name: "mapped_flow" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+    expect(
+      screen.getByText("This run was not started from a deployment, so it cannot be retried.")
+    ).toBeInTheDocument();
+  });
+
+  it("retries a failed deployment run in place", async () => {
+    const { api } = await import("../api");
+    vi.mocked(api.getFlowRun).mockResolvedValue({
+      id: "run-failed",
+      name: "failed_flow",
+      state: "FAILED",
+      version: 4,
+      deployment_id: "dep-1",
+      created_at: "2026-04-15T21:00:00+00:00",
+      updated_at: "2026-04-15T21:00:01+00:00"
+    });
+    vi.mocked(api.retryFlowRun).mockResolvedValue({
+      id: "run-failed",
+      name: "failed_flow",
+      state: "PENDING",
+      version: 5,
+      deployment_id: "dep-1",
+      created_at: "2026-04-15T21:00:00+00:00",
+      updated_at: "2026-04-15T21:00:02+00:00"
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/runs/run-failed"]}>
+          <Routes>
+            <Route path="/runs/:id" element={<RunDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+    expect(await screen.findByRole("heading", { name: "failed_flow" })).toBeInTheDocument();
+    const retry = screen.getByRole("button", { name: "Retry" });
+    retry.click();
+    expect(await screen.findByText("Retrying this run.")).toBeInTheDocument();
+    expect(api.retryFlowRun).toHaveBeenCalledWith("run-failed");
+    expect(screen.queryByText("Retry scheduled from deployment.")).not.toBeInTheDocument();
+    vi.mocked(api.getFlowRun).mockResolvedValue({
+      id: "run-1",
+      name: "mapped_flow",
+      state: "COMPLETED",
+      version: 3,
+      created_at: "2026-04-15T21:00:00+00:00",
+      updated_at: "2026-04-15T21:00:01+00:00"
+    });
   });
 
   it("labels skipped cache hits on a resume attempt", async () => {

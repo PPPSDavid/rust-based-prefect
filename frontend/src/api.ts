@@ -68,7 +68,7 @@ export const api = {
   resumeFlowRun: (id: string) =>
     readJson<FlowRun>(`${base}/api/flow-runs/${id}/resume`, { method: "POST" }),
   retryFlowRun: (id: string) =>
-    readJson<DeploymentRun>(`${base}/api/flow-runs/${id}/retry`, { method: "POST" }),
+    readJson<FlowRun>(`${base}/api/flow-runs/${id}/retry`, { method: "POST" }),
   listTaskRuns: (id: string) =>
     readJson<CursorPage<TaskRun>>(`${base}/api/flow-runs/${id}/task-runs?limit=500`),
   listLogs: (id: string, params?: { task_run_id?: string; level?: string }) =>
